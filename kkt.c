@@ -12,7 +12,7 @@
 // [ A           0    0          ],
 // [ W^{-T}*GG   0   -I          ] 
 //    
-// given H, Df, W, where GG = [Df; G], and (2) compute solution for 
+// given H, Df, W, where GG' = [Df; G], and (2) compute solution for 
 //    
 //  [ H     A'   GG'   ]   [ ux ]   [ bx ]
 //  [ A     0    0     ] * [ uy ] = [ by ].
@@ -26,11 +26,17 @@ static
 int ldl_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matrix_t *Df)
 {
     cvx_ldlsolver_t *ldl = &S->u.ldl;
-    cvx_size_t r, c, rA, cA;
+    cvx_conelp_problem_t *cp = S->cp;
+    cvx_size_t rG, cG;
     cvx_matrix_t Kt, colvec, g0;
+    cvx_matgrp_t col_g;
     
+    //printf("mnl: %d\n", ldl->mnl);
+    cvxm_size(&rG, &cG, cp->G);
+
     ldl->W = W;
-    cvxm_zero(&ldl->K, CVX_LOWER);
+    // TODO: only the LOWER triangular part?
+    cvxm_mkconst(&ldl->K, 0.0);
     if (H) {
         // H is symmetric matrix; copy only the lower triangular part
         cvxm_view_map(&Kt, &ldl->K, 0, 0, ldl->n, ldl->n);
@@ -42,6 +48,7 @@ int ldl_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matrix
     
     // copy scaled [Df; G].T to K ; column by column
     for (int k = 0; k < ldl->n; k++) {
+        // g is (mnl + G.Rows(), 1) matrix, Df is (mnl, n), G is (N, n)
         if (ldl->mnl > 0) {
             // copy Df column; Df is mnl-by-n matrix
             cvxm_view_map(&colvec, Df, 0, k, ldl->mnl, 1);
@@ -49,21 +56,32 @@ int ldl_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matrix
             cvxm_copy(&g0, &colvec, 0);
             // unmap view? no write-back
         }
-        cvxm_view_map(&colvec, ldl->G, 0, k, n, 1);
-        cvxm_view_map(&g0, &ldl->g, ldl->mnl, 0, ldl->n, 1);
+        cvxm_view_map(&colvec, ldl->G, 0, k, rG, 1);
+        cvxm_view_map(&g0, &ldl->g, ldl->mnl, 0, rG, 1);
         cvxm_copy(&g0, &colvec, 0);
+        // make it matrix group; like group on z vector
+        cvx_mgrp_init(&col_g, &g0, cp->z_g.index);
         // scale column; with W^-T
-        cvx_scale(&ldl->g, W, CVX_INV|CVX_TRANS);
+        cvx_scale(&col_g, W, CVX_INV|CVX_TRANS, &cp->work);
         // copy to K in packed storage;
-        cvx_pack(&ldl->K, &ldl->g, &ldl->dims, 0, k*ldl->ldK + ldl->n + ldl->p, ldl->mnl);
+        cvxm_view_map(&colvec, &ldl->K, ldl->n+ldl->p, k, ldl->ldK-ldl->p-ldl->n, 1);
+        cvx_pack(&colvec, &g0, col_g.index);
     }
 
     // set trailing diagonal to -1
     for (int k = ldl->n + ldl->p; k < ldl->ldK; k++) {
         cvxm_set(&ldl->K, k, k, -1.0);
     }
-
-    return cvxm_ldlfactor(&ldl->K, ldl->ipiv, CVX_LOWER);
+    if (S->debug > 1) {
+        //fprintf(stderr, "pre-factoring K\n");
+        //cvxm_printf(stderr, "%6.3f", &ldl->K);
+    }
+    int err = cvxm_ldlfactor(&ldl->K, ldl->ipiv, CVX_LOWER, &ldl->work);
+    if (S->debug > 1) {
+        //fprintf(stderr, "LDL(K)\n");
+        //cvxm_printf(stderr, "%6.3f", &ldl->K);
+    }
+    return err;
 }
 
 // Solve
@@ -78,55 +96,72 @@ int ldl_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matrix
 // the solution ux, uy, W*uz.
 
 static
-int ldl_solve(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matrix_t *z)
+int ldl_solve(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_t *z_g)
 {
+    cvx_conelp_problem_t *cp = S->cp;
     cvx_ldlsolver_t *ldl = &S->u.ldl;
     cvx_matrix_t u0;
     int err = 0;
 
-    cvxm_view_map(&u0, u, 0, 0, ldl->n, 1);
-    cvxm_copy(&u0, x);
+    cvxm_view_map(&u0, &ldl->u, 0, 0, ldl->n, 1);
+    cvxm_copy(&u0, x, CVX_ALL);
 
-    cvxm_view_map(&u0, u, ldl->n, 0, ldl->p, 1);
-    cvxm_copy(&u0, y);
+    cvxm_view_map(&u0, &ldl->u, ldl->n, 0, ldl->p, 1);
+    cvxm_copy(&u0, y, CVX_ALL);
 
-    cvx_scale(z, ldl->W, CVX_INV|CVX_TRANS);
+    // map z part; scale and copy to temp result vector as packed
+    cvx_scale(z_g, ldl->W, CVX_INV|CVX_TRANS, &cp->work);
+    cvxm_view_map(&u0, &ldl->u, ldl->n+ldl->p, 0, ldl->ldK-ldl->p-ldl->n, 1);
+    cvxm_copy(&u0, z_g->mat, 0);
 
-    err = cvxm_ldlsolve(&ldl->u, &ldl->K, ldl->ipiv, CVX_LOWER);
+    //cvx_mat_printf(stdout, "%e", &ldl->u, "ldl solve u");
+    err = cvxm_ldlsolve(&ldl->u, &ldl->K, ldl->ipiv, CVX_LOWER, &ldl->work);
+    //printf("solution u\n"); cvxm_printf(stdout, "%8.5f", &ldl->u);
     
-    cvxm_view_map(&u0, u, 0, 0, ldl->n, 1);
-    cvxm_copy(x, &u0);
+    cvxm_view_map(&u0, &ldl->u, 0, 0, ldl->n, 1);
+    cvxm_copy(x, &u0, CVX_ALL);
 
-    cvxm_view_map(&u0, u, ldl->n, 0, ldl->p, 1);
-    cvxm_copy(y, &u0);
-    cvx_unpack(z, &ldl->u, ldl->dims, ldl->mnl, ldl->n + ldl->p);
+    cvxm_view_map(&u0, &ldl->u, ldl->n, 0, ldl->p, 1);
+    cvxm_copy(y, &u0,CVX_ALL);
+    // unpack z part to result vector
+    cvxm_view_map(&u0, &ldl->u, ldl->n+ldl->p, 0, ldl->ldK-ldl->p-ldl->n, 1);
+    cvx_unpack(z_g->mat, &u0, z_g->index);
     return err;
 }
 
-int cvx_ldlsolver_init(cvx_kktsolver_t *S, cvx_dims_t *dims, cvx_matrix_t *G, cvx_matrix_t *A, int mnl)
+//int cvx_ldlsolver_init(cvx_kktsolver_t *S, cvx_dims_t *dims, cvx_matrix_t *G, cvx_matrix_t *A, int mnl)
+void cvx_ldlsolver_init(cvx_kktsolver_t *S, cvx_conelp_problem_t *cp, cvx_dimset_t *dims, int mnl)
 {
     cvx_ldlsolver_t *ldl = &S->u.ldl;
     size_t ar, ac;
 
-    cvxm_size(&ar, &ac, A);
-    ldl->ldK = ar + ac + mnl +
-        cvx_dims_sum(dims, CVXDIM_LINEAR) +
-        cvx_dims_sum(dims, CVXDIM_SOCP) +
-        cvx_dims_sum_packed(dims, CVXDIM_SDP);
+    S->cp = cp;
+    cvxm_size(&ar, &ac, cp->A);
+    ldl->ldK = ar + ac +                                // space for H and A (H can be zeroes)
+        cvx_dimset_sum(dims, CVXDIM_NONLINEAR) +        // space for Df (can be zero)
+        cvx_dimset_sum(dims, CVXDIM_LINEAR) +           // rest is space for G
+        cvx_dimset_sum(dims, CVXDIM_SOCP) +
+        cvx_dimset_sum_packed(dims, CVXDIM_SDP);
+
     cvxm_init(&ldl->K, ldl->ldK, ldl->ldK);
     ldl->ipiv = (int *)calloc(ldl->ldK, sizeof(int));
     
     cvxm_init(&ldl->u, ldl->ldK, 1);
     cvxm_init(&ldl->g, ldl->ldK, 1);
 
+    int nelem = armas_d_bkfactor_work(&ldl->K, (armas_conf_t *)0);
+    __mblk_init(&ldl->work, 4*nelem);
+
     ldl->dims = dims;
-    ldl->A = A;
-    ldl->G = G;
+    ldl->A = cp->A;
+    ldl->G = cp->G;
     ldl->n = ac;
     ldl->p = ar;
+    ldl->mnl = mnl;
     S->u.fnc.factor = ldl_factor;
     S->u.fnc.solve = ldl_solve;
-    return 0;
+    //printf("mnl: %d\n", ldl->mnl);
+    return;
 }
 
 

@@ -60,12 +60,34 @@ int cvxm_update2_sym(cvx_float_t beta, cvx_matrix_t *C, cvx_float_t alpha, const
 
 #endif
 
-int cvxm_ldlfactor(cvx_matrix_t *A, int *ipiv, int flags)
+int cvxm_ldlfactor(cvx_matrix_t *A, int *ipiv, int flags, cvx_memblk_t *wrk)
 {
+    armas_pivot_t pv;
+    size_t rows, cols;
+    armas_d_dense_t W;
+    armas_conf_t cf = *armas_conf_default();
+    cvxm_size(&rows, &cols, A);
+    armas_pivot_make(&pv, rows, ipiv);
+    // min workspace is 2*N
+    armas_d_make(&W, wrk->mlen, 1, wrk->mlen, (cvx_float_t*)wrk->memory);
+    if (armas_d_bkfactor(A, &W, &pv, flags, &cf) < 0) {
+        printf("bkfactor error: %d\n", cf.error);
+    }
     return 0;
 }
-int cvxm_ldlsolve(cvx_matrix_t *B, cvx_matrix_t *A, int *ipiv, int flags)
+int cvxm_ldlsolve(cvx_matrix_t *B, cvx_matrix_t *A, int *ipiv, int flags, cvx_memblk_t *wrk)
 {
+    armas_pivot_t pv;
+    size_t rows, cols;
+    armas_d_dense_t W;
+    armas_conf_t cf = *armas_conf_default();
+    cvxm_size(&rows, &cols, A);
+    armas_pivot_make(&pv, rows, ipiv);
+    // min workspace is 2*N
+    armas_d_make(&W, wrk->mlen, 1, wrk->mlen, (cvx_float_t*)wrk->memory);
+    if (armas_d_bksolve(B, A, &W, &pv, flags, &cf) < 0) {
+        printf("bksolve error: %d\n", cf.error);
+    }
     return 0;
 }
 
@@ -158,12 +180,14 @@ cvx_matrix_t *cvxm_new_unit_vector(cvx_size_t n, cvx_float_t val)
 // \brief print matrix to file stream
 void cvxm_printf(FILE *fp, const char *fmt, cvx_matrix_t *x)
 {
+#if 0
     if (armas_d_isvector(x) && x->cols == 1) {
         armas_d_dense_t row;
         armas_d_col_as_row(&row, x);
         armas_d_printf(fp, fmt, &row);
         return;
     }
+#endif
     armas_d_printf(fp, fmt, x);
 }
 

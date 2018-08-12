@@ -550,7 +550,7 @@ int cvx_update_scaling(cvx_scaling_t *W,
         cvxm_view_map(&zk, z, 0, 0, W->dnlsz + W->dsz, 1);
         cvxm_apply(&sk, fsqrt, CVX_ALL);
         cvxm_apply(&zk, fsqrt, CVX_ALL);
-        // lmbda = sqrt(s) */ sqrt(z)
+        // lmbda = sqrt(s) .* sqrt(z)
         cvxm_view_map(&lk, lmbda, 0, 0, W->dnlsz + W->dsz, 1);
         cvxm_copy(&lk, &sk, CVX_ALL);
         cvxm_mult_diag(&lk, 1.0, &zk, CVX_LEFT);
@@ -560,7 +560,7 @@ int cvx_update_scaling(cvx_scaling_t *W,
             cvx_mgrp_elem(&zk, z_g, CVXDIM_NONLINEAR, 0);
             // dnl = dnl .* s .* z
             cvxm_mult_diag(&dnl, 1.0, &sk, CVX_LEFT);
-            cvxm_mult_diag(&dnl, 1.0, &zk, CVX_LEFT);
+            cvxm_solve_diag(&dnl, 1.0, &zk, CVX_LEFT);
             // dnli = 1.0 ./ dnl
             cvxm_copy(&dnli, &dnl, CVX_ALL);
             cvxm_apply(&dnli, finv, CVX_ALL);
@@ -568,9 +568,9 @@ int cvx_update_scaling(cvx_scaling_t *W,
         }
         cvx_mgrp_elem(&sk, s_g, CVXDIM_LINEAR, 0);
         cvx_mgrp_elem(&zk, z_g, CVXDIM_LINEAR, 0);
-        // dl = dl .* s .* z
+        // dl = dl .* s ./ z
         cvxm_mult_diag(&dl, 1.0, &sk, CVX_LEFT);
-        cvxm_mult_diag(&dl, 1.0, &zk, CVX_LEFT);
+        cvxm_solve_diag(&dl, 1.0, &zk, CVX_LEFT);
         // dli = 1.0 ./ dl
         cvxm_copy(&dli, &dl, CVX_ALL);
         cvxm_apply(&dli, finv, CVX_ALL);
@@ -723,6 +723,8 @@ int cvx_update_scaling(cvx_scaling_t *W,
             // SVD(Lz'*Ls) = U * lmbds^+ * V'; store U in sk and V' in zk. '
             cvxm_mult(0.0, &wrk, 1.0, &Lz, &Ls, CVX_TRANS);
             // U = s; Vt = z
+            cvxm_scale(&Ls, 0.0, 0);
+            cvxm_scale(&Lz, 0.0, 0);
             cvxm_svd(&lk, &Ls, &Lz, &wrk, CVX_WANTU|CVX_WANTV, &Tmp);
             // r = r*V
             cvxm_mult(0.0, &wrk, 1.0, &r, &Lz, 0);
