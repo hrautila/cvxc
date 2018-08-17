@@ -111,12 +111,13 @@ int ldl_solve(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_t
 
     // map z part; scale and copy to temp result vector as packed
     cvx_scale(z_g, ldl->W, CVX_INV|CVX_TRANS, &cp->work);
+    //cvx_mat_printf(stdout, "%e", z_g->mat, "ldl scale(z)");
     cvxm_view_map(&u0, &ldl->u, ldl->n+ldl->p, 0, ldl->ldK-ldl->p-ldl->n, 1);
-    cvxm_copy(&u0, z_g->mat, 0);
+    cvx_pack(&u0, z_g->mat, z_g->index);
 
-    //cvx_mat_printf(stdout, "%e", &ldl->u, "ldl solve u");
+    //cvx_mat_printf(stdout, "%e", z_g->mat, "initial u");
     err = cvxm_ldlsolve(&ldl->u, &ldl->K, ldl->ipiv, CVX_LOWER, &ldl->work);
-    //printf("solution u\n"); cvxm_printf(stdout, "%8.5f", &ldl->u);
+    //cvx_mat_printf(stdout, "%8.5f", &ldl->u, "solution u");
     
     cvxm_view_map(&u0, &ldl->u, 0, 0, ldl->n, 1);
     cvxm_copy(x, &u0, CVX_ALL);

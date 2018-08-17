@@ -89,6 +89,7 @@ int cvx_trisc(cvx_matgrp_t *x_g)
         cvx_mgrp_elem(&xs, x_g, CVXDIM_SDP, k);
         cvxm_make_trm(&xs, CVX_LOWER);
         cvxm_scale(&xs, (cvx_float_t)2.0, CVX_LOWER|CVX_UNIT);
+        //cvx_mat_printf(stdout, "%13.6e", &xs, "trisc(x)");
     }    
     return 0;
 }
@@ -132,10 +133,15 @@ int cvx_triusc(cvx_matgrp_t *x_g)
  *
  *   The 's' components in S are stored in unpacked lower triangular storage.
  */
-int cvx_sgemv(cvx_matrix_t *y, cvx_matrix_t *A, cvx_matgrp_t *x_g, cvx_float_t alpha, 
-              cvx_float_t beta, int flags)
+int cvx_sgemv(cvx_float_t beta,
+              cvx_matrix_t *y,
+              cvx_float_t alpha,
+              cvx_matrix_t *A,
+              cvx_matgrp_t *x_g,
+              int flags)
 {
     if (flags & CVX_TRANS) {
+        //cvx_mat_printf(stdout, "%e", x_g->mat, "sgemv x");
         cvx_trisc(x_g);
     }
 
@@ -216,9 +222,12 @@ int cvx_sinv(cvx_matgrp_t *x_g,
             // u := yk[i:] .+ yk[i]
             cvxm_copy(&u, &yc, CVX_ALL);
             cvxm_add(&u, cvxm_get(&yc, 0, 0), CVX_ALL);
-            //cvxm_scale(&u, 0.5, CVX_ALL);
+            cvxm_scale(&u, 0.5, CVX_ALL);
+            //cvx_mat_printf(stdout, "%e", &u, "sinv: u");
+            //cvx_mat_printf(stdout, "%e", &xc, "sinv: xc");
             // x[:,i] := 2.0*u*x[:,i] ; multiply by 2 is equal to scaling u by 0.5
-            cvxm_solve_diag(&xc, 2.0, &u, CVX_LEFT);
+            cvxm_solve_diag(&xc, 1.0, &u, CVX_RIGHT);
+            //cvx_mat_printf(stdout, "%e", &xc, "sinv: xc");
         }
     }    
     return 0;
@@ -315,14 +324,17 @@ int cvx_sprod(cvx_matgrp_t *x_g,
             cvxm_copy(&A, &xk, CVX_LOWER);
             mksymm(&A, m);
             mksymm(&yk, m);
+            //cvx_mat_printf(stdout, "%13.6e", &A, "symm(A)");
+            //cvx_mat_printf(stdout, "%13.6e", &yk, "symm(yk)");
             // xk = 0.5*(yk*A^T + A*yk^T)  = 0.5*(A*yk^T + A*yk^T)
             //    =      yk*A ; mat(yk), A symmetric
             // would equal to x = tril(gemm(yk, A)), gemm implememtation maybe faster
-            cvxm_mult(0.0, &xk, 1.0, &A, &yk, 0);
+            cvxm_update2_sym(0.0, &xk, 0.5, &A, &yk, 0);
         }
         // we don't care about the strictly upper tridiagonal part (could be zeroed)
-        cvxm_make_trm(&xk, CVX_LOWER);
+        //cvxm_make_trm(&xk, CVX_LOWER);
     }    
+    //cvx_mat_printf(stdout, "%13.6e", x_g->mat, "sprod(x)");
     return 0;
 }
 

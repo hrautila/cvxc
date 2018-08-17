@@ -240,6 +240,8 @@ typedef struct cvx_scaling {
     cvx_size_t *indrti;         // Offsets to RTI matrices
     int rcount;                 // # of R/RTI matrices, equal to dims->slen
     cvx_dimset_t *dims;
+    unsigned char *__bytes;
+    cvx_size_t nbytes;
 } cvx_scaling_t;
 
 extern cvx_size_t cvx_scaling_elem(cvx_matrix_t *A, cvx_scaling_t *W, cvx_mset_enum name, int ind);
@@ -295,8 +297,8 @@ extern int cvx_sprod(cvx_matgrp_t *x, cvx_matgrp_t *y, int flags, cvx_memblk_t *
 extern int cvx_ssqr(cvx_matgrp_t *x, cvx_matgrp_t *y);
 extern int cvx_sinv(cvx_matgrp_t *x, cvx_matgrp_t *y, cvx_memblk_t *work);
 
-extern int cvx_sgemv(cvx_matrix_t *y, cvx_matrix_t *A, cvx_matgrp_t *x, cvx_float_t alpha, 
-                     cvx_float_t beta, int flags);
+extern int cvx_sgemv(cvx_float_t beta, cvx_matrix_t *y, cvx_float_t alpha, cvx_matrix_t *A, cvx_matgrp_t *x, 
+                     int flags);
 extern int cvx_triusc(cvx_matgrp_t *x);
 extern int cvx_trisc(cvx_matgrp_t *x);
 extern int cvx_mksymm(cvx_matgrp_t *x);

@@ -322,6 +322,17 @@ void cvx_index_create(cvx_matrix_t *x, cvx_index_t *index, cvx_dimset_t *dims, c
     cvx_index_init(index, dims, kind);
 }
 
+/*
+ *  Scaling matrix W, one big allocation block that is divided to index space
+ *  and matrix data space.
+ *
+ *  Size of index space is: 
+ *       (N_SOCP + 2*N_SDP)*sizeof(size_t) aligned to 64bit
+ *  Size of matrix data space: 
+ *       (2*(NONLINEAR + LINEAR) + sum(SOCP_i) + N_SOCP + 2*sum(SDP_i^2)) * sizeof(cvx_float_t)
+ *
+ */
+
 cvx_scaling_t *cvx_scaling_alloc(cvx_scaling_t *W, cvx_dimset_t *dims)
 {
     // SOCP space; for V matrices
@@ -330,24 +341,40 @@ cvx_scaling_t *cvx_scaling_alloc(cvx_scaling_t *W, cvx_dimset_t *dims)
     // SDP space; for R and RTI matrices
     cvx_size_t rspace = cvx_dimset_sum_squared(dims, CVXDIM_SDP);
 
+    // calculate index space length in bytes and align to 64bits;
+    cvx_size_t itotal = (dims->qlen + 2*dims->slen)*sizeof(cvx_size_t);
+    itotal += (itotal & 0x7) == 0 ? 8 - (itotal & 0x7) : 0;
+    
+    // matrix data space length
     cvx_size_t ntotal =
         2 * dims->mnl +         // Non-linear DNL and DNLI vectors
         2 * dims->ldim +        // Linear D and DI vectors
         dims->qlen + vspace +   // SOCP BETAs and V vectors
         2 * rspace;             // SDP R and RTI matrices
+    ntotal *= sizeof(cvx_float_t);
 
+    unsigned char *buf = calloc(itotal + ntotal, sizeof(char));
+    if (!buf)
+        return (cvx_scaling_t *)0;
+    W->__bytes = buf;
+    W->nbytes = itotal + ntotal;
+#if 0    
     W->data = (cvx_float_t *)calloc(ntotal, sizeof(cvx_float_t));
     if (!W->data)
         return (cvx_scaling_t *)0;
-    
+#endif    
+    W->indexes = (cvx_size_t *)W->__bytes;
+    W->data    = (cvx_float_t *)&W->__bytes[itotal];
     if (dims->qlen > 0 || dims->slen > 0) {
+#if 0
         // allocate space to save indexes to matrix data space
-        W->indexes = (cvx_size_t *)calloc(dims->qlen + dims->slen, sizeof(cvx_size_t));
+        W->indexes = (cvx_size_t *)calloc(dims->qlen + 2*dims->slen, sizeof(cvx_size_t));
         if (!W->indexes) {
             free(W->data);
             W->data = (cvx_float_t *)0;
             return (cvx_scaling_t *)0;
         }
+#endif
         W->vcount = dims->qlen;
         W->rcount = dims->slen;
         if (dims->qlen > 0) {
@@ -462,11 +489,17 @@ void cvx_scaling_release(cvx_scaling_t *W)
 {
     if (!W)
         return;
-    
+    if (W->__bytes) {
+        free(W->__bytes);
+        W->__bytes = (unsigned char *)0;
+    }
+        
+#if 0
     if (W->data)
         free(W->data);
     if (W->indexes)
         free(W->indexes);
+#endif
     W->data = W->dnl = W->dnli = W->d = W->di = W->beta = (cvx_float_t *)0;
     W->dnlsz = W->dsz = W->vcount = W->rcount = 0;
     W->indexes = W->indv = W->indr = W->indrti = (cvx_size_t *)0;
