@@ -202,12 +202,12 @@ typedef struct cvx_dimset {
     int mnl;            ///< Non-linear constraints
 } cvx_dimset_t;
 
-extern cvx_dimset_t *cvx_dimset_alloc(cvx_dimset_t *dims, int linear, int *socp, int *sdp);
+extern cvx_dimset_t *cvx_dimset_alloc(cvx_dimset_t *dims, int linear, const int *socp, const int *sdp);
 extern void cvx_dimset_release(cvx_dimset_t *dims);
-extern cvx_size_t cvx_dimset_max(cvx_dimset_t *dims, cvx_dim_enum name);
-extern cvx_size_t cvx_dimset_sum(cvx_dimset_t *dims, cvx_dim_enum name);
-extern cvx_size_t cvx_dimset_sum_squared(cvx_dimset_t *dims, cvx_dim_enum name);
-extern cvx_size_t cvx_dimset_sum_packed(cvx_dimset_t *dims, cvx_dim_enum name);
+extern cvx_size_t cvx_dimset_max(const cvx_dimset_t *dims, cvx_dim_enum name);
+extern cvx_size_t cvx_dimset_sum(const cvx_dimset_t *dims, cvx_dim_enum name);
+extern cvx_size_t cvx_dimset_sum_squared(const cvx_dimset_t *dims, cvx_dim_enum name);
+extern cvx_size_t cvx_dimset_sum_packed(const cvx_dimset_t *dims, cvx_dim_enum name);
 
 typedef struct cvx_index {
     cvx_size_t *index;         ///< Index data
@@ -215,14 +215,14 @@ typedef struct cvx_index {
     cvx_size_t *inds;          ///< Indexes of SDP constraints
     cvx_size_t *indl;          ///< Index to linear
     cvx_size_t *indnl;         ///< Index to non-linear
-    cvx_dimset_t *dims;
+    const cvx_dimset_t *dims;
 } cvx_index_t;
 
-extern cvx_size_t cvx_index_count(cvx_index_t *index, cvx_dim_enum name);
-extern cvx_index_t *cvx_index_init(cvx_index_t *index, cvx_dimset_t *dims, int packed);
+extern cvx_size_t cvx_index_count(const cvx_index_t *index, cvx_dim_enum name);
+extern cvx_index_t *cvx_index_init(cvx_index_t *index, const cvx_dimset_t *dims, int packed);
 extern void cvx_index_release(cvx_index_t *dims);
-extern cvx_size_t cvx_index_elem(cvx_matrix_t *x, cvx_matrix_t *y, cvx_index_t *ind, cvx_dim_enum name, int k);
-extern void cvx_index_create(cvx_matrix_t *x, cvx_index_t *index, cvx_dimset_t *dims, cvx_index_type kind);
+extern cvx_size_t cvx_index_elem(cvx_matrix_t *x, const cvx_matrix_t *y, const cvx_index_t *ind, cvx_dim_enum name, int k);
+extern void cvx_index_create(cvx_matrix_t *x, cvx_index_t *index, const cvx_dimset_t *dims, cvx_index_type kind);
 
 typedef struct cvx_scaling {
     cvx_float_t *data;          // Scaling matrix data space, one big block
@@ -239,13 +239,13 @@ typedef struct cvx_scaling {
     cvx_size_t *indr;           // Offsets to R matrices
     cvx_size_t *indrti;         // Offsets to RTI matrices
     int rcount;                 // # of R/RTI matrices, equal to dims->slen
-    cvx_dimset_t *dims;
+    const cvx_dimset_t *dims;
     unsigned char *__bytes;
     cvx_size_t nbytes;
 } cvx_scaling_t;
 
-extern cvx_size_t cvx_scaling_elem(cvx_matrix_t *A, cvx_scaling_t *W, cvx_mset_enum name, int ind);
-extern cvx_scaling_t *cvx_scaling_alloc(cvx_scaling_t *W, cvx_dimset_t *dims);
+extern cvx_size_t cvx_scaling_elem(cvx_matrix_t *A, const cvx_scaling_t *W, cvx_mset_enum name, int ind);
+extern cvx_scaling_t *cvx_scaling_init(cvx_scaling_t *W, const cvx_dimset_t *dims);
 extern void cvx_scaling_release(cvx_scaling_t *W);
 
 
@@ -277,6 +277,9 @@ int cvx_mgrp_count(cvx_matgrp_t *g, cvx_dim_enum name)
     return cvx_index_count(g->index, name);
 }
 
+extern void cvx_mgrp_copy_lambda(cvx_matgrp_t *ds_g, cvx_matgrp_t *lmbda);
+extern void cvx_mgrp_scale_sz(cvx_matgrp_t *ds_g, cvx_float_t v, int flags);
+extern void cvx_mgrp_update_sz(cvx_matgrp_t *ds_g, cvx_float_t v, int flags);
 extern void cvx_mgrp_printf(FILE *f, const char *format, cvx_matgrp_t *g, const char *s);
 extern void cvx_mat_printf(FILE *f, const char *format, cvx_matrix_t *g, const char *s);
 extern void cvx_scaling_printf(FILE *f, const char *format, cvx_scaling_t *W, const char *s);
@@ -287,9 +290,11 @@ extern void cvx_scaling_printf(FILE *f, const char *format, cvx_scaling_t *W, co
 extern cvx_float_t cvx_jnrm2(cvx_matrix_t *x);
 // \brief hyperbolic x'*y
 extern cvx_float_t cvx_jdot(cvx_matrix_t *x, cvx_matrix_t *y);
+extern cvx_float_t cvx_snrm2(cvx_matgrp_t *x);
+extern cvx_float_t cvx_sdot(cvx_matgrp_t *x, cvx_matgrp_t *y);
 
-extern int cvx_pack(cvx_matrix_t *y, cvx_matrix_t *x, cvx_index_t *index);
-extern int cvx_unpack(cvx_matrix_t *y, cvx_matrix_t *x, cvx_index_t *index);
+extern void cvx_pack(cvx_matrix_t *y, cvx_matrix_t *x, const cvx_index_t *index);
+extern void cvx_unpack(cvx_matrix_t *y, cvx_matrix_t *x, const cvx_index_t *index);
 
 extern int cvx_scale(cvx_matgrp_t *x, cvx_scaling_t *W, int flags, cvx_memblk_t *work);
 extern int cvx_scale2(cvx_matgrp_t *x_g, cvx_matgrp_t *lmbda_g, int flags, cvx_memblk_t *work);
@@ -302,8 +307,6 @@ extern int cvx_sgemv(cvx_float_t beta, cvx_matrix_t *y, cvx_float_t alpha, cvx_m
 extern int cvx_triusc(cvx_matgrp_t *x);
 extern int cvx_trisc(cvx_matgrp_t *x);
 extern int cvx_mksymm(cvx_matgrp_t *x);
-extern cvx_float_t cvx_snrm2(cvx_matgrp_t *x);
-extern cvx_float_t cvx_sdot(cvx_matgrp_t *x, cvx_matgrp_t *y);
 
 extern int
 cvx_compute_scaling(cvx_scaling_t *W, cvx_matgrp_t *s_g, cvx_matgrp_t *z_g, cvx_matgrp_t *l_g, cvx_memblk_t *wrk);
@@ -498,6 +501,8 @@ typedef struct cvx_conelp_problem {
     cvx_size_t mlen;
     cvx_float_t *memory;
 } cvx_conelp_problem_t;
+
+extern cvx_float_t cvx_max_step(cvx_matgrp_t *x, cvx_matgrp_t *sigs, cvx_memblk_t *wrk);
 
 extern cvx_conelp_problem_t *
 cvx_conelp_setup(cvx_conelp_problem_t *prob,

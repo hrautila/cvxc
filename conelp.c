@@ -7,72 +7,6 @@
 //#define EFRM "%9.2e"
 #define STEP 0.99
 
-cvx_float_t cvx_max_step(cvx_matgrp_t *x_g,
-                         cvx_matgrp_t *sigma_g,
-                         cvx_memblk_t *wrk)
-{
-    cvx_float_t v, tmax = -1e18;
-    cvx_matrix_t u, u1;
-    cvx_index_t *index = x_g->index;
-    cvx_size_t m;
-    
-    if (index->indnl) {
-        m = cvx_mgrp_elem(&u, x_g, CVXDIM_NONLINEAR, 0);
-        for (int k = 0; k < m; k++) {
-            if (tmax < -cvxm_get(&u, k, 0)) {
-                tmax = -cvxm_get(&u, k, 0);
-            }
-        }
-    }
-    if (index->indl) {
-        m = cvx_mgrp_elem(&u, x_g, CVXDIM_LINEAR, 0);
-        for (int k = 0; k < m; k++) {
-            if (tmax < -cvxm_get(&u, k, 0)) {
-                tmax = -cvxm_get(&u, k, 0);
-            }
-        }
-    }
-    if (index->indq) {
-        for (int k = 0; k < cvx_mgrp_count(x_g, CVXDIM_SOCP); k++) {
-            m = cvx_mgrp_elem(&u, x_g, CVXDIM_SOCP, k);
-            cvxm_view_map(&u1, &u, 1, 0, m-1, 1);
-            v = cvxm_nrm2(&u1);
-            v -= cvxm_get(&u, 0, 0);
-            if (tmax < v) {
-                tmax = v;
-            }
-        }
-    }
-    if (index->inds) {
-        cvx_matrix_t Q, w, lk;
-        cvx_memblk_t mem;
-        for (int k = 0; k < cvx_mgrp_count(x_g, CVXDIM_SDP); k++) {
-            m = cvx_mgrp_elem(&u, x_g,  CVXDIM_SDP, k);
-            if (sigma_g) {
-                cvx_mgrp_elem(&lk, sigma_g, CVXDIM_SDP, k);
-                cvxm_evd_sym(&lk, &u, CVX_WANTV|CVX_LOWER|ARMAS_FORWARD, wrk);
-                //cvx_mat_printf(stdout, "%13.6e", &u, "evd_sym(x)");
-                //cvx_mat_printf(stdout, "%13.6e", &lk, "evd_sym.sigma");
-                v = - cvxm_get(&lk, 0, 0);
-            } else {
-                cvxm_map_data(&Q, m, m, __mblk_offset(wrk, 0));
-                cvxm_map_data(&w, m, 1, __mblk_offset(wrk, m*m));
-                __mblk_subblk(&mem, wrk, m*m +m);
-                cvxm_copy(&Q, &u, 0);
-                //cvx_mat_printf(stdout, "%13.6e", &Q, "evd(Q)");
-                //cvxm_evd_sym_selected(&w, &Q, (int []){1, 1}, CVX_LOWER, &mem);
-                cvxm_evd_sym(&w, &Q, CVX_LOWER, &mem);
-                //cvx_mat_printf(stdout, "%e", &w, "w");
-                
-                v = - cvxm_get(&w, 0, 0);
-                //printf("evd(1): %e\n", v);
-            }
-            if (tmax < v)
-                tmax = v;
-        }
-    }
-    return tmax;
-}
 
 static 
 int cvx_res(cvx_conelp_problem_t *cp,
@@ -537,7 +471,7 @@ cvx_conelp_problem_t *cvx_conelp_setup(cvx_conelp_problem_t *prob,
     cvx_mgrp_init(&prob->lmbdasq_g, &prob->lmbdasq, &prob->index_diag);
 
     // allocate scaling
-    cvx_scaling_alloc(&prob->W, dims);
+    cvx_scaling_init(&prob->W, dims);
 
     if (kktsolver) {
         prob->solver = kktsolver;
@@ -684,90 +618,6 @@ int cvx_conelp_compute_start(cvx_conelp_problem_t *prob)
     return 0;
 }
 
-// \brief Copy lambda vector with diagonal 'S' space to s/z with vectors with standard 'S' storage
-int cvx_copy_lambda(cvx_matgrp_t *ds_g, cvx_matgrp_t *lmbda_g)
-{
-    cvx_matrix_t dk, lk, d;
-    
-    cvx_dimset_t *dims = ds_g->index->dims;
-    cvx_size_t n =
-        cvx_dimset_sum(dims, CVXDIM_NONLINEAR) +
-        cvx_dimset_sum(dims, CVXDIM_LINEAR) +
-        cvx_dimset_sum(dims, CVXDIM_SOCP);
-
-    cvxm_map_data(&dk, n, 1, cvxm_data(ds_g->mat, 0));
-    cvxm_map_data(&lk, n, 1, cvxm_data(lmbda_g->mat, 0));
-    cvxm_copy(&dk, &lk, CVX_ALL);
-    
-    for (int k = 0; k < cvx_mgrp_count(ds_g, CVXDIM_SDP); k++) {
-        cvx_mgrp_elem(&dk, ds_g, CVXDIM_SDP, k);
-        cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_SDP, k);
-        // clear it
-        cvxm_mkconst(&dk, 0.0);
-        // copy to diagonal
-        cvxm_view_diag(&d, &dk, 0);
-        cvxm_copy(&d, &lk, 0);
-    }
-    return 0;
-}
-
-// \brief Update matrix group by adding parameter value to its elements
-int cvx_conelp_update_sz(cvx_matgrp_t *ds_g, cvx_float_t val, int flags)
-{
-    cvx_matrix_t x, xd;
-    if (flags == 0 || (flags & CVXDIM_LINEAR) != 0) {
-        // linear part; L => L +/ val
-        cvx_mgrp_elem(&x, ds_g, CVXDIM_LINEAR, 0);
-        cvxm_add(&x, val, 0);
-    }
-
-    if (flags == 0 || (flags & CVXDIM_SOCP) != 0) {
-        // SOCP part; (y0, y1) => (y0+val, y1)
-        for (int k = 0; k < cvx_mgrp_count(ds_g, CVXDIM_SOCP); k++) {
-            cvx_mgrp_elem(&x, ds_g, CVXDIM_SOCP, k);
-            cvxm_set(&x, 0, 0, cvxm_get(&x, 0, 0) + val);
-        }
-    }
-
-    if (flags == 0 || (flags & CVXDIM_SDP) != 0) {
-        // SDP part; diag(S) => diag(S) +/ val
-        for (int k = 0; k < cvx_mgrp_count(ds_g, CVXDIM_SDP); k++) {
-            cvx_mgrp_elem(&x, ds_g, CVXDIM_SDP, k);
-            cvxm_view_diag(&xd, &x, 0);
-            cvxm_add(&xd, val, 0);
-        }
-    }
-    return 0;
-}
-
-// \brief Update matrix group by scaling its elements by parameter value
-int cvx_conelp_scale_sz(cvx_matgrp_t *ds_g, cvx_float_t val, int flags)
-{
-    cvx_matrix_t x, xd;
-    if (flags == 0 || (flags & CVXDIM_LINEAR) != 0) {
-        // linear part; L => L * val
-        cvx_mgrp_elem(&x, ds_g, CVXDIM_LINEAR, 0);
-        cvxm_scale(&x, val, 0);
-    }
-
-    if (flags == 0 || (flags & CVXDIM_SOCP) != 0) {
-        // SOCP part; (y0, y1) => (y0*val, y1*val)
-        for (int k = 0; k < cvx_mgrp_count(ds_g, CVXDIM_SOCP); k++) {
-            cvx_mgrp_elem(&x, ds_g, CVXDIM_SOCP, k);
-            cvxm_scale(&x, val, 0);
-        }
-    }
-
-    if (flags == 0 || (flags & CVXDIM_SDP) != 0) {
-        // SDP part; diag(S) => diag(S) */ val
-        for (int k = 0; k < cvx_mgrp_count(ds_g, CVXDIM_SDP); k++) {
-            cvx_mgrp_elem(&x, ds_g, CVXDIM_SDP, k);
-            cvxm_view_diag(&xd, &x, 0);
-            cvxm_scale(&xd, val, 0);
-        }
-    }
-    return 0;
-}
 
 
 int cvx_conelp_ready(cvx_conelp_problem_t *prob, cvx_stats_t *stats, int iter, int stat)
@@ -960,24 +810,24 @@ int cvx_conelp_solve(cvx_conelp_problem_t *prob, cvx_solopts_t *opts)
         max_nrms = __MAX2(1.0, prob->nrms);
         max_nrmz = __MAX2(1.0, prob->nrmz);
         if (prob->ts >= - 1e-8 * max_nrms) {
-            cvx_conelp_update_sz(&prob->s_g, 1.0+prob->ts, 0);
+            cvx_mgrp_update_sz(&prob->s_g, 1.0+prob->ts, 0);
         }
 
         if (prob->tz >= -1e-8 * max_nrmz) {
-            cvx_conelp_update_sz(&prob->z_g, 1.0+prob->tz, 0);
+            cvx_mgrp_update_sz(&prob->z_g, 1.0+prob->tz, 0);
         }
         //cvx_mat_printf(stdout, "%e", &prob->s, "s:");
         //cvx_mat_printf(stdout, "%e", &prob->z, "z:");
     } else if (primalstart && ! dualstart) {
         max_nrms = __MAX2(1.0, prob->nrms);
         if (prob->ts >= - 1e-8 * max_nrms) {
-            cvx_conelp_update_sz(&prob->s_g, 1.0+prob->ts, 0);
+            cvx_mgrp_update_sz(&prob->s_g, 1.0+prob->ts, 0);
         }
 
     } else if (dualstart && ! primalstart) {
         max_nrmz = __MAX2(1.0, prob->nrmz);
         if (prob->tz >= -1e-8 * max_nrmz) {
-            cvx_conelp_update_sz(&prob->z_g, 1.0+prob->tz, 0);
+            cvx_mgrp_update_sz(&prob->z_g, 1.0+prob->tz, 0);
         }
     }
 
@@ -1204,7 +1054,7 @@ int cvx_conelp_solve(cvx_conelp_problem_t *prob, cvx_solopts_t *opts)
             // dkappa = -lambdasq[-1]                            if i == 0 
             //        = -lambdasq[-1] - dkappaa*dtaua + sigma*mu if i == 1.
             
-            cvx_copy_lambda(&prob->ds_g, &prob->lmbdasq_g);
+            cvx_mgrp_copy_lambda(&prob->ds_g, &prob->lmbdasq_g);
             prob->dkappa = cvxm_get(&prob->lmbdasq, prob->cdim_diag, 0);
             //cvx_mat_printf(stdout, "%e", &prob->ds, "ds");
             //printf("dkappa=%e, mu=%e, sigma=%e, refinement=%d, i=%d\n", prob->dkappa, mu, sigma, refinement, i);
@@ -1214,7 +1064,7 @@ int cvx_conelp_solve(cvx_conelp_problem_t *prob, cvx_solopts_t *opts)
                 cvxm_axpy(&prob->ds, 1.0, &prob->ws3);
 
                 // update ds with -sigma*mu
-                cvx_conelp_update_sz(&prob->ds_g, -sigma*mu, 0);
+                cvx_mgrp_update_sz(&prob->ds_g, -sigma*mu, 0);
                 prob->dkappa = prob->dkappa + prob->wkappa3 - sigma*mu;
                 //cvx_mat_printf(stdout, "%e", &prob->ds, "from saved ws3->ds (i=1)");
             }
@@ -1308,11 +1158,11 @@ int cvx_conelp_solve(cvx_conelp_problem_t *prob, cvx_solopts_t *opts)
         //
         // ds := e + step*ds for 'l' and 'q' blocks.
         // dz := e + step*dz for 'l' and 'q' blocks.
-        cvx_conelp_scale_sz(&prob->ds_g, step, CVXDIM_LINEAR|CVXDIM_SOCP);
-        cvx_conelp_update_sz(&prob->ds_g, 1.0, CVXDIM_LINEAR|CVXDIM_SOCP);
+        cvx_mgrp_scale_sz(&prob->ds_g, step, CVXDIM_LINEAR|CVXDIM_SOCP);
+        cvx_mgrp_update_sz(&prob->ds_g, 1.0, CVXDIM_LINEAR|CVXDIM_SOCP);
 
-        cvx_conelp_scale_sz(&prob->dz_g, step, CVXDIM_LINEAR|CVXDIM_SOCP);
-        cvx_conelp_update_sz(&prob->dz_g, 1.0, CVXDIM_LINEAR|CVXDIM_SOCP);
+        cvx_mgrp_scale_sz(&prob->dz_g, step, CVXDIM_LINEAR|CVXDIM_SOCP);
+        cvx_mgrp_update_sz(&prob->dz_g, 1.0, CVXDIM_LINEAR|CVXDIM_SOCP);
 
         //cvx_mat_printf(stdout, "%e", &prob->dz, "update dz");
         //cvx_mat_printf(stdout, "%e", &prob->ds, "update ds");
@@ -1398,11 +1248,11 @@ int cvx_conelp_solve(cvx_conelp_problem_t *prob, cvx_solopts_t *opts)
         
         // Unscale s, z, tau, kappa (unscaled variables are used only to 
         // compute feasibility residuals).
-        cvx_copy_lambda(&prob->s_g, &prob->lmbda_g);
+        cvx_mgrp_copy_lambda(&prob->s_g, &prob->lmbda_g);
         cvx_scale(&prob->s_g, &prob->W, CVX_TRANS, &prob->work);
         //cvx_mat_printf(stdout, "%e", &prob->s, "unscaled s");
 
-        cvx_copy_lambda(&prob->z_g, &prob->lmbda_g);
+        cvx_mgrp_copy_lambda(&prob->z_g, &prob->lmbda_g);
         cvx_scale(&prob->z_g, &prob->W, CVX_INV, &prob->work);
         //cvx_mat_printf(stdout, "%e", &prob->z, "unscaled z");
 

@@ -287,15 +287,16 @@ extern cvx_matrix_t *cvxm_mkconst(cvx_matrix_t *x, cvx_float_t val);
 extern cvx_matrix_t *cvxm_identity(cvx_size_t n);
 extern cvx_matrix_t *cvxm_new_vector(cvx_size_t n, cvx_float_t val);
 extern cvx_matrix_t *cvxm_new_unit_vector(cvx_size_t n, cvx_float_t val);
-extern void cvxm_printf(FILE *, const char *fmt, cvx_matrix_t *);
+extern void cvxm_printf(FILE *, const char *fmt, const cvx_matrix_t *);
 
-extern int cvxm_norm(cvx_float_t *nrm, cvx_matrix_t *A, int norm);
+extern void cvxm_mksymm(cvx_matrix_t *A, int n);
+extern int cvxm_norm(cvx_float_t *nrm, const cvx_matrix_t *A, int norm);
 extern void cvxm_zero(cvx_matrix_t *A, int flags);
 
 // \brief LDL factorization
 extern int cvxm_ldlfactor(cvx_matrix_t *A, int *ipiv, int flags, cvx_memblk_t *work);
 // \brief Solve equations using computed LDL factorization
-extern int cvxm_ldlsolve(cvx_matrix_t *B, cvx_matrix_t *A, int *ipiv, int flags, cvx_memblk_t *wrk);
+extern int cvxm_ldlsolve(cvx_matrix_t *B, const cvx_matrix_t *A, const int *ipiv, int flags, cvx_memblk_t *wrk);
 // \brief Eigenvalues of symmetric matrix
 extern int cvxm_evd_sym(cvx_matrix_t *D, cvx_matrix_t *S, int flags, cvx_memblk_t *work);
 // \brief Selected eigenvalues of symmetric matrix

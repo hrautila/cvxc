@@ -75,17 +75,17 @@ int cvxm_ldlfactor(cvx_matrix_t *A, int *ipiv, int flags, cvx_memblk_t *wrk)
     }
     return 0;
 }
-int cvxm_ldlsolve(cvx_matrix_t *B, cvx_matrix_t *A, int *ipiv, int flags, cvx_memblk_t *wrk)
+int cvxm_ldlsolve(cvx_matrix_t *B, const cvx_matrix_t *A, const int *ipiv, int flags, cvx_memblk_t *wrk)
 {
     armas_pivot_t pv;
     size_t rows, cols;
     armas_d_dense_t W;
     armas_conf_t cf = *armas_conf_default();
     cvxm_size(&rows, &cols, A);
-    armas_pivot_make(&pv, rows, ipiv);
+    armas_pivot_make(&pv, rows, (int *)ipiv);
     // min workspace is 2*N
     armas_d_make(&W, wrk->mlen, 1, wrk->mlen, (cvx_float_t*)wrk->memory);
-    if (armas_d_bksolve(B, A, &W, &pv, flags, &cf) < 0) {
+    if (armas_d_bksolve(B, (cvx_matrix_t *)A, &W, &pv, flags, &cf) < 0) {
         printf("bksolve error: %d\n", cf.error);
     }
     return 0;
@@ -178,7 +178,7 @@ cvx_matrix_t *cvxm_new_unit_vector(cvx_size_t n, cvx_float_t val)
 }
 
 // \brief print matrix to file stream
-void cvxm_printf(FILE *fp, const char *fmt, cvx_matrix_t *x)
+void cvxm_printf(FILE *fp, const char *fmt, const cvx_matrix_t *x)
 {
 #if 0
     if (armas_d_isvector(x) && x->cols == 1) {
@@ -200,7 +200,7 @@ cvx_size_t cvxm_svd_workspace(cvx_size_t r, cvx_size_t c)
 }
 
 // \brief Matrix or vector norm
-int cvxm_norm(cvx_float_t *nrm, cvx_matrix_t *A, int norm)
+int cvxm_norm(cvx_float_t *nrm, const cvx_matrix_t *A, int norm)
 {
     cvx_size_t rows, cols;
 
@@ -229,6 +229,16 @@ int cvxm_norm(cvx_float_t *nrm, cvx_matrix_t *A, int norm)
     return 0;
 }
 
+void cvxm_mksymm(cvx_matrix_t *x, int n)
+{
+    cvx_matrix_t xcol, xrow;
+    for (int i = 0; i < n-1; i++) {
+        // i'th column and i'th row
+        cvxm_view_map(&xcol, x, i+1, i, n-1-i, 1);
+        cvxm_view_map(&xrow, x, i, i+1, 1, n-1-i);
+        cvxm_copy(&xrow, &xcol, CVX_ALL);
+    }
+}
 
 
 // Local Variables:

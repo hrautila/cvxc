@@ -4,52 +4,6 @@
 #include "convex.h"
 
 
-/*
- * Compute inner product of two vectors in S; S part is assumed to be in lower
- * storage format.
- */
-cvx_float_t cvx_sdot(cvx_matgrp_t *x_g, cvx_matgrp_t *y_g)
-{
-    cvx_size_t ind;
-    cvx_matrix_t x0, y0, xs, ys, *x = x_g->mat, *y = y_g->mat;
-    cvx_float_t sdot = 0.0;
-    int k, j;
-
-    ind = x_g->index->dims->mnl +
-        cvx_dimset_sum(x_g->index->dims, CVXDIM_LINEAR) +
-        cvx_dimset_sum(x_g->index->dims, CVXDIM_SOCP);
-    
-    cvxm_view_map(&x0, x, 0, 0, ind, 1);
-    cvxm_view_map(&y0, y, 0, 0, ind, 1);
-    sdot = cvxm_dot(&x0, &y0);
-    
-    for (k = 0; k < cvx_mgrp_count(x_g, CVXDIM_SDP); k++) {
-        cvx_size_t m = cvx_mgrp_elem(&xs, x_g, CVXDIM_SDP, k);
-        cvx_mgrp_elem(&ys, y_g, CVXDIM_SDP, k);
-
-        cvxm_view_diag(&x0, &xs, 0);
-        cvxm_view_diag(&y0, &ys, 0);
-        sdot += cvxm_dot(&x0, &y0);
-
-        for (j = 1; j < m; j++) {
-            // j'th subdiagonal
-            cvxm_view_diag(&x0, &xs, -j);
-            cvxm_view_diag(&y0, &ys, -j);
-            sdot += 2.0 * cvxm_dot(&x0, &y0);
-        }
-    }
-    return sdot;
-}
-
-/*
- * Compute the norm of vector in S
- */
-cvx_float_t cvx_snrm2(cvx_matgrp_t *x_g)
-{
-    return sqrt(cvx_sdot(x_g, x_g));
-}
-
-
 static inline
 void mksymm(cvx_matrix_t *x, int n)
 {
@@ -322,8 +276,8 @@ int cvx_sprod(cvx_matgrp_t *x_g,
         } else {
             cvxm_map_data(&A, m, m, __mblk_offset(work, 0));
             cvxm_copy(&A, &xk, CVX_LOWER);
-            mksymm(&A, m);
-            mksymm(&yk, m);
+            cvxm_mksymm(&A, m);
+            cvxm_mksymm(&yk, m);
             //cvx_mat_printf(stdout, "%13.6e", &A, "symm(A)");
             //cvx_mat_printf(stdout, "%13.6e", &yk, "symm(yk)");
             // xk = 0.5*(yk*A^T + A*yk^T)  = 0.5*(A*yk^T + A*yk^T)

@@ -658,7 +658,6 @@ int cvx_update_scaling(cvx_scaling_t *W,
             d = (vu*cvxm_get(&v, 0, 0)
                  - (cvxm_get(&sk, 0, 0) - cvxm_get(&zk, 0, 0))/2.0) / (wk0 + 1.0);
 
-            //printf("** a=%e, b=%e, c=%e, d=%e, vs=%e, vz=%e, vq=%e, vu=%e, wk0=%e\n", a, b, c, d, vs, vz, vq, vu, wk0);
             // lambda_k1 = 2 * v_k1 * vk' * (-d*q + u/2) - d*q1 + u1/2
             cvxm_copy(&lk, &v, CVX_ALL);
             cvxm_scale(&lk, (2.0 * (-d*vq + 0.5*vu)), CVX_ALL);

@@ -4,7 +4,19 @@ NETLIB = ../armas/src/.libs/libarmasd.a
 
 CFLAGS = -g -O0 -I../armas/src -Wall -pthread
 
-CVXOBJ = dims.o jfunc.o sfunc.o scale.o conelp.o kkt.o misc.o
+CVXOBJ = dims.o \
+	sfunc.o \
+	scale.o \
+	conelp.o \
+	kkt.o \
+	mgrp.o \
+	index.o \
+	scaling.o \
+	pack.o \
+	norm.o \
+	step.o \
+	print.o
+
 MATOBJ = cvxm.o cvxmio.o
 
 LIBOBJ = $(CVXOBJ) $(MATOBJ)
