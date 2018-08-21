@@ -70,6 +70,8 @@ cvx_size_t cvx_dimset_max(const cvx_dimset_t *dims, cvx_dim_enum name)
                 m = dims->sdims[k];
         }
         break;
+    default:
+        break;
     }
     return m;
 }
@@ -94,6 +96,15 @@ cvx_size_t cvx_dimset_sum(const cvx_dimset_t *dims, cvx_dim_enum name)
         for (int k = 0; k < dims->slen; k++)
             sum += dims->sdims[k];
         break;
+    case CVXDIM_CONELP:
+        sum = dims->ldim;
+        for (int k = 0; k < dims->qlen; k++)
+            sum += dims->qdims[k];
+        for (int k = 0; k < dims->slen; k++)
+            sum += dims->sdims[k];
+        break;
+    default:
+        break;
     }
     return sum;
 }
@@ -107,14 +118,28 @@ cvx_size_t cvx_dimset_sum_squared(const cvx_dimset_t *dims, cvx_dim_enum name)
 
     switch (name) {
     case CVXDIM_NONLINEAR:
+        return dims->mnl;
     case CVXDIM_LINEAR:
+        return dims->ldim;
     case CVXDIM_SOCP:
-        return 0;
+        for (int k = 0; k < dims->qlen; k++)
+            sum += dims->qdims[k];
+        break;
     case CVXDIM_SDP:
         for (int k = 0; k < dims->slen; k++)
             sum += dims->sdims[k] * dims->sdims[k];
         break;
+    case CVXDIM_CONELP:
+        sum = dims->ldim;
+        for (int k = 0; k < dims->qlen; k++)
+            sum += dims->qdims[k];
+        for (int k = 0; k < dims->slen; k++)
+            sum += dims->sdims[k] * dims->sdims[k];
+        break;
+    default:
+        break;
     }
+
     return sum;
 }
 
@@ -133,6 +158,15 @@ cvx_size_t cvx_dimset_sum_packed(const cvx_dimset_t *dims, cvx_dim_enum name)
     case CVXDIM_SDP:
         for (int k = 0; k < dims->slen; k++)
             sum += dims->sdims[k] * (dims->sdims[k] + 1)/2;
+        break;
+    case CVXDIM_CONELP:
+        sum = dims->ldim;
+        for (int k = 0; k < dims->qlen; k++)
+            sum += dims->qdims[k];
+        for (int k = 0; k < dims->slen; k++)
+            sum += dims->sdims[k] * (dims->sdims[k] + 1)/2;
+        break;
+    default:
         break;
     }
     return sum;

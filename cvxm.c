@@ -23,6 +23,7 @@ cvx_matrix_t *cvxm_new(cvx_size_t r, cvx_size_t c);
 cvx_matrix_t *cvxm_newcopy(const cvx_matrix_t *A);
 cvx_float_t *cvxm_data(const cvx_matrix_t *A, cvx_size_t k);
 
+cvx_size_t cvxm_make(cvx_matrix_t *A, cvx_size_t rows, cvx_size_t cols,  void *mem, cvx_size_t nbytes);
 cvx_matrix_t *cvxm_map_data(cvx_matrix_t *A, cvx_size_t rows, cvx_size_t cols,  cvx_float_t *data);
 
 cvx_matrix_t *cvxm_view_map(cvx_matrix_t *A, const cvx_matrix_t *B, cvx_size_t r, cvx_size_t c, cvx_size_t nr, cvx_size_t nc);

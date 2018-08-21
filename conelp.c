@@ -7,6 +7,25 @@
 //#define EFRM "%9.2e"
 #define STEP 0.99
 
+#if 0
+static
+void print_r_rti(cvx_scaling_t *W, int k, const char *s)
+{
+    cvx_matrix_t r, rti;
+    cvx_scaling_elem(&r, W, CVXWS_R, k);
+    cvx_scaling_elem(&rti, W, CVXWS_RTI, k);
+    printf("%s r\n", s);
+    cvxm_printf(stdout, "%13.6e", &r);
+    printf("%s rti\n", s);
+    cvxm_printf(stdout, "%13.6e", &rti);
+}
+#endif
+
+static inline
+cvx_size_t __WORKBYTES(cvx_size_t n)
+{
+    return 8*n*n*sizeof(cvx_float_t);
+}
 
 static 
 int cvx_res(cvx_conelp_problem_t *cp,
@@ -242,208 +261,193 @@ int f6(cvx_conelp_problem_t *cp,
     return err;
 }
 
-
-cvx_conelp_problem_t *cvx_conelp_setup(cvx_conelp_problem_t *prob,
-                                       cvx_matrix_t *c,
-                                       cvx_matrix_t *G,
-                                       cvx_matrix_t *h,
-                                       cvx_matrix_t *A,
-                                       cvx_matrix_t *b,
-                                       cvx_dimset_t *dims,
-                                       cvx_kktsolver_t *kktsolver)
+/**
+ * @brief Compute memory allocation needed for CONELP problem
+ *
+ * @param[in] n  Number of variables
+ * @param[in] m  Number of equality constrains (rows of A matrix)
+ * @param[in] dims Dimensions of inequality constraints, linear, scop and sdp
+ *
+ * @return Number of bytes of memory needed.
+ */
+cvx_size_t cvx_conelp_bytes(int n, int m, const cvx_dimset_t *dims)
 {
-
-    cvx_size_t mc, nc, mG, nG, mA, nA, mh, nh, mb, nb;
-    
-
-    mc = nc = mG = nG = mA = nA = mh = nh = mb = nb = 0;
-    if (! prob)
-        return prob;
-
-    if (!c) {
-        prob->error = CVX_ERR_NULLCOST;
-        return (cvx_conelp_problem_t *)0;
-    }
-
-    cvxm_size(&mc, &nc, c);
-    if (G)
-        cvxm_size(&mG, &nG, G);
-    if (A)
-        cvxm_size(&mA, &nA, A);
-    if (h)
-        cvxm_size(&mh, &nh, h);
-    if (b)
-        cvxm_size(&mb, &nb, b);
-    
-    if (nc > 1 || mc < 1) {
-        prob->error = CVX_ERR_DIMC;
-        return (cvx_conelp_problem_t *)0;
-    }
-
-    cvx_size_t cdim = cvx_dimset_sum(dims, CVXDIM_LINEAR) +
-        cvx_dimset_sum(dims, CVXDIM_SOCP) +
-        cvx_dimset_sum_squared(dims, CVXDIM_SDP);
-
-    cvx_size_t cdim_pckd = cvx_dimset_sum(dims, CVXDIM_LINEAR) +
-        cvx_dimset_sum(dims, CVXDIM_SOCP) +
-        cvx_dimset_sum_packed(dims, CVXDIM_SDP);
-    
-    cvx_size_t cdim_diag = cvx_dimset_sum(dims, CVXDIM_LINEAR) +
-        cvx_dimset_sum(dims, CVXDIM_SOCP) +
-        cvx_dimset_sum(dims, CVXDIM_SDP);
-    
-    if (nh > 1 || mh != cdim) {
-        prob->error = CVX_ERR_DIMH;
-        return (cvx_conelp_problem_t *)0;
-    }
-
-    if (mG != cdim || nG != mc) {
-        prob->error = CVX_ERR_DIMG;
-        return (cvx_conelp_problem_t *)0;
-    }
-    if (nA != mc || mA != mb) {
-        prob->error = CVX_ERR_DIMA;
-        return (cvx_conelp_problem_t *)0;
-    }
-    if (nb != 1) {
-        prob->error = CVX_ERR_DIMB;
-        return (cvx_conelp_problem_t *)0;
-    }
-    if ( mb > mc || mb + cdim_pckd < mc) {
-        prob->error = CVX_ERR_RANK;
-        return (cvx_conelp_problem_t *)0;
-    }
-
-    // make space reservations; first init matrix to zero size; compute total space needed
-    // and make one huge allocation; then divide space to matrices by mapping them over
-
-    cvx_size_t sdim = cvx_dimset_sum(dims, CVXDIM_SDP);
+    cvx_size_t cdim      = cvx_dimset_sum_squared(dims, CVXDIM_CONELP);
+    cvx_size_t cdim_diag = cvx_dimset_sum(dims, CVXDIM_CONELP);
+    cvx_size_t sdim      = cvx_dimset_sum(dims, CVXDIM_SDP);
+    cvx_size_t maxsdp    = cvx_dimset_max(dims, CVXDIM_SDP);
     cvx_size_t total = 0;
-    total += 7*mc*nc;  // for x, dx, rx, hrx, x1, wx, wx2
-    total += 7*mb*nb;  // for y, dy, ry, hry, y1, wy, wy2
+
+    total += 7*n;      // for x, dx, rx, hrx, x1, wx, wx2
+    total += 7*m;      // for y, dy, ry, hry, y1, wy, wy2
     total += 5*cdim;   // for s, ds, ws, ws2, ws3
     total += 8*cdim;   // for z, dz, rz, hrz, z1, wz, wz2, wz3
     total += 2*cdim_diag + 2; // for lmbda, lmbdasq
     total += 2*sdim;   // for sigs, sigz
-    total += mh*nh;    // for th
+    total += cdim;     // for th
 
-    cvx_float_t *space = (cvx_float_t *)calloc(total, sizeof(cvx_float_t));
-    if (!space) {
-        prob->error = CVX_ERR_MEMORY;
-        return (cvx_conelp_problem_t *)0;
-    }
-    prob->mlen = total;
-    prob->memory = space;
+    cvx_size_t nbytes = total*sizeof(cvx_float_t);
 
-    prob->c = c;
-    prob->G = G;
-    prob->h = h;
-    prob->A = A;
-    prob->b = b;
-    prob->dims = dims;
+    // workspace for SDP constraint scaling; TODO: think about this.
+    if (maxsdp > 0)
+        nbytes += __WORKBYTES(maxsdp);   
+    
+    cvx_size_t isize;
+    // calculte space need for scaling matrix
+    nbytes += cvx_scaling_bytes(&isize, dims);
 
-    prob->primal_x = (cvx_matrix_t *)0;
-    prob->primal_s = (cvx_matrix_t *)0;
-    prob->dual_y = (cvx_matrix_t *)0;
-    prob->dual_z = (cvx_matrix_t *)0;
+    // size of standard index set
+    nbytes += cvx_index_bytes(dims, 0);
+    // size of packed index set
+    nbytes += cvx_index_bytes(dims, 1);
+    // size of diagonal index set
+    nbytes += cvx_index_bytes(dims, 2);
+    // size of SDP diagonal index set
+    nbytes += cvx_index_bytes(dims, 3);
+
+    return nbytes;
+}
+
+#define __INIT(a, fn)                                           \
+    do {                                                        \
+        a = fn;                                                 \
+        if ((a) == 0) {                                         \
+            fprintf(stderr, "__INIT@%d [%ld,%ld] '%s'\n", __LINE__, nbytes, offset, #fn); \
+            abort();                                            \
+        }                                                       \
+        nbytes -= (a);                                          \
+        offset += (a);                                          \
+    } while (0)
+
+#define __INITC(a, l, var, fn)                                          \
+do {                                                                    \
+    if ((l) == 0) {                                                     \
+        cvxm_map_data(var, 0, 1, (cvx_float_t *)0);              \
+    }                                                                   \
+    else {                                                              \
+        a = fn;                                                         \
+        if ((a) == 0) {                                                 \
+            fprintf(stderr, "__INIT@%d [%ld,%ld] '%s'\n", __LINE__, nbytes, offset, #fn); \
+            abort();                                                    \
+        }                                                               \
+        nbytes -= (a);                                                  \
+        offset += (a);                                                  \
+    } \
+} while (0)
+
+/**
+ * @brief Overlay problem variables onto memory block
+ * 
+ * @param[in,out] prob  
+ *      ConeLP problem structure
+ * @param[in] n  
+ *      Number of variables (length of x -vector)
+ * @param[in] m  
+ *      Number of equality constrains (rows of A matrix)
+ * @param[in] 
+ *      dims Dimensions of inequality constraints, linear, scop and sdp
+ * @param[in] memory
+ *      Pointer to memory block 
+ * @param[in] nbytes
+ *      Size of memory block in bytes
+ *
+ * @return Number of bytes of memory used, zero if memory was not large enough.
+ * 
+ */
+cvx_size_t cvx_conelp_make(cvx_conelp_problem_t *prob,
+                           int n,
+                           int m,
+                           const cvx_dimset_t *dims,
+                           void *memory,
+                           cvx_size_t nbytes)
+{
+    cvx_size_t offset = 0;
+    cvx_size_t used = 0;
+    unsigned char *bytes = (unsigned char *)memory;
+    cvx_size_t cdim =
+        cvx_dimset_sum_squared(dims, CVXDIM_CONELP);
 
     prob->cdim = cdim;
-    prob->cdim_diag = cdim_diag;
+
+    // __INIT macro assumes variables offset and nbytes;
+    // overlay index sets
+    __INIT(used, cvx_index_make(&prob->index_full, dims, 0, bytes,  nbytes));
+    __INIT(used, cvx_index_make(&prob->index_packed, dims, 1, &bytes[offset],  nbytes));
+    __INIT(used, cvx_index_make(&prob->index_diag, dims, 2, &bytes[offset],  nbytes));
+    __INIT(used, cvx_index_make(&prob->index_sig, dims, 3, &bytes[offset],  nbytes));
+
+    // map result matrix; 
+    __INIT(used, cvxm_make(&prob->x, n, 1, &bytes[offset], nbytes));
+    __INITC(used, m, &prob->y, cvxm_make(&prob->y, m, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&prob->s, cdim, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&prob->z, cdim, 1, &bytes[offset], nbytes));
     
-    // init index sets for access to s, z and friends
-    cvx_index_init(&prob->index_full, dims, 0);
-    cvx_index_init(&prob->index_packed, dims, 1); // TODO: is this needed??
-    cvx_index_init(&prob->index_diag, dims, 2);
-    cvx_index_init(&prob->index_sig, dims, 3);
-
-    // map matrices to data space;
-    cvx_size_t offset = 0;
-
-    // result matrices: x, y, s, z  (TODO: separate space for results?)
-    cvxm_map_data(&prob->x, mc, nc, &space[offset]);
-    offset += mc*nc;
-    cvxm_map_data(&prob->y, mb, nb, &space[offset]);
-    offset += mb*nb;
-    cvxm_map_data(&prob->s, cdim, 1, &space[offset]);
-    offset += cdim;
-    cvxm_map_data(&prob->z, cdim, 1, &space[offset]);
-    offset += cdim;
-
     // dx, dy, ds, dz
-    cvxm_map_data(&prob->dx, mc, nc, &space[offset]);
-    offset += mc*nc;
-    cvxm_map_data(&prob->dy, mb, nb, &space[offset]);
-    offset += mb*nb;
-    cvxm_map_data(&prob->ds, cdim, 1, &space[offset]);
-    offset += cdim;
-    cvxm_map_data(&prob->dz, cdim, 1, &space[offset]);
-    offset += cdim;
+    __INIT(used, cvxm_make(&prob->dx, n, 1, &bytes[offset], nbytes));
+    __INITC(used, m, &prob->dy, cvxm_make(&prob->dy, m, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&prob->ds, cdim, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&prob->dz, cdim, 1, &bytes[offset], nbytes));
 
     // rx, ry, rz
-    cvxm_map_data(&prob->rx, mc, nc, &space[offset]);
-    offset += mc*nc;
-    cvxm_map_data(&prob->ry, mb, nb, &space[offset]);
-    offset += mb*nb;
-    cvxm_map_data(&prob->rz, cdim, 1, &space[offset]);
-    offset += cdim;
-    
+    __INIT(used, cvxm_make(&prob->rx, n, 1, &bytes[offset], nbytes));
+    __INITC(used, m, &prob->ry, cvxm_make(&prob->ry, m, 1, &bytes[offset], nbytes));
+    //__INIT(used, cvxm_make(&prob->rs, cdim, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&prob->rz, cdim, 1, &bytes[offset], nbytes));
+
     // x1, y1, z1
-    cvxm_map_data(&prob->x1, mc, nc, &space[offset]);
-    offset += mc*nc;
-    cvxm_map_data(&prob->y1, mb, nb, &space[offset]);
-    offset += mb*nb;
-    cvxm_map_data(&prob->z1, cdim, 1, &space[offset]);
-    offset += cdim;
+    __INIT(used, cvxm_make(&prob->x1, n, 1, &bytes[offset], nbytes));
+    __INITC(used, m, &prob->y1, cvxm_make(&prob->y1, m, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&prob->z1, cdim, 1, &bytes[offset], nbytes));
 
     // hrx, hry, hrz
-    cvxm_map_data(&prob->hrx, mc, nc, &space[offset]);
-    offset += mc*nc;
-    cvxm_map_data(&prob->hry, mb, nb, &space[offset]);
-    offset += mb*nb;
-    cvxm_map_data(&prob->hrz, cdim, 1, &space[offset]);
-    offset += cdim;
+    __INIT(used, cvxm_make(&prob->hrx, n, 1, &bytes[offset], nbytes));
+    __INITC(used, m, &prob->hry, cvxm_make(&prob->hry, m, 1, &bytes[offset], nbytes));
+    //__INIT(used, cvxm_make(&prob->hrs, cdim, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&prob->hrz, cdim, 1, &bytes[offset], nbytes));
 
     // wx, wy, ws, wz
-    cvxm_map_data(&prob->wx, mc, nc, &space[offset]);
-    offset += mc*nc;
-    cvxm_map_data(&prob->wy, mb, nb, &space[offset]);
-    offset += mb*nb;
-    cvxm_map_data(&prob->ws, cdim, 1, &space[offset]);
-    offset += cdim;
-    cvxm_map_data(&prob->wz, cdim, 1, &space[offset]);
-    offset += cdim;
+    __INIT(used, cvxm_make(&prob->wx, n, 1, &bytes[offset], nbytes));
+    __INITC(used, m, &prob->wy2, cvxm_make(&prob->wy, m, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&prob->ws, cdim, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&prob->wz, cdim, 1, &bytes[offset], nbytes));
 
     // wx2, wy2, ws2, wz2
-    cvxm_map_data(&prob->wx2, mc, nc, &space[offset]);
-    offset += mc*nc;
-    cvxm_map_data(&prob->wy2, mb, nb, &space[offset]);
-    offset += mb*nb;
-    cvxm_map_data(&prob->ws2, cdim, 1, &space[offset]);
-    offset += cdim;
-    cvxm_map_data(&prob->wz2, cdim, 1, &space[offset]);
-    offset += cdim;
-   
+    __INIT(used, cvxm_make(&prob->wx2, n, 1, &bytes[offset], nbytes));
+    __INITC(used, m, &prob->wy2, cvxm_make(&prob->wy2, m, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&prob->ws2, cdim, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&prob->wz2, cdim, 1, &bytes[offset], nbytes));
+
     // ws3, wz3
-    cvxm_map_data(&prob->ws3, cdim, 1, &space[offset]);
-    offset += cdim;
-    cvxm_map_data(&prob->wz3, cdim, 1, &space[offset]);
-    offset += cdim;
-
-    // lmbda, lmbdasq (length == cdim_diag + 1)
-    cvxm_map_data(&prob->lmbda, cdim_diag + 1, 1, &space[offset]);
-    offset += cdim_diag + 1;
-    cvxm_map_data(&prob->lmbdasq, cdim_diag + 1, 1, &space[offset]);
-    offset += cdim_diag + 1;
-
-    // sigs, sigz  (length == sum(dimset.S)) will hold eigenvalues of 'S' space
-    cvxm_map_data(&prob->sigs, sdim, 1, &space[offset]);
-    offset += sdim;
-    cvxm_map_data(&prob->sigz, sdim, 1, &space[offset]);
-    offset += sdim;
+    __INIT(used, cvxm_make(&prob->ws3, cdim, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&prob->wz3, cdim, 1, &bytes[offset], nbytes));
 
     // th
-    cvxm_map_data(&prob->th, mh*nh, 1, &space[offset]);
-    offset += mh*nh;
+    __INIT(used, cvxm_make(&prob->th, cdim, 1, &bytes[offset], nbytes));
+
+    cvx_size_t cdim_diag =
+        cvx_dimset_sum(dims, CVXDIM_CONELP);
+
+    prob->cdim_diag = cdim_diag;
+
+    // lmbda, lmbdasq
+    __INIT(used, cvxm_make(&prob->lmbda,   cdim_diag+1, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&prob->lmbdasq, cdim_diag+1, 1, &bytes[offset], nbytes));
+
+    cvx_size_t sdim   = cvx_dimset_sum(dims, CVXDIM_SDP);
+    cvx_size_t maxsdp = cvx_dimset_max(dims, CVXDIM_SDP);
+    
+    // sigs, sigz; space for eigenvalues; zero if no SDP constraints
+    __INITC(used, sdim, &prob->sigs, cvxm_make(&prob->sigs, sdim, 1, &bytes[offset], nbytes));
+    __INITC(used, sdim, &prob->sigs, cvxm_make(&prob->sigz, sdim, 1, &bytes[offset], nbytes));
+    
+    // scaling matrix
+    __INIT(used, cvx_scaling_make(&prob->W, dims, &bytes[offset], nbytes));
+
+    // workspace for SDP contraints handling
+    __mblk_empty(&prob->work);
+    if (maxsdp > 0) {
+        __INIT(used, __mblk_make(&prob->work, __WORKBYTES(maxsdp), &bytes[offset], nbytes));
+    }
 
     // setup matrix group variables
     cvx_mgrp_init(&prob->h_g,   prob->h,    &prob->index_full);
@@ -453,9 +457,7 @@ cvx_conelp_problem_t *cvx_conelp_setup(cvx_conelp_problem_t *prob,
     cvx_mgrp_init(&prob->th_g,  &prob->th,  &prob->index_full);
     cvx_mgrp_init(&prob->ds_g,  &prob->ds,  &prob->index_full);
     cvx_mgrp_init(&prob->dz_g,  &prob->dz,  &prob->index_full);
-    cvx_mgrp_init(&prob->rs_g,  &prob->rs,  &prob->index_full);
     cvx_mgrp_init(&prob->rz_g,  &prob->rz,  &prob->index_full);
-    cvx_mgrp_init(&prob->hrs_g, &prob->hrs, &prob->index_full);
     cvx_mgrp_init(&prob->hrz_g, &prob->hrz, &prob->index_full);
     cvx_mgrp_init(&prob->ws_g,  &prob->ws,  &prob->index_full);
     cvx_mgrp_init(&prob->wz_g,  &prob->wz,  &prob->index_full);
@@ -470,9 +472,112 @@ cvx_conelp_problem_t *cvx_conelp_setup(cvx_conelp_problem_t *prob,
     cvx_mgrp_init(&prob->lmbda_g,   &prob->lmbda,   &prob->index_diag);
     cvx_mgrp_init(&prob->lmbdasq_g, &prob->lmbdasq, &prob->index_diag);
 
-    // allocate scaling
-    cvx_scaling_init(&prob->W, dims);
 
+    return offset;
+}
+
+int cvx_conelp_isok(const cvx_matrix_t *c,
+                    const cvx_matrix_t *G,
+                    const cvx_matrix_t *h,
+                    const cvx_matrix_t *A,
+                    const cvx_matrix_t *b,
+                    const cvx_dimset_t *dims)
+{
+    cvx_size_t mc, nc, mG, nG, mA, nA, mh, nh, mb, nb;  
+
+    mc = nc = mG = nG = mA = nA = mh = nh = mb = nb = 0;
+    if (!c) {
+        return CVX_ERR_NULLCOST;
+    }
+
+    cvxm_size(&mc, &nc, c);
+    if (G)
+        cvxm_size(&mG, &nG, G);
+    if (A)
+        cvxm_size(&mA, &nA, A);
+    if (h)
+        cvxm_size(&mh, &nh, h);
+    if (b)
+        cvxm_size(&mb, &nb, b);
+    
+    if (nc > 1 || mc < 1) {
+        return CVX_ERR_DIMC;
+    }
+
+    cvx_size_t cdim      = cvx_dimset_sum_squared(dims, CVXDIM_CONELP);
+    cvx_size_t cdim_pckd = cvx_dimset_sum_packed(dims, CVXDIM_CONELP);   
+    
+    if (nh > 1 || mh != cdim) {
+        return CVX_ERR_DIMH;
+    }
+
+    if (mG != cdim || nG != mc) {
+        return CVX_ERR_DIMG;
+    }
+    if (nA != mc || mA != mb) {
+        return CVX_ERR_DIMA;
+    }
+    if (nb != 1) {
+        return CVX_ERR_DIMB;
+    }
+    if ( mb > mc || mb + cdim_pckd < mc) {
+        return CVX_ERR_RANK;
+    }
+    return 0;
+}
+
+cvx_size_t cvx_conelp_setup(cvx_conelp_problem_t *prob,
+                            cvx_matrix_t *c,
+                            cvx_matrix_t *G,
+                            cvx_matrix_t *h,
+                            cvx_matrix_t *A,
+                            cvx_matrix_t *b,
+                            cvx_dimset_t *dims,
+                            cvx_kktsolver_t *kktsolver)
+{
+    if (! prob)
+        return 0;
+
+    cvx_size_t mc, nc, mb, nb;
+    int err;
+    if ((err = cvx_conelp_isok(c, G, h, A, b, dims)) != 0) {
+        prob->error = err;
+        return 0;
+    }
+    
+    mc = nc = mb = nb = 0;
+    cvxm_size(&mc, &nc, c);
+    if (b)
+        cvxm_size(&mb, &nb, b);
+
+    cvx_size_t nbytes = cvx_conelp_bytes(mc, mb, dims);
+    void *memory = calloc(nbytes, 1);
+    if (!memory) {
+        prob->error = CVX_ERR_MEMORY;
+        return 0;
+    }
+                
+    prob->c = c;
+    prob->G = G;
+    prob->h = h;
+    prob->A = A;
+    prob->b = b;
+    prob->dims = dims;
+
+    prob->primal_x = (cvx_matrix_t *)0;
+    prob->primal_s = (cvx_matrix_t *)0;
+    prob->dual_y = (cvx_matrix_t *)0;
+    prob->dual_z = (cvx_matrix_t *)0;
+
+    if (cvx_conelp_make(prob, mc, mb, dims, memory, nbytes) == 0) {
+        prob->error = CVX_ERR_MEMORY;
+        return 0;
+    }
+    prob->mlen = nbytes;
+    prob->memory = memory;
+
+
+    // init KKT solver
     if (kktsolver) {
         prob->solver = kktsolver;
     } else {
@@ -480,13 +585,8 @@ cvx_conelp_problem_t *cvx_conelp_setup(cvx_conelp_problem_t *prob,
         prob->solver = &prob->__S;
     }
     
-    // TODO: initialized workspace; needed if SDP constraints
-    __mblk_empty(&prob->work);
-    cvx_size_t maxsdp = cvx_dimset_max(dims, CVXDIM_SDP);
-    if (maxsdp > 0)
-        __mblk_init(&prob->work, 6*maxsdp*maxsdp);
 
-    return prob;
+    return nbytes;
 }
 
 void cvx_conelp_set_start(cvx_conelp_problem_t *prob,
@@ -539,7 +639,6 @@ int cvx_conelp_compute_start(cvx_conelp_problem_t *prob)
     int primalstart = ! (prob->primal_x && prob->primal_s);
     int dualstart = ! (prob->dual_y && prob->dual_z);
 
-    //printf("solver.mnl: %ld\n", prob->solver->u.ldl.mnl);
     if (primalstart || dualstart) {      
         cvx_conelp_init_scaling(&prob->W);       
         cvx_kktfactor(prob->solver, &prob->W, __cvxnil, __cvxnil);
@@ -797,8 +896,6 @@ int cvx_conelp_solve(cvx_conelp_problem_t *prob, cvx_solopts_t *opts)
             stats->relgap = __NaN();
         }
 
-        //printf("gap: %e, pcost: %e, dcost: %e, relgap: %e\n", stats->gap, stats->pcost, stats->dcost, stats->relgap);
-
         if (prob->ts <= 0.0 && prob->tz < 0 &&
             (stats->gap <= abstol ||
              (!isnan(stats->relgap) && stats->relgap <= reltol))) {
@@ -849,12 +946,9 @@ int cvx_conelp_solve(cvx_conelp_problem_t *prob, cvx_solopts_t *opts)
         // hrx = -A'*y - G'*z
         cvxm_scale(&prob->hrx, 0.0, CVX_ALL);
         cvxm_mvmult(0.0, &prob->hrx, -1.0, prob->A, &prob->y, CVX_TRANS);
-        //cvx_mat_printf(stdout, "%e", &prob->z, "hresx z");
         cvx_sgemv(1.0, &prob->hrx, -1.0, prob->G, &prob->z_g, CVX_TRANS);
-        //cvxm_mvmult(1.0, &prob->hrx, -1.0, prob->G, &prob->z, CVX_TRANS);
         //stats->hresx = cvxm_nrm2(&prob->hrx);
         stats->hresx = SQRT(cvxm_dot(&prob->hrx, &prob->hrx));
-        //printf("hresx: %e\n", stats->hresx);
         //cvx_mat_printf(stdout, "%e", &prob->hrx, "hrx");
         
         // rx  = hrx - c*tau
@@ -895,9 +989,7 @@ int cvx_conelp_solve(cvx_conelp_problem_t *prob, cvx_solopts_t *opts)
             //cvx_mat_printf(stdout, "%e", &prob->rz, "rz (iter > 0)");
         }
 
-        //stats->resz = cvx_snrm2(&prob->rz_g) / prob->tau;
-        cvx_float_t tmp = cvx_snrm2(&prob->rz_g);
-        stats->resz = tmp / prob->tau;
+        stats->resz = cvx_snrm2(&prob->rz_g) / prob->tau;
         //printf("resz : %e [%e/%e]\n", stats->resz, tmp, prob->tau);
 
         // rt = kappa + c'*x + b'*y + h'*z '
@@ -935,7 +1027,6 @@ int cvx_conelp_solve(cvx_conelp_problem_t *prob, cvx_solopts_t *opts)
         if (stats->cx < 0.0) {
             stats->dinfres = __MAX2((stats->hresy/stats->resy0),  (stats->hresz/stats->resz0)) / (-stats->cx);
         }
-        //printf("pinfres: %e, dinfres: %e\n", stats->pinfres, stats->dinfres);
         if (opts->show_progress > 0) {
             if (iter == 0) {
                 fprintf(stderr, "%10s %12s %10s %8s %7s %5s\n",
@@ -1250,11 +1341,10 @@ int cvx_conelp_solve(cvx_conelp_problem_t *prob, cvx_solopts_t *opts)
         // compute feasibility residuals).
         cvx_mgrp_copy_lambda(&prob->s_g, &prob->lmbda_g);
         cvx_scale(&prob->s_g, &prob->W, CVX_TRANS, &prob->work);
-        //cvx_mat_printf(stdout, "%e", &prob->s, "unscaled s");
 
         cvx_mgrp_copy_lambda(&prob->z_g, &prob->lmbda_g);
+
         cvx_scale(&prob->z_g, &prob->W, CVX_INV, &prob->work);
-        //cvx_mat_printf(stdout, "%e", &prob->z, "unscaled z");
 
         prob->kappa = cvxm_get(&prob->lmbda, prob->cdim_diag, 0) / prob->dgi;
         prob->tau   = cvxm_get(&prob->lmbda, prob->cdim_diag, 0) * prob->dgi;

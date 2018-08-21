@@ -46,7 +46,70 @@ cvx_size_t cvx_index_bytes(const cvx_dimset_t *dims, int kind)
     } else {
         n = dims->slen + 1;
     }
-    return n*sizeof(cvx_size_t);
+    n *= sizeof(cvx_size_t);
+    // align to 64bits
+    n += (n & 0x7) != 0 ? 8 - (n & 0x7) : 0;
+    return n;
+}
+
+/**
+ * @brief Overlay index structure to provided memory block.
+ */
+cvx_size_t cvx_index_make(cvx_index_t *ind,
+                          const cvx_dimset_t *dims,
+                          int kind,
+                          void *buf,
+                          cvx_size_t nbytes)
+{
+    if (!ind || !dims)
+        return 0;
+    
+    int n = cvx_index_bytes(dims, kind);
+    if (nbytes < n)
+        return 0;
+
+    int k = 0;
+    int off = 0;
+    ind->indnl = ind->indl = ind->indq = ind->inds = (cvx_size_t *)0;
+    ind->dims = dims;
+    ind->index = (cvx_size_t *)buf;
+    
+    if (kind != 3) {
+        if (dims->mnl > 0) {
+            ind->indnl = &ind->index[k];
+            ind->indnl[0] = off;
+            k++;
+            off += dims->mnl;
+        }
+        if (dims->ldim > 0) {
+            ind->indl = &ind->index[k];
+            ind->index[k] = off;
+            k++;
+            off += dims->ldim;
+        }
+        for (int j = 0; j < dims->qlen; j++) {
+            if (j == 0)
+                ind->indq = &ind->index[k];
+            ind->index[k] = off;
+            k++;
+            off += dims->qdims[j];
+        }
+    }
+
+    for (int j = 0; j < dims->slen; j++) {
+        if (j == 0)
+            ind->inds = &ind->index[k];
+        ind->index[k] = off;
+        k++;
+        off += kind == 0 ?
+            dims->sdims[j] * dims->sdims[j] :           // normal storage for S
+            ( kind == 1 ?   
+              dims->sdims[j] * (dims->sdims[j] + 1)/2 : // packed storage for S
+              dims->sdims[j]);                          // diagonal storage for S (kind == 2|3)
+    }
+    // offset past the last entry;
+    ind->index[k] = off;
+    return n;
 }
 
 /**
@@ -72,12 +135,21 @@ cvx_size_t cvx_index_bytes(const cvx_dimset_t *dims, int kind)
  */
 cvx_index_t *cvx_index_init(cvx_index_t *ind, const cvx_dimset_t *dims, int kind)
 {
-    int n;
     if (! ind)
         return ind;
     if (! dims)
         return (cvx_index_t *)0;
 
+    cvx_size_t nb = cvx_index_bytes(dims, kind);
+    void *mem = calloc(nb, 1);
+    if (!mem)
+        return (cvx_index_t *)0;
+        
+    cvx_index_make(ind, dims, kind, mem, nb);
+    ind->__bytes = mem;
+    return ind;
+
+#if 0    
     // allocate for offsets
     if (kind != 3) {
         n = dims->slen +
@@ -93,6 +165,7 @@ cvx_index_t *cvx_index_init(cvx_index_t *ind, const cvx_dimset_t *dims, int kind
     ind->index = (cvx_size_t *)calloc(n, sizeof(cvx_size_t));
     if (! ind->index)
         return (cvx_index_t *)0;
+    ind->__bytes = ind->index;
     
     int k = 0;
     int off = 0;
@@ -135,14 +208,17 @@ cvx_index_t *cvx_index_init(cvx_index_t *ind, const cvx_dimset_t *dims, int kind
     // offset past the last entry;
     ind->index[k] = off;
     return ind;
+#endif
 }
 
 void cvx_index_release(cvx_index_t *ind)
 {
     if (! ind)
         return;
-    if (ind->index)
-        free(ind->index);
+    if (ind->__bytes) {
+        free(ind->__bytes);
+        ind->__bytes = (void *)0;
+    }
     ind->index = ind->indnl = ind->indl = ind->indq = ind->inds = (cvx_size_t *)0;
 }
 
@@ -215,6 +291,10 @@ cvx_size_t cvx_index_elem(cvx_matrix_t *x,
             if (x)
                 cvxm_map_data(x, m, 1, cvxm_data(y, ind->indnl[0]));
         }
+        break;
+    default:
+        if (x)
+            cvxm_map_data(x, 0, 0, (cvx_float_t *)0);
         break;
     }
     return m;

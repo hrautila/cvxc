@@ -156,8 +156,6 @@ int cvx_scale(cvx_matgrp_t *x_g,
     if (W->rcount > 0) {
         cvx_matrix_t xd;
         int rflags = inverse ? flags & CVX_TRANS : (flags ^ CVX_TRANS);
-        int trans  = (flags & CVX_TRANS) != 0;
-        int t  = (rflags & CVX_TRANS) != 0;
         for (k = 0; k < W->rcount; k++) {
             m = cvx_scaling_elem(&r, W, (inverse ? CVXWS_RTI : CVXWS_R), k);
             // workspace Ak = mat(xk)
@@ -171,12 +169,10 @@ int cvx_scale(cvx_matgrp_t *x_g,
                 //
                 cvxm_copy(&Ak, &r, CVX_ALL);
                 if ((rflags & CVX_TRANS) == 0) {
-                    printf("scale right: inv=%d, trans=%d, t=%d\n", inverse, trans, t);
                     cvxm_mult_trm(&Ak, 1.0, &xk, CVX_RIGHT|CVX_LOWER);
                     // x = 0.0*x + (r*a' + a*r') (lower triangular storage)
                     cvxm_update2_sym(0.0, &xk, 1.0, &r, &Ak, rflags|CVX_LOWER);
                 } else {
-                    printf("scale left: inv=%d, trans=%d, t=%d\n", inverse, trans, t);
                     cvxm_mult_trm(&Ak, 1.0, &xk, CVX_LEFT|CVX_LOWER);
                     // x = 0.0*x + (r'*a + a'*r) (lower triangular storage)
                     cvxm_update2_sym(0.0, &xk, 1.0, &r, &Ak, rflags|CVX_LOWER);
@@ -260,10 +256,8 @@ int cvx_scale_vector(cvx_matgrp_t *x_g,
     if (W->rcount > 0) {
         cvx_matrix_t Ak, xd;
         int rflags = inverse ? flags & CVX_TRANS : (flags ^ CVX_TRANS);
-        //int trans  = (flags & CVX_TRANS) != 0;
-        //int t  = (rflags & CVX_TRANS) != 0;
         for (int k = 0; k < W->rcount; k++) {
-            m = cvx_scaling_elem(&r, W, (inverse ? CVXWS_RTI : CVXWS_R), k);
+            m = cvx_scaling_elem(&r, W, (inverse ? CVXWS_RTI : CVXWS_R), k); 
             // workspace Ak = mat(xk)
             cvxm_map_data(&Ak, m, m, __mblk_offset(work, 0));
             // x is matrix in lower triangular storage format
@@ -273,15 +267,11 @@ int cvx_scale_vector(cvx_matgrp_t *x_g,
             cvxm_scale(&xd, 0.5, CVX_ALL);
             cvxm_copy(&Ak, &r, CVX_ALL);
             if ((rflags & CVX_TRANS) == 0) {
-                //printf("scale right: inv=%d, trans=%d, t=%d\n", inverse, trans, t);
                 cvxm_mult_trm(&Ak, 1.0, &xk, CVX_RIGHT|CVX_LOWER);
                 // x = 0.0*x + (r*a' + a*r') (lower triangular storage)
                 cvxm_update2_sym(0.0, &xk, 1.0, &r, &Ak, rflags|CVX_LOWER);
             } else {
-                //printf("scale left: inv=%d, trans=%d, t=%d\n", inverse, trans, t);
-                //cvx_mat_printf(stdout, "%13.6e", &Ak, "** a = r");
                 cvxm_mult_trm(&Ak, 1.0, &xk, CVX_LEFT|CVX_LOWER);
-                //cvx_mat_printf(stdout, "%13.6e", &Ak, "** a*x");
                 // x = 0.0*x + (r'*a + a'*r) (lower triangular storage)
                 cvxm_update2_sym(0.0, &xk, 1.0, &r, &Ak, rflags|CVX_LOWER);
             }
@@ -492,9 +482,7 @@ int cvx_compute_scaling(cvx_scaling_t *W,
             cvxm_make_trm(&Ls, CVX_LOWER);
             cvxm_copy(&wrk, &Ls, 0);
             cvxm_mult_trm(&wrk, 1.0, &Lz, CVX_LEFT|CVX_LOWER|CVX_TRANS);
-            //cvx_mat_printf(stdout, "%13.6e", &wrk, "SVD");
             cvxm_svd(&lk, &r, (cvx_matrix_t *)0, &wrk, CVX_WANTU/*|ARMAS_FORWARD*/, &Tmp);
-            //cvx_mat_printf(stdout, "%13.6e", &r, "SVD:U");
             cvxm_copy(&rti, &r, CVX_ALL);
             // r = Lz^-T * U
             cvxm_solve_trm(&r, 1.0, &Lz, CVX_LEFT|CVX_TRANS|CVX_LOWER);
@@ -723,27 +711,19 @@ int cvx_update_scaling(cvx_scaling_t *W,
             // workspaces
             __mblk_clear(work);
             cvxm_map_data(&wrk, m, m, __mblk_offset(work, 0));
-            cvxm_map_data(&tmp, 2*m, 1, __mblk_offset(work, m*m));
-            __mblk_subblk(&Tmp, work, m*m+2*m);
+            __mblk_subblk(&Tmp, work, m*m);
             // t = r*sk = r*Ls
-            //cvx_mat_printf(stdout, "%13.6e", &r, "r");
             cvxm_mult(0.0, &wrk, 1.0, &r, &Ls, 0);
             cvxm_copy(&r, &wrk, CVX_ALL);
-            //cvx_mat_printf(stdout, "%13.6e", &r, "r*Ls");
             // rti = rti*Lz
-            //cvx_mat_printf(stdout, "%13.6e", &rti, "rti");
             cvxm_mult(0.0, &wrk, 1.0, &rti, &Lz, 0);
             cvxm_copy(&rti, &wrk, CVX_ALL);
-            //cvx_mat_printf(stdout, "%13.6e", &rti, "rti*Lz");
             // SVD(Lz'*Ls) = U * lmbds^+ * V'; store U in sk and V' in zk. '
             cvxm_mult(0.0, &wrk, 1.0, &Lz, &Ls, CVX_TRANS);
             // U = s; Vt = z
             cvxm_scale(&Ls, 0.0, 0);
             cvxm_scale(&Lz, 0.0, 0);
-            //cvx_mat_printf(stdout, "%13.6e", &wrk, "SVD");
-            cvxm_svd(&lk, &Ls, &Lz, &wrk, CVX_WANTU|CVX_WANTV/*|ARMAS_FORWARD*/, &Tmp);
-            //cvx_mat_printf(stdout, "%13.6e", &Ls, "SVD:U");
-            //cvx_mat_printf(stdout, "%13.6e", &Lz, "SVD:V");
+            cvxm_svd(&lk, &Ls, &Lz, &wrk, CVX_WANTU|CVX_WANTV, &Tmp);
             // r = r*V
             cvxm_mult(0.0, &wrk, 1.0, &r, &Lz, CVX_TRANSB);
             cvxm_copy(&r, &wrk, CVX_ALL);

@@ -46,7 +46,8 @@ typedef enum cvx_flags {
     CVX_LEFT   = ARMAS_LEFT,
     CVX_RIGHT  = ARMAS_RIGHT,
     CVX_WANTU  = ARMAS_WANTU,
-    CVX_WANTV  = ARMAS_WANTV
+    CVX_WANTV  = ARMAS_WANTV,
+    CVX_DEBUG  = 0x8000000
 } cvx_flags_t;
 
 __CVX_INLINE
@@ -86,6 +87,16 @@ __CVX_INLINE
 cvx_float_t *cvxm_data(const cvx_matrix_t *A, cvx_size_t k)
 {
     return &armas_d_data(A)[k];
+}
+
+__CVX_INLINE
+cvx_size_t cvxm_make(cvx_matrix_t *A, cvx_size_t rows, cvx_size_t cols,  void *data, cvx_size_t nbytes)
+{
+    cvx_size_t nb = rows * cols * sizeof(cvx_float_t);
+    if (nbytes < nb)
+        return 0;
+    armas_d_make(A, (int)rows, (int)cols, (int)rows, (cvx_float_t *)data);
+    return nb;
 }
 
 // \brief Create matrix view of elements pointed by data

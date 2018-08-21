@@ -21,8 +21,9 @@ cvx_size_t cvx_scaling_bytes(cvx_size_t *isize, const cvx_dimset_t *dims)
     cvx_size_t rspace = cvx_dimset_sum_squared(dims, CVXDIM_SDP);
 
     // calculate index space length in bytes and align to 64bits;
-    cvx_size_t itotal = (dims->qlen + 2*dims->slen)*sizeof(cvx_size_t);
-    itotal += (itotal & 0x7) == 0 ? 8 - (itotal & 0x7) : 0;
+    // (2 is for linear and non-linear spaces.)
+    cvx_size_t itotal = (2 + dims->qlen + 2*dims->slen)*sizeof(cvx_size_t);
+    itotal += (itotal & 0x7) != 0 ? 8 - (itotal & 0x7) : 0;
     
     // matrix data space length
     cvx_size_t ntotal =
@@ -88,6 +89,7 @@ cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *me
     // setup indexes
     cvx_size_t offset = 0;
     W->dnlsz = dims->mnl;
+    W->dnl = W->dnli = (cvx_float_t *)0;
     if (dims->mnl > 0) {
         // Direct pointers to DNL/DNLI data space
         W->dnl = W->data;
@@ -96,6 +98,7 @@ cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *me
         offset += dims->mnl;
     }
     W->dsz = dims->ldim;
+    W->d = W->di = (cvx_float_t *)0;
     if (dims->ldim > 0) {
         // Direct pointers to D/DI data space
         W->d = &W->data[offset];
@@ -190,6 +193,13 @@ void cvx_scaling_release(cvx_scaling_t *W)
     W->data = W->dnl = W->dnli = W->d = W->di = W->beta = (cvx_float_t *)0;
     W->dnlsz = W->dsz = W->vcount = W->rcount = 0;
     W->indexes = W->indv = W->indr = W->indrti = (cvx_size_t *)0;
+}
+
+void cvx_scaling_free(cvx_scaling_t *W)
+{
+    cvx_scaling_release(W);
+    if (W)
+        free(W);
 }
 
 // \brief Get scaling element NAME at index ind; returns size of element

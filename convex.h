@@ -89,8 +89,9 @@ typedef enum {
     NL = 8,
     CVXDIM_LINEAR = 1,
     CVXDIM_SDP = 2,
-    CVXDIM_SOCP = 4,
-    CVXDIM_NONLINEAR = 8
+    CVXDIM_SOCP = 4,   
+    CVXDIM_NONLINEAR = 8,
+    CVXDIM_CONELP = 7
 } cvx_dim_enum;
 
 typedef enum {
@@ -129,9 +130,11 @@ typedef enum  {
 
 // -------------------------------------------------------------------------------------
 
+// very simple
 typedef struct cvx_memblk {
     cvx_float_t *memory;
     cvx_size_t mlen;
+    void *__bytes;
 } cvx_memblk_t;
 
 static inline
@@ -151,24 +154,39 @@ void __mblk_init(cvx_memblk_t *m, cvx_size_t n)
     if (space) {
         m->memory = space;
         m->mlen = n;
+        m->__bytes = space;
     }
     
 }
 
 static inline
+cvx_size_t __mblk_make(cvx_memblk_t *m, cvx_size_t mlen, void *ptr, cvx_size_t nbytes)
+{
+    if (!ptr || nbytes < mlen)
+        return 0;
+    m->memory = (cvx_float_t *)ptr;
+    m->mlen = mlen/sizeof(cvx_float_t);
+    m->__bytes = (void *)0;
+    return mlen;
+}
+
+static inline
 void __mblk_release(cvx_memblk_t *m)
 {
-    if (m->memory)
-        free(m->memory);
+    if (m->__bytes)
+        free(m->__bytes);
     m->memory = (cvx_float_t *)0;
     m->mlen = 0;
+    m->__bytes = (void *)0;
 }
 
 static inline
 cvx_float_t *__mblk_offset(cvx_memblk_t *m, cvx_size_t off)
 {
-    if (off >= m->mlen)
+    if (off >= m->mlen) {
+        abort();
         return (cvx_float_t *)0;
+    }
     return &m->memory[off];
 }
 
@@ -216,9 +234,12 @@ typedef struct cvx_index {
     cvx_size_t *indl;          ///< Index to linear
     cvx_size_t *indnl;         ///< Index to non-linear
     const cvx_dimset_t *dims;
+    void *__bytes;
 } cvx_index_t;
 
+extern cvx_size_t cvx_index_bytes(const cvx_dimset_t *dims, int kind);
 extern cvx_size_t cvx_index_count(const cvx_index_t *index, cvx_dim_enum name);
+extern cvx_size_t cvx_index_make(cvx_index_t *ind, const cvx_dimset_t *dims, int kind, void *buf, cvx_size_t nbytes);
 extern cvx_index_t *cvx_index_init(cvx_index_t *index, const cvx_dimset_t *dims, int packed);
 extern void cvx_index_release(cvx_index_t *dims);
 extern cvx_size_t cvx_index_elem(cvx_matrix_t *x, const cvx_matrix_t *y, const cvx_index_t *ind, cvx_dim_enum name, int k);
@@ -243,6 +264,9 @@ typedef struct cvx_scaling {
     unsigned char *__bytes;
     cvx_size_t nbytes;
 } cvx_scaling_t;
+
+extern cvx_size_t cvx_scaling_bytes(cvx_size_t *isize, const cvx_dimset_t *dims);
+extern cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *mem, size_t nbytes);
 
 extern cvx_size_t cvx_scaling_elem(cvx_matrix_t *A, const cvx_scaling_t *W, cvx_mset_enum name, int ind);
 extern cvx_scaling_t *cvx_scaling_init(cvx_scaling_t *W, const cvx_dimset_t *dims);
@@ -455,14 +479,14 @@ typedef struct cvx_conelp_problem {
 
     cvx_matrix_t x1, y1, z1;
     
-    cvx_matrix_t rx, ry, rz, rs;
-    cvx_matrix_t hrx, hry, hrz, hrs;
+    cvx_matrix_t rx, ry, rz;
+    cvx_matrix_t hrx, hry, hrz;
     cvx_matrix_t sigs, sigz;
     cvx_matrix_t lmbda, lmbdasq;
     
     cvx_matrix_t wx, wy, ws, wz;
     cvx_matrix_t wx2, wy2, ws2, wz2;
-    cvx_matrix_t wx3, wy3, ws3, wz3;
+    cvx_matrix_t ws3, wz3;
     cvx_matrix_t th;
     cvx_float_t wkappa3;
     
@@ -470,8 +494,8 @@ typedef struct cvx_conelp_problem {
     cvx_matgrp_t h_g;
     cvx_matgrp_t s_g, z_g;
     cvx_matgrp_t ds_g, dz_g;
-    cvx_matgrp_t hrs_g, hrz_g;
-    cvx_matgrp_t rs_g, rz_g;
+    cvx_matgrp_t hrz_g;
+    cvx_matgrp_t rz_g;
     cvx_matgrp_t ws_g, wz_g;
     cvx_matgrp_t ws2_g, wz2_g;
     cvx_matgrp_t ws3_g, wz3_g;
@@ -504,7 +528,14 @@ typedef struct cvx_conelp_problem {
 
 extern cvx_float_t cvx_max_step(cvx_matgrp_t *x, cvx_matgrp_t *sigs, cvx_memblk_t *wrk);
 
-extern cvx_conelp_problem_t *
+extern cvx_size_t cvx_conelp_bytes(int n, int m, const cvx_dimset_t *dims);
+extern cvx_size_t cvx_conelp_make(cvx_conelp_problem_t *prob, int n, int m, const cvx_dimset_t *dims, void *memory, cvx_size_t nbytes);
+
+extern int cvx_conelp_isok(const cvx_matrix_t *c, const cvx_matrix_t *G, const cvx_matrix_t *h,
+                           const cvx_matrix_t *A, const cvx_matrix_t *b, const cvx_dimset_t *dims);
+
+
+extern cvx_size_t
 cvx_conelp_setup(cvx_conelp_problem_t *prob,
                  cvx_matrix_t *c, cvx_matrix_t *G, cvx_matrix_t *h,
                  cvx_matrix_t *A, cvx_matrix_t *b, cvx_dimset_t *dims,
