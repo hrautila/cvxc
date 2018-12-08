@@ -527,7 +527,7 @@ int cvx_update_scaling(cvx_scaling_t *W,
                        cvx_matgrp_t *z_g,
                        cvx_memblk_t *work)
 {
-    cvx_size_t m, ind = 0;
+    cvx_size_t m; //ind = 0;
     cvx_matrix_t sk, zk, lk, wrk, tmp;
     cvx_matrix_t dnl, dnli, dl, dli;
     cvx_matrix_t *s = s_g->mat, *z = z_g->mat, *lmbda = lmbda_g->mat;
@@ -537,6 +537,47 @@ int cvx_update_scaling(cvx_scaling_t *W,
     //    d :=  d .* sqrt( s ./ z )
     //    lmbda := lmbda .* sqrt(s) .* sqrt(z)
     //
+#if 0
+    if  (W->dnlsz > 0) {
+        cvx_scaling_elem(&dnl,  W, CVXWS_DNL, 0);
+        cvx_scaling_elem(&dnli, W, CVXWS_DNLI, 0);
+        // s = sqrt(s) ; z = sqrt(z);
+        cvx_mgrp_elem(&sk, s_g, CVXDIM_NONLINEAR, 0);
+        cvx_mgrp_elem(&zk, z_g, CVXDIM_NONLINEAR, 0);
+        cvxm_apply(&sk, fsqrt, CVX_ALL);
+        cvxm_apply(&zk, fsqrt, CVX_ALL);
+        // lmbda = sqrt(s) .* sqrt(z)
+        cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_NONLINEAR, 0);
+        cvxm_copy(&lk, &sk, CVX_ALL);
+        cvxm_mult_diag(&lk, 1.0, &zk, CVX_LEFT);
+        // dnl = dnl .* s .* z
+        cvxm_mult_diag(&dnl, 1.0, &sk, CVX_LEFT);
+        cvxm_solve_diag(&dnl, 1.0, &zk, CVX_LEFT);
+        // dnli = 1.0 ./ dnl
+        cvxm_copy(&dnli, &dnl, CVX_ALL);
+        cvxm_apply(&dnli, finv, CVX_ALL);
+    }
+    if (W->dsz > 0) {
+        cvx_scaling_elem(&dl,  W, CVXWS_D, 0);
+        cvx_scaling_elem(&dli, W, CVXWS_DI, 0);
+        // s = sqrt(s) ; z = sqrt(z);
+        cvx_mgrp_elem(&sk, s_g, CVXDIM_LINEAR, 0);
+        cvx_mgrp_elem(&zk, z_g, CVXDIM_LINEAR, 0);
+        cvxm_apply(&sk, fsqrt, CVX_ALL);
+        cvxm_apply(&zk, fsqrt, CVX_ALL);
+        // lmbda = sqrt(s) .* sqrt(z)
+        cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_LINEAR, 0);
+        cvxm_copy(&lk, &sk, CVX_ALL);
+        cvxm_mult_diag(&lk, 1.0, &zk, CVX_LEFT);
+        // dl = dl .* s ./ z
+        cvxm_mult_diag(&dl, 1.0, &sk, CVX_LEFT);
+        cvxm_solve_diag(&dl, 1.0, &zk, CVX_LEFT);
+        // dli = 1.0 ./ dl
+        cvxm_copy(&dli, &dl, CVX_ALL);
+        cvxm_apply(&dli, finv, CVX_ALL);
+    }
+#endif
+#if 1
     if (W->dsz + W->dnlsz > 0) {
         if (W->dnlsz > 0) {
             cvx_scaling_elem(&dnl,  W, CVXWS_DNL, 0);
@@ -563,7 +604,7 @@ int cvx_update_scaling(cvx_scaling_t *W,
             // dnli = 1.0 ./ dnl
             cvxm_copy(&dnli, &dnl, CVX_ALL);
             cvxm_apply(&dnli, finv, CVX_ALL);
-            ind = W->dnlsz;
+            //ind = W->dnlsz;
         }
         cvx_mgrp_elem(&sk, s_g, CVXDIM_LINEAR, 0);
         cvx_mgrp_elem(&zk, z_g, CVXDIM_LINEAR, 0);
@@ -573,9 +614,9 @@ int cvx_update_scaling(cvx_scaling_t *W,
         // dli = 1.0 ./ dl
         cvxm_copy(&dli, &dl, CVX_ALL);
         cvxm_apply(&dli, finv, CVX_ALL);
-        ind += W->dsz;
+        //ind += W->dsz;
     }
-
+#endif
     // 'q' blocks.
     // Let st and zt be the new variables in the old scaling:
     //
@@ -673,7 +714,7 @@ int cvx_update_scaling(cvx_scaling_t *W,
             // beta[k] *= ( aa / bb )**1/2
             cvxm_set(&beta, k, 0, SQRT(a/b)*cvxm_get(&beta, k, 0));
 
-            ind += m;
+            //ind += m;
        }
     }
 
