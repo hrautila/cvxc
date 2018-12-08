@@ -18,6 +18,7 @@
 // inline function reference
 void cvxm_init(cvx_matrix_t *m, cvx_size_t r, cvx_size_t c);
 void cvxm_release(cvx_matrix_t *X);
+void cvxm_free(cvx_matrix_t *X);
 size_t cvxm_sizeof();
 cvx_matrix_t *cvxm_new(cvx_size_t r, cvx_size_t c);
 cvx_matrix_t *cvxm_newcopy(const cvx_matrix_t *A);
@@ -30,7 +31,7 @@ cvx_matrix_t *cvxm_view_map(cvx_matrix_t *A, const cvx_matrix_t *B, cvx_size_t r
 void cvxm_view_unmap(cvx_matrix_t *A, cvx_matrix_t *B);
 cvx_matrix_t *cvxm_view_diag(cvx_matrix_t *A, const cvx_matrix_t *B, int nd);
 void cvxm_size(size_t *r, size_t *c, const cvx_matrix_t *A);
-cvx_float_t cvxm_get(cvx_matrix_t *A, cvx_size_t r, cvx_size_t c);
+cvx_float_t cvxm_get(const cvx_matrix_t *A, cvx_size_t r, cvx_size_t c);
 void cvxm_set(cvx_matrix_t *A, cvx_size_t r, cvx_size_t c, cvx_float_t val);
 void cvxm_apply(cvx_matrix_t *A, cvx_oper_t f, int flags);
 
@@ -61,17 +62,35 @@ int cvxm_update2_sym(cvx_float_t beta, cvx_matrix_t *C, cvx_float_t alpha, const
 
 #endif
 
+// get size of the work space needed to factor matrix A
+cvx_size_t cvxm_ldlwork(const cvx_matrix_t *A)
+{
+    armas_conf_t cf = *armas_conf_default();
+    armas_wbuf_t wb = (armas_wbuf_t){
+        .buf = (char *)0,
+        .offset = 0,
+        .bytes = 0
+    };
+    armas_d_bkfactor_w((cvx_matrix_t *)A, (armas_pivot_t *)0, ARMAS_LOWER, &wb, &cf);
+    return wb.bytes;
+}
+
 int cvxm_ldlfactor(cvx_matrix_t *A, int *ipiv, int flags, cvx_memblk_t *wrk)
 {
     armas_pivot_t pv;
     size_t rows, cols;
-    armas_d_dense_t W;
+    //armas_d_dense_t W;
     armas_conf_t cf = *armas_conf_default();
+    armas_wbuf_t wb = (armas_wbuf_t){
+        .buf = (char *)wrk->memory,
+        .offset = 0,
+        .bytes = wrk->mlen*sizeof(cvx_float_t)
+    };
     cvxm_size(&rows, &cols, A);
     armas_pivot_make(&pv, rows, ipiv);
     // min workspace is 2*N
-    armas_d_make(&W, wrk->mlen, 1, wrk->mlen, (cvx_float_t*)wrk->memory);
-    if (armas_d_bkfactor(A, &W, &pv, flags, &cf) < 0) {
+    //armas_d_make(&W, wrk->mlen, 1, wrk->mlen, (cvx_float_t*)wrk->memory);
+    if (armas_d_bkfactor_w(A, &pv, flags, &wb, &cf) < 0) {
         printf("bkfactor error: %d\n", cf.error);
     }
     return 0;
@@ -80,13 +99,19 @@ int cvxm_ldlsolve(cvx_matrix_t *B, const cvx_matrix_t *A, const int *ipiv, int f
 {
     armas_pivot_t pv;
     size_t rows, cols;
-    armas_d_dense_t W;
+    //armas_d_dense_t W;
     armas_conf_t cf = *armas_conf_default();
+    armas_wbuf_t wb = (armas_wbuf_t){
+        .buf = (char *)wrk->memory,
+        .offset = 0,
+        .bytes = wrk->mlen*sizeof(cvx_float_t)
+    };
+
     cvxm_size(&rows, &cols, A);
     armas_pivot_make(&pv, rows, (int *)ipiv);
     // min workspace is 2*N
-    armas_d_make(&W, wrk->mlen, 1, wrk->mlen, (cvx_float_t*)wrk->memory);
-    if (armas_d_bksolve(B, (cvx_matrix_t *)A, &W, &pv, flags, &cf) < 0) {
+    //armas_d_make(&W, wrk->mlen, 1, wrk->mlen, (cvx_float_t*)wrk->memory);
+    if (armas_d_bksolve_w(B, A, &pv, flags, &wb, &cf) < 0) {
         printf("bksolve error: %d\n", cf.error);
     }
     return 0;
@@ -95,32 +120,92 @@ int cvxm_ldlsolve(cvx_matrix_t *B, const cvx_matrix_t *A, const int *ipiv, int f
 // \brief Cholesky factorization
 int cvxm_cholfactor(cvx_matrix_t *A, int flags)
 {
-    return armas_d_cholfactor(A, (armas_d_dense_t *)0, ARMAS_NOPIVOT, flags, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_cholfactor(A, ARMAS_NOPIVOT, flags, &cf);
+}
+
+int cvxm_cholsolve(cvx_matrix_t *x, cvx_matrix_t *A, int flags)
+{
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_cholsolve(x, A, ARMAS_NOPIVOT, flags, &cf);
 }
 
 // \brief SVD factorization
 int cvxm_svd(cvx_matrix_t *D, cvx_matrix_t *U, cvx_matrix_t *V, cvx_matrix_t *A, int flags, cvx_memblk_t *wrk)
 {
-    cvx_matrix_t w;
-    armas_d_make(&w, wrk->mlen, 1, wrk->mlen, wrk->memory);
-    return armas_d_svd(D, U, V, A, &w, flags, NULLCONF);
+    //cvx_matrix_t w;
+    armas_conf_t cf = *armas_conf_default();
+    armas_wbuf_t wb = (armas_wbuf_t){
+        .buf = (char *)wrk->memory,
+        .offset = 0,
+        .bytes = wrk->mlen*sizeof(cvx_float_t)
+    };
+    //armas_d_make(&w, wrk->mlen, 1, wrk->mlen, wrk->memory);
+    return armas_d_svd_w(D, U, V, A, flags, &wb, &cf);
 }
 
 // \brief Compute eigenvalues of symmetric matrix.
 int cvxm_evd_sym(cvx_matrix_t *D, cvx_matrix_t *S, int flags, cvx_memblk_t *work)
 {
-    cvx_matrix_t wrk;
-    armas_d_make(&wrk, work->mlen, 1, work->mlen, work->memory);
-    return armas_d_eigen_sym(D, S, &wrk, flags, NULLCONF);
+    //cvx_matrix_t wrk;
+    //armas_d_make(&wrk, work->mlen, 1, work->mlen, work->memory);
+    armas_conf_t cf = *armas_conf_default();
+    armas_wbuf_t wb = (armas_wbuf_t){
+        .buf = (char *)work->memory,
+        .offset = 0,
+        .bytes = work->mlen*sizeof(cvx_float_t)
+    };
+    if (armas_d_eigen_sym_w(D, S, flags, &wb, &cf) < 0) {
+        printf("evd_sym error: %d\n", cf.error);
+        return -1;
+    }
+    return 0;
 }
 
 // \brief Compute selected eigenvalues of symmetric matrix.
 //  Parameter ival[2] hold  lower and upper limits of speficied interval.
-int cvxm_evd_sym_selected(cvx_matrix_t *D, cvx_matrix_t *S, int *index, int flags, cvx_memblk_t *work)
+int cvxm_evd_sym_selected(cvx_matrix_t *D, cvx_matrix_t *S, int *index, int flags, cvx_memblk_t *wrk)
 {
-    cvx_matrix_t wrk;
-    armas_d_make(&wrk, work->mlen, 1, work->mlen, work->memory);
-    return armas_d_eigen_sym_selected(D, S, &wrk, ARMAS_EIGEN_INT(index[0], index[1]), flags, NULLCONF);
+    //cvx_matrix_t wrk;
+    //armas_d_make(&wrk, work->mlen, 1, work->mlen, work->memory);
+    armas_conf_t cf = *armas_conf_default();
+    armas_wbuf_t wb = (armas_wbuf_t){
+        .buf = (char *)wrk->memory,
+        .offset = 0,
+        .bytes = wrk->mlen*sizeof(cvx_float_t)
+    };
+    return armas_d_eigen_sym_selected_w(D, S, ARMAS_EIGEN_INT(index[0], index[1]), flags, &wb, &cf);
+}
+
+int cvxm_lqfactor(cvx_matrix_t *A, cvx_matrix_t *tau, cvx_memblk_t *wrk)
+{
+    //cvx_matrix_t W;
+    //armas_d_make(&W, wrk->mlen, 1, wrk->mlen, wrk->memory);
+    armas_conf_t cf = *armas_conf_default();
+    armas_wbuf_t wb = (armas_wbuf_t){
+        .buf = (char *)wrk->memory,
+        .offset = 0,
+        .bytes = wrk->mlen*sizeof(cvx_float_t)
+    };
+    return armas_d_lqfactor_w(A, tau, &wb, &cf);
+}
+
+int cvxm_lqmult(cvx_matrix_t *C,
+                const cvx_matrix_t *A,
+                const cvx_matrix_t *tau,
+                int flags,
+                cvx_memblk_t *wrk)
+{
+    //armas_conf_t *cf = armas_conf_default();
+    //cvx_matrix_t W;
+    //armas_d_make(&W, wrk->mlen, 1, wrk->mlen, wrk->memory);
+    armas_conf_t cf = *armas_conf_default();
+    armas_wbuf_t wb = (armas_wbuf_t){
+        .buf = (char *)wrk->memory,
+        .offset = 0,
+        .bytes = wrk->mlen*sizeof(cvx_float_t)
+    };
+    return armas_d_lqmult_w(C, A, tau, flags, &wb, &cf);
 }
 
 cvx_matrix_t *cvxm_mkconst(cvx_matrix_t *x, cvx_float_t val)
@@ -197,7 +282,8 @@ cvx_size_t cvxm_svd_workspace(cvx_size_t r, cvx_size_t c)
 {
     cvx_matrix_t Tmp;
     armas_d_make(&Tmp, r, c,  r, (cvx_float_t *)0);
-    return armas_d_svd_work(&Tmp, ARMAS_WANTU, NULLCONF);
+    return 0;
+    //return armas_d_svd_work(&Tmp, ARMAS_WANTU, NULLCONF);
 }
 
 // \brief Matrix or vector norm

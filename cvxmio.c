@@ -29,18 +29,15 @@ int cvxm_read_sbuffer(cvx_matrix_t *m, const char *s)
     sp++;
 
     nrows = strtoul(sp, &endp, 0);
-    sp = endp;
+    for (sp = endp; *sp && *sp != ',' && !isspace(*sp); sp++)
     if (*sp == '\0')
         return -1;
-    if (*sp == ',')
-        sp++;
-    
+    //if (*sp == ',') sp++;
+
     ncols = strtoul(sp, &endp, 0);
-    sp = endp;
+    for (sp = endp; *sp && *sp != ',' && !isspace(*sp); sp++)
     if (*sp == '\0')
         return -1;
-    if (*sp == ',')
-        sp++;
 
     nelems = nrows*ncols;
     cvxm_init(m, nrows, ncols);
@@ -71,11 +68,11 @@ int cvxm_read_sbuffer(cvx_matrix_t *m, const char *s)
         ep[k] = eval;
         k++;
         nelems--;
-        sp = endp;
+        for (sp = endp; *sp && *sp != ',' && !isspace(*sp); sp++)
+        //sp = endp;
         if (*sp == ']')
             break;
-        if (*sp == ',')
-            sp++;
+        //if (*sp == ',') sp++;
 
     }
     return 0;
@@ -260,7 +257,7 @@ int cvxm_write_file(FILE *fp, const cvx_matrix_t *m)
 int cvxm_json_write_file(FILE *fp, const cvx_matrix_t *m)
 {
     int n = 0;
-    n += fprintf(fp, "{\"rows\":%d, \"cols\": %d, \"elems\":[", m->rows, m->cols);
+    n += fprintf(fp, "{\"rows\":%d, \"cols\": %d, \"data\":[", m->rows, m->cols);
     for (int j = 0; j < m->cols; j++) {
         for (int i = 0; i < m->rows; i++) {
             if ((j == 0 && i > 0) || j > 0) {

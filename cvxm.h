@@ -24,6 +24,7 @@
 
 typedef uint64_t cvx_size_t;
 typedef double cvx_float_t;
+typedef int64_t cvx_int_t;
 
 typedef armas_d_dense_t cvx_matrix_t;
 typedef armas_d_operator_t cvx_oper_t;
@@ -73,6 +74,13 @@ __CVX_INLINE
 void cvxm_release(cvx_matrix_t *X)
 {
     armas_d_release(X);
+}
+
+__CVX_INLINE
+void cvxm_free(cvx_matrix_t *X)
+{
+    armas_d_release(X);
+    if (X) free(X);
 }
 
 // create a copy of matrix 
@@ -140,7 +148,7 @@ void cvxm_size(size_t *r, size_t *c, const cvx_matrix_t *A)
 }
 
 __CVX_INLINE
-cvx_float_t cvxm_get(cvx_matrix_t *A, cvx_size_t r, cvx_size_t c)
+cvx_float_t cvxm_get(const cvx_matrix_t *A, cvx_size_t r, cvx_size_t c)
 {
     return armas_d_get_unsafe(A, r, c);
 }
@@ -162,21 +170,24 @@ void cvxm_apply(cvx_matrix_t *A, cvx_oper_t f, int flags)
 __CVX_INLINE
 cvx_float_t cvxm_dot(const cvx_matrix_t *X, const cvx_matrix_t *Y)
 {
-    return armas_d_dot(X, Y, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_dot(X, Y, &cf);
 }
 
 // \brief sum of absolute values
 __CVX_INLINE
 cvx_float_t cvxm_asum(const cvx_matrix_t *X)
 {
-    return armas_d_asum(X, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_asum(X, &cf);
 }
 
 // \brief vector nrm2
 __CVX_INLINE
 cvx_float_t cvxm_nrm2(const cvx_matrix_t *X)
 {
-    return armas_d_nrm2(X, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_nrm2(X, &cf);
 }
 
 // \brief element-wise scale with constant
@@ -210,14 +221,16 @@ void cvxm_copy(cvx_matrix_t *X, const cvx_matrix_t *Y, int flags)
 __CVX_INLINE
 int cvxm_axpy(cvx_matrix_t *Y, cvx_float_t alpha, const cvx_matrix_t *X)
 {
-    return armas_d_axpy(Y, alpha, X, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_axpy(Y, alpha, X, &cf);
 }
 
 // \brief matrix-vector solve; X = alpha*A.-1*X
 __CVX_INLINE
 int cvxm_mvsolve_trm(cvx_matrix_t *X, cvx_float_t alpha, const cvx_matrix_t *A, int flags)
 {
-    return armas_d_mvsolve_trm(X, alpha, A, flags, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_mvsolve_trm(X, alpha, A, flags, &cf);
 }
 
 //  \brief matrix-vector multiply; Y = alpha*A*X
@@ -225,42 +238,48 @@ __CVX_INLINE
 int cvxm_mvmult(cvx_float_t beta, cvx_matrix_t *Y, cvx_float_t alpha, const cvx_matrix_t *A,
                 const cvx_matrix_t *X, int flags)
 {
-    return armas_d_mvmult(1.0, Y, alpha, A, X, flags, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_mvmult(beta, Y, alpha, A, X, flags, &cf);
 }
 
 //  \brief matrix-vector rank update; A = A + alpha*X*Y
 __CVX_INLINE
 int cvxm_mvupdate(cvx_matrix_t *A, cvx_float_t alpha, const cvx_matrix_t *X, const cvx_matrix_t *Y)
 {
-    return armas_d_mvupdate(A, alpha, X, Y, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_mvupdate(A, alpha, X, Y, &cf);
 }
 
 //  \brief diag solve; X = alpha*diag(A).-1*X
 __CVX_INLINE
 int cvxm_solve_diag(cvx_matrix_t *X, cvx_float_t alpha, const cvx_matrix_t *A, int flags)
 {
-    return armas_d_solve_diag(X, alpha, A, flags, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_solve_diag(X, alpha, A, flags, &cf);
 }
 
 //  \brief diag mult; X = alpha*diag(A)*X
 __CVX_INLINE
 int cvxm_mult_diag(cvx_matrix_t *X, cvx_float_t alpha, const cvx_matrix_t *A, int flags)
 {
-    return armas_d_mult_diag(X, alpha, A, flags, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_mult_diag(X, alpha, A, flags, &cf);
 }
 
 //  \brief matrix-matrix solve; X = alpha*A.-1*X
 __CVX_INLINE
 int cvxm_solve_trm(cvx_matrix_t *X, cvx_float_t alpha, const cvx_matrix_t *A, int flags)
 {
-    return armas_d_solve_trm(X, alpha, A, flags, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_solve_trm(X, alpha, A, flags, &cf);
 }
 
 //  \brief triangiar matrix multiply; X = alpha*A*X
 __CVX_INLINE
 int cvxm_mult_trm(cvx_matrix_t *X, cvx_float_t alpha, const cvx_matrix_t *A, int flags)
 {
-    return armas_d_mult_trm(X, alpha, A, flags, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_mult_trm(X, alpha, A, flags, &cf);
 }
 
 //  \brief matrix-matrix multiply; C = beta*C + alpha*A*B
@@ -268,14 +287,16 @@ __CVX_INLINE
 int cvxm_mult(cvx_float_t beta, cvx_matrix_t *C, cvx_float_t alpha, const cvx_matrix_t *A, 
               const cvx_matrix_t *B, int flags)
 {
-    return armas_d_mult(beta, C, alpha, A, B, flags, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_mult(beta, C, alpha, A, B, flags, &cf);
 }
 
 //  \brief symmetric rank-k update; C = C + alpha*A*A^T
 __CVX_INLINE
 int cvxm_update_sym(cvx_matrix_t *C, cvx_float_t alpha, const cvx_matrix_t *A, int flags)
 {
-    return armas_d_update_sym(1.0, C, alpha, A, flags, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_update_sym(1.0, C, alpha, A, flags, &cf);
 }
 
 //  \brief symmetric rank 2k update; C = C + alpha*B*B^T
@@ -283,10 +304,12 @@ __CVX_INLINE
 int cvxm_update2_sym(cvx_float_t beta, cvx_matrix_t *C, cvx_float_t alpha, const cvx_matrix_t *A, 
                      const cvx_matrix_t *B, int flags)
 {
-    return armas_d_update2_sym(beta, C, alpha, A, B, flags, NULLCONF);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_update2_sym(beta, C, alpha, A, B, flags, &cf);
 }
 
 
+extern int cvxm_mmload(cvx_matrix_t *A, FILE *fp);
 extern int cvxm_write_file(FILE *fp, const cvx_matrix_t *m);
 extern int cvxm_json_write_file(FILE *fp, const cvx_matrix_t *m);
 extern int cvxm_read_file(cvx_matrix_t *m, FILE *fp);
@@ -304,6 +327,7 @@ extern void cvxm_mksymm(cvx_matrix_t *A, int n);
 extern int cvxm_norm(cvx_float_t *nrm, const cvx_matrix_t *A, int norm);
 extern void cvxm_zero(cvx_matrix_t *A, int flags);
 
+extern cvx_size_t cvxm_ldlwork(const cvx_matrix_t *A);
 // \brief LDL factorization
 extern int cvxm_ldlfactor(cvx_matrix_t *A, int *ipiv, int flags, cvx_memblk_t *work);
 // \brief Solve equations using computed LDL factorization
@@ -314,8 +338,13 @@ extern int cvxm_evd_sym(cvx_matrix_t *D, cvx_matrix_t *S, int flags, cvx_memblk_
 extern int cvxm_evd_sym_selected(cvx_matrix_t *D, cvx_matrix_t *S, int *ival, int flags, cvx_memblk_t *work);
 // \brief Cholesky factorization
 extern int cvxm_cholfactor(cvx_matrix_t *A, int flags);
+extern int cvxm_cholsolve(cvx_matrix_t *x, cvx_matrix_t *A, int flags);
 // \brief SVD factorization
 extern int cvxm_svd(cvx_matrix_t *D, cvx_matrix_t *U, cvx_matrix_t *V, cvx_matrix_t *A, int flags, cvx_memblk_t *wrk);
+extern int cvxm_lqfactor(cvx_matrix_t *A, cvx_matrix_t *tau, cvx_memblk_t *wrk);
+extern int cvxm_lqmult(cvx_matrix_t *C, const cvx_matrix_t *A, const cvx_matrix_t *tau, int flags, cvx_memblk_t *wrk);
+extern int cvxm_qrfactor(cvx_matrix_t *A, cvx_matrix_t *tau, cvx_memblk_t *wrk);
+extern int cvxm_qrmult(cvx_matrix_t *C, const cvx_matrix_t *A, const cvx_matrix_t *tau, int flags, cvx_memblk_t *wrk);
 
 // compute workspace needed for SVD factorization of matrix [r, c]
 extern cvx_size_t cvxm_svd_workspace(cvx_size_t r, cvx_size_t c);
