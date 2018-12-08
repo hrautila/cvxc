@@ -4,6 +4,14 @@
 #include "convex.h"
 #include "cvxm.h"
 
+/*
+   Index layout:
+
+       0       : 0
+       1       : length of non-linear
+       2       : ind[1] + length-of-linear
+       
+ */
 
 /**
  * @brief Allocate and initialize new indexing over spesified dimension set.
@@ -23,7 +31,7 @@
  * @return 
  *    New index set or null;
  */
-cvx_index_t *cvx_index_new(cvx_dimset_t *dims, int kind)
+cvx_index_t *cvx_index_new(const cvx_dimset_t *dims, int kind)
 {
     cvx_index_t *ind = (cvx_index_t *)malloc(sizeof(cvx_index_t));
     if (ind)
@@ -107,8 +115,10 @@ cvx_size_t cvx_index_make(cvx_index_t *ind,
               dims->sdims[j] * (dims->sdims[j] + 1)/2 : // packed storage for S
               dims->sdims[j]);                          // diagonal storage for S (kind == 2|3)
     }
+
     // offset past the last entry;
     ind->index[k] = off;
+    ind->indlen = k;
     return n;
 }
 
@@ -149,66 +159,6 @@ cvx_index_t *cvx_index_init(cvx_index_t *ind, const cvx_dimset_t *dims, int kind
     ind->__bytes = mem;
     return ind;
 
-#if 0    
-    // allocate for offsets
-    if (kind != 3) {
-        n = dims->slen +
-            dims->qlen +
-            (dims->ldim > 0 ? 1 : 0) +
-            (dims->mnl > 0 ? 1 : 0) +
-            1;
-    } else {
-        n = dims->slen + 1;
-    }
-    
-    // allocate memory to hold both arrays
-    ind->index = (cvx_size_t *)calloc(n, sizeof(cvx_size_t));
-    if (! ind->index)
-        return (cvx_index_t *)0;
-    ind->__bytes = ind->index;
-    
-    int k = 0;
-    int off = 0;
-    ind->indnl = ind->indl = ind->indq = ind->inds = (cvx_size_t *)0;
-    ind->dims = dims;
-
-    if (kind != 3) {
-        if (dims->mnl > 0) {
-            ind->indnl = &ind->index[k];
-            ind->indnl[0] = off;
-            k++;
-            off += dims->mnl;
-        }
-        if (dims->ldim > 0) {
-            ind->indl = &ind->index[k];
-            ind->index[k] = off;
-            k++;
-            off += dims->ldim;
-        }
-        for (int j = 0; j < dims->qlen; j++) {
-            if (j == 0)
-                ind->indq = &ind->index[k];
-            ind->index[k] = off;
-            k++;
-            off += dims->qdims[j];
-        }
-    }
-
-    for (int j = 0; j < dims->slen; j++) {
-        if (j == 0)
-            ind->inds = &ind->index[k];
-        ind->index[k] = off;
-        k++;
-        off += kind == 0 ?
-            dims->sdims[j] * dims->sdims[j] :           // normal storage for S
-            ( kind == 1 ?   
-              dims->sdims[j] * (dims->sdims[j] + 1)/2 : // packed storage for S
-              dims->sdims[j]);                          // diagonal storage for S (kind == 2|3)
-    }
-    // offset past the last entry;
-    ind->index[k] = off;
-    return ind;
-#endif
 }
 
 void cvx_index_release(cvx_index_t *ind)
@@ -239,8 +189,23 @@ cvx_size_t cvx_index_count(const cvx_index_t *ind,
     return 0;
 }
 
-/*
+/**
  * @brief Make 'x' to present k'th element of y's dimension set.
+ *
+ * @param[out] x
+ *     If not null; on entry uninitialized matrix, on exit k'th element 
+ *     of requested set.
+ * @param[in]  y
+ *     Source vector
+ * @param[in] ind
+ *     Index set associated with y
+ * @param[in] name
+ *     Index set name, CVXDIM_NONLINEAR (NL), CVXDIM_LINEAR (L),  CVXDIM_SOCP (Q)
+ *     CVXDIM_SDP (S) or CVXDIM_CONELP.
+ * @param[in] k
+ *     Requested element. Non-zero value meaningfull only for SOCP and SDP sets.
+ *
+ * @return Length of the requested element;
  *
  * If x is null then returns dimensionality of k'th element in the spesified 
  * dimension set.
@@ -251,7 +216,7 @@ cvx_size_t cvx_index_elem(cvx_matrix_t *x,
                           cvx_dim_enum name,
                           int k)
 {
-    cvx_size_t n, m = 0;
+    cvx_size_t n = 0, m = 0;
 
     if (!y || !ind)
         return 0;
@@ -260,6 +225,13 @@ cvx_size_t cvx_index_elem(cvx_matrix_t *x,
         cvxm_map_data(x, 0, 0, (cvx_float_t *)0);
 
     switch (name) {
+    case CVXDIM_NONLINEAR:
+        if (ind->indnl) {
+            m = ind->indnl[1] - ind->indnl[0];
+            if (x)
+                cvxm_map_data(x, m, 1, cvxm_data(y, ind->indnl[0]));
+        }
+        break;
     case CVXDIM_LINEAR:
         if (ind->indl) {
             m = ind->indl[1] - ind->indl[0];
@@ -285,16 +257,25 @@ cvx_size_t cvx_index_elem(cvx_matrix_t *x,
             }
         }
         break;
-    case CVXDIM_NONLINEAR:
-        if (ind->indnl) {
-            m = ind->indnl[1] - ind->indnl[0];
-            if (x)
-                cvxm_map_data(x, m, 1, cvxm_data(y, ind->indnl[0]));
-        }
+    case CVXDIM_CONELP:
+        // map linear,socp and sdp parts onto x
+        if (ind->indl)
+            n = ind->indl[0];  // have linear part
+        else if (ind->indq)
+            n = ind->indq[0];  // have socp part
+        else if (ind->inds)
+            n = ind->inds[0];  // last resort; must have sdp part
+        m = ind->index[ind->indlen] - n;
+        if (x)
+            cvxm_map_data(x, m, 1, cvxm_data(y, n));
+        break;
+    case CVXDIM_CONVEXLP:
+        // map all parts
+        m = ind->index[ind->indlen];
+        if (x)
+            cvxm_map_data(x, m, 1, cvxm_data(y, 0));
         break;
     default:
-        if (x)
-            cvxm_map_data(x, 0, 0, (cvx_float_t *)0);
         break;
     }
     return m;
