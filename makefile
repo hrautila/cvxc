@@ -8,7 +8,7 @@ CVXOBJ = dims.o \
 	sfunc.o \
 	scale.o \
 	conelp.o \
-	kkt.o \
+	kktldl.o \
 	mgrp.o \
 	index.o \
 	scaling.o \
@@ -25,9 +25,15 @@ OBJS   = test_lp.o test_conelp.o test_socp.o test_sdp.o
 $(LIBOBJ): convex.h cvxm.h
 $(OBJS): convex.h cvxm.h
 
+json.o: json.h cvxm.h convex.h
+cpl.o:  cpl.c cpl.h convex.h cvxm.h
+conelp2.o: conelp2.c convex.h cvxm.h
+
 libcvx.a : $(LIBOBJ)
 	$(AR) rs $@ $(LIBOBJ)
 
+test_cpl: test_cpl.o libcvx.a
+	$(CC) $(CFLAGS) -o $@ test_cpl.o libcvx.a $(NETLIB) -lm
 test_lp: test_lp.o libcvx.a
 	$(CC) $(CFLAGS) -o $@ test_lp.o libcvx.a $(NETLIB) -lm
 test_socp: test_socp.o libcvx.a
@@ -36,6 +42,10 @@ test_sdp: test_sdp.o libcvx.a
 	$(CC) $(CFLAGS) -o $@ test_sdp.o libcvx.a $(NETLIB) -lm
 test_conelp: test_conelp.o libcvx.a
 	$(CC) $(CFLAGS) -o $@ test_conelp.o libcvx.a $(NETLIB) -lm
+test_kkt: test_kkt.o kktldl2.o kktqr.o libcvx.a
+	$(CC) $(CFLAGS) -o $@ test_kkt.o kktldl2.o kktqr.o libcvx.a $(NETLIB) -lm
+test_json: test_json.o json.o libcvx.a
+	$(CC) $(CFLAGS) -o $@ test_json.o json.o libcvx.a $(NETLIB) -lm
 
 test_init: test_init.o libcvx.a
 	$(CC) $(CFLAGS) -o $@ test_init.o libcvx.a $(NETLIB) -lm
