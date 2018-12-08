@@ -33,6 +33,42 @@ cvx_dimset_t *cvx_dimset_alloc(cvx_dimset_t *dims, int linear, const int *socp, 
     return dims;
 }
 
+cvx_dimset_t *cvx_dimset_create(cvx_dimset_t *dims, int nonlinear, int linear, int socp, int sdp)
+{
+    dims->mnl = nonlinear;
+    dims->ldim = linear;
+    dims->qlen = socp;
+    dims->slen = sdp;
+    
+    dims->qdims = (int *)0;
+    dims->sdims = (int *)0;
+
+    if (socp + sdp > 0) {
+        // allocate memory to hold both arrays
+        dims->qdims = (int *)calloc(dims->slen + dims->qlen, sizeof(int));
+        if (! dims->qdims) {
+            dims->qlen = dims->slen = 0;
+            return (cvx_dimset_t *)0;
+        }
+        // SDP dimension after SOCP dimension
+        dims->sdims = dims->slen > 0 ? &dims->qdims[dims->qlen] : (int *)0;
+    }
+    return dims;
+}
+
+cvx_dimset_t *cvx_dimset_new(int nonlinear, int linear, int socp, int sdp)
+{
+    cvx_dimset_t *dims = (cvx_dimset_t *)malloc(sizeof(cvx_dimset_t));
+    if (!dims) 
+        return (cvx_dimset_t *)0;
+    
+    if (! cvx_dimset_create(dims, nonlinear, linear, socp, sdp)) {
+        free(dims);
+        return (cvx_dimset_t *)0;
+    }
+    return dims;
+}
+
 void cvx_dimset_release(cvx_dimset_t *dims)
 {
     if (!dims)
@@ -44,6 +80,14 @@ void cvx_dimset_release(cvx_dimset_t *dims)
     dims->qdims = (int *)0;
     dims->sdims = (int *)0;
     dims->ldim = 0;
+}
+
+void cvx_dimset_free(cvx_dimset_t *dims)
+{
+    if (!dims)
+        return;
+    cvx_dimset_release(dims);
+    free(dims);
 }
 
 cvx_size_t cvx_dimset_max(const cvx_dimset_t *dims, cvx_dim_enum name)
@@ -96,8 +140,10 @@ cvx_size_t cvx_dimset_sum(const cvx_dimset_t *dims, cvx_dim_enum name)
         for (int k = 0; k < dims->slen; k++)
             sum += dims->sdims[k];
         break;
+    case CVXDIM_CONVEXLP:
+        sum += dims->mnl;
     case CVXDIM_CONELP:
-        sum = dims->ldim;
+        sum += dims->ldim;
         for (int k = 0; k < dims->qlen; k++)
             sum += dims->qdims[k];
         for (int k = 0; k < dims->slen; k++)
@@ -129,8 +175,10 @@ cvx_size_t cvx_dimset_sum_squared(const cvx_dimset_t *dims, cvx_dim_enum name)
         for (int k = 0; k < dims->slen; k++)
             sum += dims->sdims[k] * dims->sdims[k];
         break;
+    case CVXDIM_CONVEXLP:
+        sum += dims->mnl;
     case CVXDIM_CONELP:
-        sum = dims->ldim;
+        sum += dims->ldim;
         for (int k = 0; k < dims->qlen; k++)
             sum += dims->qdims[k];
         for (int k = 0; k < dims->slen; k++)
@@ -159,8 +207,10 @@ cvx_size_t cvx_dimset_sum_packed(const cvx_dimset_t *dims, cvx_dim_enum name)
         for (int k = 0; k < dims->slen; k++)
             sum += dims->sdims[k] * (dims->sdims[k] + 1)/2;
         break;
+    case CVXDIM_CONVEXLP:
+        sum += dims->mnl;
     case CVXDIM_CONELP:
-        sum = dims->ldim;
+        sum += dims->ldim;
         for (int k = 0; k < dims->qlen; k++)
             sum += dims->qdims[k];
         for (int k = 0; k < dims->slen; k++)
