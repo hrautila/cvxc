@@ -56,6 +56,18 @@ int __isnull(const void *ptr) {
 }
 
 static inline
+cvx_size_t __aligned128(cvx_size_t n)
+{
+    return (n & 0xF) != 0 ? 16 - (n & 0xF) : 0;
+}
+
+static inline
+cvx_size_t __aligned64(cvx_size_t n)
+{
+    return (n & 0x7) != 0 ? 8 - (n & 0x7) : 0;
+}
+
+static inline
 cvx_float_t __maxvec(int n, const cvx_float_t *vec)
 {
     cvx_float_t r = vec[0];
@@ -91,7 +103,8 @@ typedef enum {
     CVXDIM_SDP = 2,
     CVXDIM_SOCP = 4,   
     CVXDIM_NONLINEAR = 8,
-    CVXDIM_CONELP = 7
+    CVXDIM_CONELP = 7,
+    CVXDIM_CONVEXLP = 15
 } cvx_dim_enum;
 
 typedef enum {
@@ -220,6 +233,9 @@ typedef struct cvx_dimset {
     int mnl;            ///< Non-linear constraints
 } cvx_dimset_t;
 
+extern cvx_dimset_t *cvx_dimset_new(int nonlinear, int linear, int socp, int sdp);
+extern void cvx_dimset_free(cvx_dimset_t *dims);
+extern cvx_dimset_t *cvx_dimset_create(cvx_dimset_t *dims, int nonlinear, int linear, int socp, int sdp);
 extern cvx_dimset_t *cvx_dimset_alloc(cvx_dimset_t *dims, int linear, const int *socp, const int *sdp);
 extern void cvx_dimset_release(cvx_dimset_t *dims);
 extern cvx_size_t cvx_dimset_max(const cvx_dimset_t *dims, cvx_dim_enum name);
@@ -228,11 +244,12 @@ extern cvx_size_t cvx_dimset_sum_squared(const cvx_dimset_t *dims, cvx_dim_enum 
 extern cvx_size_t cvx_dimset_sum_packed(const cvx_dimset_t *dims, cvx_dim_enum name);
 
 typedef struct cvx_index {
-    cvx_size_t *index;         ///< Index data
-    cvx_size_t *indq;          ///< SOCP vector
-    cvx_size_t *inds;          ///< Indexes of SDP constraints
-    cvx_size_t *indl;          ///< Index to linear
-    cvx_size_t *indnl;         ///< Index to non-linear
+    cvx_size_t *index;          ///< Index data
+    cvx_size_t *indq;           ///< SOCP vector
+    cvx_size_t *inds;           ///< Indexes of SDP constraints
+    cvx_size_t *indl;           ///< Index to linear
+    cvx_size_t *indnl;          ///< Index to non-linear
+    cvx_size_t indlen;          ///< Total number of  index elements
     const cvx_dimset_t *dims;
     void *__bytes;
 } cvx_index_t;
@@ -319,6 +336,7 @@ extern cvx_float_t cvx_sdot(cvx_matgrp_t *x, cvx_matgrp_t *y);
 
 extern void cvx_pack(cvx_matrix_t *y, cvx_matrix_t *x, const cvx_index_t *index);
 extern void cvx_unpack(cvx_matrix_t *y, cvx_matrix_t *x, const cvx_index_t *index);
+extern void cvx_pack2(cvx_matrix_t *x, const cvx_index_t *index, cvx_memblk_t *work);
 
 extern int cvx_scale(cvx_matgrp_t *x, cvx_scaling_t *W, int flags, cvx_memblk_t *work);
 extern int cvx_scale2(cvx_matgrp_t *x_g, cvx_matgrp_t *lmbda_g, int flags, cvx_memblk_t *work);
@@ -343,15 +361,21 @@ cvx_update_scaling(cvx_scaling_t *W, cvx_matgrp_t *s_g, cvx_matgrp_t *z_g, cvx_m
    
 /* Forward declarations */
 typedef struct cvx_conelp_problem cvx_conelp_problem_t;
+typedef struct cvx_problem cvx_problem_t;
 typedef struct cvx_kktsolver_s cvx_kktsolver_t;
 
 typedef struct cvx_kktfuncs_s {
+    cvx_kktsolver_t *(*new)(cvx_problem_t *cp, int n, int m, const cvx_dimset_t *dims);
+    int (*init)(cvx_kktsolver_t *S, cvx_problem_t *cp, int n, int m, const cvx_dimset_t *dims);
     int (*factor)(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matrix_t *Df);
     int (*solve)(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_t *z_g);
+    cvx_size_t (*bytes)(int n, int m, const cvx_dimset_t *dims);
+    cvx_size_t (*make)(cvx_kktsolver_t *S, cvx_problem_t *cp, int n, int m, const cvx_dimset_t *dims, void *ptr, cvx_size_t nbytes);   
+    void (*free)(cvx_kktsolver_t *S);
 } cvx_kktfuncs_t;
     
 typedef struct cvx_ldlsolver_s {
-    cvx_kktfuncs_t fnc;
+    cvx_kktfuncs_t *fnc;
     cvx_matrix_t K;
     cvx_matrix_t u;
     cvx_matrix_t g;
@@ -359,7 +383,9 @@ typedef struct cvx_ldlsolver_s {
     cvx_scaling_t *W;
     cvx_matrix_t *A;
     cvx_matrix_t *G;
-    cvx_dimset_t *dims;
+    cvx_matrix_t *Df;
+    cvx_problem_t *cp;
+    const cvx_dimset_t *dims;
     size_t ldK;
     int *ipiv;
     size_t p;
@@ -367,29 +393,65 @@ typedef struct cvx_ldlsolver_s {
     size_t mnl;
 } cvx_ldlsolver_t;
 
+typedef struct cvx_qrsolver_s {
+    cvx_kktfuncs_t *fnc;
+    cvx_matrix_t QA;
+    cvx_matrix_t tauA;
+    cvx_matrix_t Gs;
+    cvx_matrix_t tauG;
+    cvx_matrix_t u;
+    cvx_matrix_t vv;
+    cvx_matrix_t w;
+    cvx_memblk_t work;
+    cvx_scaling_t *W;
+    cvx_matrix_t *A;
+    cvx_matrix_t *G;
+    cvx_problem_t *cp;
+    const cvx_dimset_t *dims;
+    size_t p;
+    size_t n;
+} cvx_qrsolver_t;
+
 
 struct cvx_kktsolver_s {
     union {
-        cvx_kktfuncs_t fnc;
+        cvx_kktfuncs_t *fnc;
         cvx_ldlsolver_t ldl;
     } u;
-    cvx_conelp_problem_t *cp;
     int debug;
 };
 
-//extern void cvx_ldlsolver_init(cvx_kktsolver_t *, cvx_dimset_t *, cvx_matrix_t *G, cvx_matrix_t *A, int n);
-extern void cvx_ldlsolver_init(cvx_kktsolver_t *kkt, cvx_conelp_problem_t *cp, cvx_dimset_t *dims, int mnl);
+extern cvx_kktfuncs_t *cvx_ldlload(void *ptr);
 
 static inline
-int cvx_kktfactor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matrix_t *Df)
+void cvx_ldlsolver_init(cvx_kktsolver_t *kkt,
+                        cvx_problem_t *cp,
+                        int n, int m, const cvx_dimset_t *dims)
 {
-    return (*S->u.fnc.factor)(S, W, H, Df);
+    cvx_kktfuncs_t *fnc = cvx_ldlload((void *)0);
+    fnc->init(kkt, cp, n, m, dims);
 }
 
 static inline
-int cvx_kktsolve(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_t *z_g)
+int cvx_kktinit(cvx_kktsolver_t *S,
+                cvx_problem_t *cp,
+                int n, int m, const cvx_dimset_t *dims)
 {
-    return (*S->u.fnc.solve)(S, x, y, z_g);
+    return (*S->u.fnc->init)(S, cp, n, m, dims);
+}
+
+static inline
+int cvx_kktfactor(cvx_kktsolver_t *S,
+                  cvx_scaling_t *W, cvx_matrix_t *H, cvx_matrix_t *Df)
+{
+    return (*S->u.fnc->factor)(S, W, H, Df);
+}
+
+static inline
+int cvx_kktsolve(cvx_kktsolver_t *S,
+                 cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_t *z_g)
+{
+    return (*S->u.fnc->solve)(S, x, y, z_g);
 }
 
 typedef struct __solution_s {
@@ -446,39 +508,20 @@ typedef struct cvx_stats {
     cvx_float_t relgap;
 } cvx_stats_t;
 
-typedef struct cvx_conelp_problem {
-    cvx_matrix_t *c;                    ///< Cost function coefficients
-    cvx_matrix_t *G;                    ///< Inequality constraint coefficients
-    cvx_matrix_t *h;                    ///< Inequality constraint limits
-    cvx_matrix_t *A;                    ///< Equality constraint coefficients
-    cvx_matrix_t *b;                    ///< Equality constraint limits
-    cvx_dimset_t *dims;                 ///< Problems dimensions
-    cvx_kktsolver_t *solver;            ///< KKT solver
 
-    // user defined starting points
-    cvx_matrix_t *primal_x;             ///< User defined starting point for primal
-    cvx_matrix_t *primal_s;             ///< User defined starintg point for primal slacks
-    cvx_matrix_t *dual_y;               ///< User defined starting point for dual
-    cvx_matrix_t *dual_z;               ///< User defined starting point for dual slacks
-    
-    int error;                          ///< Last error
-    
-    cvx_solution_t solution;            ///< Solution data
-    
-    // internal 
-    cvx_kktsolver_t __S;        // internal solver structure
-
-    cvx_size_t cdim, cdim_diag;
-    // solution matrix
-    cvx_matrix_t x, y, s, z;
-
+typedef struct cvx_conelp_internal {
     cvx_float_t tau, kappa;
+    cvx_float_t dkappa, dtau;
+    cvx_float_t wkappa3;
+    cvx_float_t nrms, nrmz;
+    cvx_float_t dg, dgi;
+    cvx_float_t ts, tz;                 // step sizes
+
+    // internal result
+    cvx_matrix_t x, y, s, z;
     
     cvx_matrix_t dx, dy, ds, dz;
-    cvx_float_t dkappa, dtau;
-
-    cvx_matrix_t x1, y1, z1;
-    
+    cvx_matrix_t x1, y1, z1;   
     cvx_matrix_t rx, ry, rz;
     cvx_matrix_t hrx, hry, hrz;
     cvx_matrix_t sigs, sigz;
@@ -488,7 +531,6 @@ typedef struct cvx_conelp_problem {
     cvx_matrix_t wx2, wy2, ws2, wz2;
     cvx_matrix_t ws3, wz3;
     cvx_matrix_t th;
-    cvx_float_t wkappa3;
     
     // matrix groups with correct indexing
     cvx_matgrp_t h_g;
@@ -504,51 +546,97 @@ typedef struct cvx_conelp_problem {
     cvx_matgrp_t lmbda_g, lmbdasq_g;
     cvx_matgrp_t sigs_g, sigz_g;
     
-    // statistics
-    cvx_stats_t stats;
-    // solver options
-    cvx_solopts_t *solopts;
-
-    cvx_float_t nrms, nrmz;
-    cvx_float_t dg, dgi;
-    cvx_float_t ts, tz;                 // step sizes
-
-    cvx_scaling_t W;                    // scaling matrix group
-
     cvx_index_t index_full;             // indexing to full matrix group
     cvx_index_t index_packed;           // indexing to matrix group with packed 'S' space
     cvx_index_t index_diag;             // indexing to matrix group with diagonal 'S' space
     cvx_index_t index_sig;              // indexing to matrix group with only diagonal 'S" space
 
-    cvx_memblk_t work;                  // workspace
+} cvx_conelp_internal_t;
+
+typedef struct cvx_cpl_internal {
+} cvx_cpl_internal_t;
+
+typedef struct cvx_problem {
+    cvx_matrix_t *c;                    ///< Cost function coefficients
+    cvx_matrix_t *G;                    ///< Inequality constraint coefficients
+    cvx_matrix_t *h;                    ///< Inequality constraint limits
+    cvx_matrix_t *A;                    ///< Equality constraint coefficients
+    cvx_matrix_t *b;                    ///< Equality constraint limits
+    cvx_dimset_t *dims;                 ///< Problems dimensions
+    cvx_kktsolver_t *solver;            ///< KKT solver
+
+    // user defined starting points
+    cvx_matrix_t *primal_x;             ///< User defined starting point for primal
+    cvx_matrix_t *primal_s;             ///< User defined starintg point for primal slacks
+    cvx_matrix_t *dual_y;               ///< User defined starting point for dual
+    cvx_matrix_t *dual_z;               ///< User defined starting point for dual slacks
     
+    // result 
+    cvx_matrix_t *x;
+    cvx_matrix_t *y;
+    cvx_matrix_t *s;
+    cvx_matrix_t *z;
+
+    cvx_index_t *index_g;
+    
+    int error;                          ///< Last error
+    
+    cvx_solution_t solution;            ///< Solution data
+    
+    // internal 
+    cvx_kktsolver_t __S;        // internal solver structure
+
+    cvx_size_t cdim, cdim_diag;
+
+    // statistics
+    cvx_stats_t stats;
+    // solver options
+    cvx_solopts_t *solopts;
+
+    cvx_scaling_t W;                    // scaling matrix group
+
+    // solver internal variables
+    union {
+        cvx_conelp_internal_t conelp;
+        cvx_cpl_internal_t cpl;
+    } u;
+
+    cvx_memblk_t work;                  // workspace   
     cvx_size_t mlen;
     cvx_float_t *memory;
-} cvx_conelp_problem_t;
+
+} cvx_problem_t;
+
 
 extern cvx_float_t cvx_max_step(cvx_matgrp_t *x, cvx_matgrp_t *sigs, cvx_memblk_t *wrk);
 
+
 extern cvx_size_t cvx_conelp_bytes(int n, int m, const cvx_dimset_t *dims);
-extern cvx_size_t cvx_conelp_make(cvx_conelp_problem_t *prob, int n, int m, const cvx_dimset_t *dims, void *memory, cvx_size_t nbytes);
+extern cvx_size_t cvx_conelp_make(cvx_problem_t *prob,
+                                  int n, int m, const cvx_dimset_t *dims,
+                                  void *memory, cvx_size_t nbytes);
 
 extern int cvx_conelp_isok(const cvx_matrix_t *c, const cvx_matrix_t *G, const cvx_matrix_t *h,
                            const cvx_matrix_t *A, const cvx_matrix_t *b, const cvx_dimset_t *dims);
 
 
 extern cvx_size_t
-cvx_conelp_setup(cvx_conelp_problem_t *prob,
+cvx_conelp_setup(cvx_problem_t *prob,
                  cvx_matrix_t *c, cvx_matrix_t *G, cvx_matrix_t *h,
                  cvx_matrix_t *A, cvx_matrix_t *b, cvx_dimset_t *dims,
                  cvx_kktsolver_t *kktsolver);
 extern void
-cvx_conelp_set_start(cvx_conelp_problem_t *prob,
+cvx_conelp_set_start(cvx_problem_t *prob,
                      cvx_matrix_t *primal_x, cvx_matrix_t *primal_s,
                      cvx_matrix_t *dual_y, cvx_matrix_t *dual_z);
 extern int
-cvx_conelp_compute_start(cvx_conelp_problem_t *prob);
+cvx_conelp_compute_start(cvx_problem_t *prob);
 
 extern int
-cvx_conelp_solve(cvx_conelp_problem_t *prob, cvx_solopts_t *opts);
+cvx_conelp_solve(cvx_problem_t *prob, cvx_solopts_t *opts);
+
+extern int
+cvx_conelp2_solve(cvx_solution_t *sol, cvx_conelp_problem_t *prob, cvx_solopts_t *opts);
 
 
 
