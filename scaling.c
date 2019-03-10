@@ -1,5 +1,5 @@
 
-// Copyright: Harri Rautila, 2016 <harri.rautila@gmail.com>
+// Copyright: Harri Rautila, 2018 <harri.rautila@gmail.com>
 
 #include "convex.h"
 #include "cvxm.h"
@@ -21,12 +21,13 @@ cvx_size_t cvx_scaling_bytes(cvx_size_t *isize, const cvx_dimset_t *dims)
     cvx_size_t rspace = cvx_dimset_sum_squared(dims, CVXDIM_SDP);
 
     // calculate index space length in bytes and align to 64bits;
-    // (2 is for linear and non-linear spaces.)
-    cvx_size_t itotal = (2 + dims->qlen + 2*dims->slen)*sizeof(cvx_size_t);
+    // (3 is for linear, non-linear and non-linear target spaces.)
+    cvx_size_t itotal = (3 + dims->qlen + 2*dims->slen)*sizeof(cvx_size_t);
     itotal += (itotal & 0x7) != 0 ? 8 - (itotal & 0x7) : 0;
-    
+
     // matrix data space length
     cvx_size_t ntotal =
+        2 * dims->iscpt +       // Non-linear target function
         2 * dims->mnl +         // Non-linear DNL and DNLI vectors
         2 * dims->ldim +        // Linear D and DI vectors
         dims->qlen + vspace +   // SOCP BETAs and V vectors
@@ -59,8 +60,10 @@ cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *me
     cvx_size_t ntotal, itotal;
     ntotal = cvx_scaling_bytes(&itotal, dims);
 
-    if (nbytes < ntotal)
+    if (nbytes < ntotal) {
+        fprintf(stderr, "scaling make: need %ld, provided %ld\n", ntotal, nbytes);
         return 0;
+    }
 
     // set __bytes to null to indicate that memory block is not owned by scaling matrix
     W->__bytes = (unsigned char *)0;
@@ -68,8 +71,8 @@ cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *me
     W->nbytes = ntotal;
     W->indexes = (cvx_size_t *)buf;
     W->data    = (cvx_float_t *)&buf[itotal];
-    
-    // initialized pointers and indexes.    
+
+    // initialized pointers and indexes.
     if (dims->qlen > 0 || dims->slen > 0) {
         W->vcount = dims->qlen;
         W->rcount = dims->slen;
@@ -84,28 +87,54 @@ cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *me
         W->indexes = W->indv = W->indr = W->indrti = (cvx_size_t *)0;
         W->vcount = W->rcount = 0;
     }
-            
-    W->dims = dims;   
+
+    W->dims = dims;
     // setup indexes
     cvx_size_t offset = 0;
+    W->dnltsz = dims->iscpt ? 1 : 0;
+    W->dnlt = W->dnlti = (cvx_float_t *)0;
     W->dnlsz = dims->mnl;
     W->dnl = W->dnli = (cvx_float_t *)0;
+    W->dsz = dims->ldim;
+    W->d = W->di = (cvx_float_t *)0;
+
+    // Arrange NLTARGET, NONLINEAR and LINEAR spaces to continous
+    // memory blocks for direct and inverse cases.
+    // Memory layout:
+    //   |DNLT|DNL|D|DNLTI|DNLI|DI|BETA|V[0]| ..|V[q]|R[0]|RTI[0]|..|R[n]|RTI[n]|
+    //
+    if (dims->iscpt > 0) {
+        // Direct pointers to DNLT data space
+        W->dnlt  = &W->data[offset];
+        offset  += W->dnltsz;
+    }
     if (dims->mnl > 0) {
-        // Direct pointers to DNL/DNLI data space
-        W->dnl = W->data;
+        // Direct pointers to DNL data space
+        W->dnl  = &W->data[offset];
         offset += dims->mnl;
+    }
+    if (dims->ldim > 0) {
+        // Direct pointers to D data space
+        W->d = &W->data[offset];
+        offset += dims->ldim;
+    }
+    // Inverse pointers
+    if (dims->iscpt > 0) {
+        // Direct pointers to DNLTI data space
+        W->dnlti = &W->data[offset];
+        offset  += W->dnltsz;
+    }
+    if (dims->mnl > 0) {
+        // Direct pointers to DNLI data space
         W->dnli = &W->data[offset];
         offset += dims->mnl;
     }
-    W->dsz = dims->ldim;
-    W->d = W->di = (cvx_float_t *)0;
     if (dims->ldim > 0) {
-        // Direct pointers to D/DI data space
-        W->d = &W->data[offset];
-        offset += dims->ldim;
+        // Direct pointers to DI data space
         W->di = &W->data[offset];
         offset += dims->ldim;
     }
+
     if (dims->qlen > 0) {
         // Direct pointer to BETA vector data space
         W->beta = &W->data[offset];
@@ -132,9 +161,9 @@ cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *me
  *  Scaling matrix W, one big allocation block that is divided to index space
  *  and matrix data space.
  *
- *  Size of index space is: 
+ *  Size of index space is:
  *       (N_SOCP + 2*N_SDP)*sizeof(size_t) aligned to 64bit
- *  Size of matrix data space: 
+ *  Size of matrix data space:
  *       (2*(NONLINEAR + LINEAR) + sum(SOCP_i) + N_SOCP + 2*sum(SDP_i^2)) * sizeof(cvx_float_t)
  *
  */
@@ -149,7 +178,7 @@ cvx_scaling_t *cvx_scaling_init(cvx_scaling_t *W, const cvx_dimset_t *dims)
 {
     cvx_size_t ntotal, itotal;
     ntotal = cvx_scaling_bytes(&itotal, dims);
-    
+
     unsigned char *buf = calloc(ntotal, sizeof(char));
     if (!buf)
         return (cvx_scaling_t *)0;
@@ -202,6 +231,20 @@ void cvx_scaling_free(cvx_scaling_t *W)
         free(W);
 }
 
+int cvx_scaling_copy(cvx_scaling_t *W, const cvx_scaling_t *Ws)
+{
+    if (W->nbytes != Ws->nbytes)
+        return -1;
+    if (W->__bytes && Ws->__bytes) {
+        memcpy(W->__bytes, Ws->__bytes, W->nbytes);
+    } else {
+        // memory block not owned by structure; layout is [indexes; data]
+        // copy nbytes from the start of indexes.
+        memcpy(W->indexes, Ws->indexes, W->nbytes);
+    }
+    return 0;
+}
+
 // \brief Get scaling element NAME at index ind; returns size of element
 cvx_size_t cvx_scaling_elem(cvx_matrix_t *A, const cvx_scaling_t *W, cvx_mset_enum name, int ind)
 {
@@ -209,8 +252,18 @@ cvx_size_t cvx_scaling_elem(cvx_matrix_t *A, const cvx_scaling_t *W, cvx_mset_en
         return 0;
 
     cvxm_map_data(A, 0, 0, (cvx_float_t *)0);
-    
+
     switch (name) {
+    case CVXWS_DNLT:
+        if (W->dnltsz > 0) {
+            cvxm_map_data(A, W->dnltsz, 1, W->dnlt);
+            return W->dnlsz;
+        }
+    case CVXWS_DNLTI:
+        if (W->dnltsz > 0) {
+            cvxm_map_data(A, W->dnltsz, 1, W->dnlti);
+            return W->dnlsz;
+        }
     case CVXWS_DNL:
         if (W->dnlsz > 0) {
             cvxm_map_data(A, W->dnlsz, 1, W->dnl);
@@ -255,7 +308,39 @@ cvx_size_t cvx_scaling_elem(cvx_matrix_t *A, const cvx_scaling_t *W, cvx_mset_en
     return 0;
 }
 
-
+/*
+ * @brief Set scaling matrix to initial value
+ *
+ * d, di to ones, beta_j = 1, v_j = e_1, r_k, rti_k = diag(1)
+ *
+ */
+void cvx_scaling_initial_value(cvx_scaling_t *W)
+{
+    cvx_matrix_t x;
+    // D = ones
+    cvx_scaling_elem(&x, W, CVXWS_D, 0);
+    cvxm_mkconst(&x, 1.0);
+    // DI = ones
+    cvx_scaling_elem(&x, W, CVXWS_DI, 0);
+    cvxm_mkconst(&x, 1.0);
+    if (W->vcount > 0) {
+        // BETA = ones
+        cvx_scaling_elem(&x, W, CVXWS_BETA, 0);
+        cvxm_mkconst(&x, 1.0);
+        // V is unit vector
+        for (int k = 0; k < W->vcount; k++) {
+            cvx_scaling_elem(&x, W, CVXWS_V, k);
+            cvxm_mkident(&x);
+        }
+    }
+    // R & RTI are identity
+    for (int k = 0; k < W->rcount; k++) {
+        cvx_scaling_elem(&x, W, CVXWS_R, k);
+        cvxm_mkident(&x);
+        cvx_scaling_elem(&x, W, CVXWS_RTI, k);
+        cvxm_mkident(&x);
+    }
+}
 
 // Local Variables:
 // indent-tabs-mode: nil
