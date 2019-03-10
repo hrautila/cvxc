@@ -1,5 +1,5 @@
 
-// Copyright: Harri Rautila, 2016 <harri.rautila@gmail.com>
+// Copyright: Harri Rautila, 2018 <harri.rautila@gmail.com>
 
 #include "convex.h"
 
@@ -55,22 +55,22 @@ static cvx_kktfuncs_t ldl2functions = {
 };
 
 /*
-    Solution of KKT equations by a dense LDL factorization of the 2 x 2 
+    Solution of KKT equations by a dense LDL factorization of the 2 x 2
     system.
-    
+
     Returns a function that (1) computes the LDL factorization of
-    
+
         [ H + GG' * W^{-1} * W^{-T} * GG   A' ]
         [                                     ]
         [ A                                0  ]
-    
-    given H, Df, W, where GG = [Df; G], and (2) returns a function for 
-    solving 
-    
+
+    given H, Df, W, where GG = [Df; G], and (2) returns a function for
+    solving
+
         [ H    A'   GG'   ]   [ ux ]   [ bx ]
         [ A    0    0     ] * [ uy ] = [ by ].
         [ GG   0   -W'*W  ]   [ uz ]   [ bz ]
-    
+
     H is n x n,  A is p x n, Df is mnl x n, G is N x n where
 */
 
@@ -84,7 +84,7 @@ int ldl2_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matri
     cvx_matgrp_t g_g;
     int mnl = cvx_dimset_sum(cp->dims, CVXDIM_NONLINEAR);
     int err;
-    
+
     cvxm_size(&rG, &cG, cp->G);
     ldl->W = W;
     // TODO: only the LOWER triangular part?
@@ -99,7 +99,7 @@ int ldl2_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matri
         cvxm_view_map(&Kt, &ldl->K, ldl->n, 0, ldl->p, ldl->n);
         cvxm_copy(&Kt, ldl->A, 0);
     }
-    
+
     // Build lower triangular part of K column by column
     for (int k = 0; k < ldl->n; k++) {
         // k'th column of K on and below diagonal
@@ -138,11 +138,11 @@ int ldl2_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matri
 
 /*
    Solve
-   
-        [ H + GG' * W^{-1} * W^{-T} * GG    A' ]   [ ux ]   
-        [                                      ] * [    ] 
-        [ A                                 0  ]   [ uy ]   
-        
+
+        [ H + GG' * W^{-1} * W^{-T} * GG    A' ]   [ ux ]
+        [                                      ] * [    ]
+        [ A                                 0  ]   [ uy ]
+
                  [ bx + GG' * W^{-1} * W^{-T} * bz ]
              =   [                                 ]
                  [ by                              ]
@@ -177,16 +177,16 @@ int ldl2_solve(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_
     cvx_sgemv(beta, &ldl->u, 1.0, ldl->G, &g_g, CVX_TRANS);
     cvxm_axpy(&u0, 1.0, x);
     cvxm_copy(&u1, y, 0);
-    
+
     if (ldl->p > 0) {
         err = cvxm_ldlsolve(&ldl->u, &ldl->K, ldl->ipiv, CVX_LOWER, &ldl->work);
     } else {
         err = cvxm_cholsolve(&ldl->u, &ldl->K, CVX_LOWER);
     }
-    
+
     cvxm_copy(x, &u0, 0);
     cvxm_copy(y, &u1, 0);
-    
+
     if (mnl > 0) {
     }
     cvx_mgrp_init(&x_g, x, (cvx_index_t *)0);
@@ -207,13 +207,13 @@ int ldl2_init(cvx_kktsolver_t *S, cvx_problem_t *cp, int n, int m, const cvx_dim
 
     cvxm_size(&grows, &gcols, cp->G);
     ldl->ldK = n + m;                                // space for H and A (H can be zeroes)
-    
+
     cvxm_init(&ldl->K, ldl->ldK, ldl->ldK);
     if (m > 0)
         ldl->ipiv = (int *)calloc(ldl->ldK, sizeof(int));
     else
         ldl->ipiv = (int *)0;
-    
+
     cvxm_init(&ldl->u, ldl->ldK, 1);
     cvxm_init(&ldl->g, grows, 1);
 
@@ -273,7 +273,7 @@ void ldl2_free(cvx_kktsolver_t *kkt)
 {
     if (!kkt)
         return;
-    
+
     cvx_ldlsolver_t *ldl = (cvx_ldlsolver_t *)kkt;
     cvxm_release(&ldl->K);
     cvxm_release(&ldl->u);
