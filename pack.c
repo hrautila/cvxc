@@ -1,5 +1,5 @@
 
-// Copyright: Harri Rautila, 2016 <harri.rautila@gmail.com>
+// Copyright: Harri Rautila, 2018 <harri.rautila@gmail.com>
 
 #include <stdio.h>
 #include "convex.h"
@@ -34,7 +34,7 @@
 void cvx_pack(cvx_matrix_t *y, cvx_matrix_t *x, const cvx_index_t *index)
 {
     cvx_size_t nlq, ip, n, np;
-    int j, k;
+    cvx_size_t j, k;
     cvx_matrix_t x1, y1, xk;
     
     nlq = cvx_dimset_sum(index->dims, CVXDIM_NONLINEAR) +
@@ -79,7 +79,7 @@ void cvx_pack(cvx_matrix_t *y, cvx_matrix_t *x, const cvx_index_t *index)
 void cvx_unpack(cvx_matrix_t *y, cvx_matrix_t *x, const cvx_index_t *index)
 {
     cvx_size_t nlq, ip, n;
-    int j, k;
+    cvx_size_t j, k;
     cvx_matrix_t x1, yk, y1;
     
     nlq = cvx_dimset_sum(index->dims, CVXDIM_NONLINEAR) +
@@ -125,7 +125,7 @@ void cvx_unpack(cvx_matrix_t *y, cvx_matrix_t *x, const cvx_index_t *index)
 void cvx_pack2(cvx_matrix_t *x, const cvx_index_t *index, cvx_memblk_t *work)
 {
     cvx_size_t iu, ip, n, nr, nc;
-    int i, j, k;
+    cvx_size_t i, j, k;
     cvx_matrix_t xk, row;
     
     iu = ip = cvx_dimset_sum(index->dims, CVXDIM_NONLINEAR) +
