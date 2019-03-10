@@ -15,9 +15,9 @@ char *solution_name[] = {
 
 // one linear [2,1], one sdp of size [3,3]
 cvx_float_t gdata[] = {
-    // 1st 
+    // 1st
     16., 7., /**/ 7., -5., 1., -5., 1., -7., 1., -7., -4.,
-    // 2nd 
+    // 2nd
     -14., 2.,/**/ 3., 13., -6., 13., 12., -10., -6., -10., -28.,
     // 3rd
     5., 0., /**/ 9.,  6., -6., 6., -7., -7., -6., -7., -11.
@@ -65,7 +65,7 @@ int main(int argc, char **argv)
         .kkt_solver_name = 0,
         .show_progress = 1
     };
-    
+
     while ((opt = getopt(argc, argv, "N:")) != -1) {
         switch (opt) {
         case 'N':
@@ -75,7 +75,7 @@ int main(int argc, char **argv)
             break;
         }
     }
-    // 
+    //
     cvxm_map_data(&c, 3, 1, cdata);
     // inequality constraints; G*x <= h
     cvxm_map_data(&G, 11, 3, gdata);
@@ -84,13 +84,13 @@ int main(int argc, char **argv)
     cvxm_map_data(&A, 0, 3, (cvx_float_t *)0);
     cvxm_map_data(&b, 0, 1, (cvx_float_t *)0);
 
-    cvx_dimset_alloc(&dims, 2, (int *)0, (int[]){3, 0});
+    cvx_dimset_alloc(&dims, 2, (cvx_size_t *)0, (cvx_size_t[]){3, 0});
 
     cvx_conelp_setup(&cp, &c, &G, &h, &A, &b, &dims, (cvx_kktsolver_t *)0);
     //cp.solver->debug = 2;
-    
+
     cvx_conelp_compute_start(&cp);
-    if (cvx_conelp_solve(&cp, &opts) == 0) 
+    if (cvx_conelp_solve(&cp, &opts) == 0)
         print_solution(&cp.solution);
 }
 

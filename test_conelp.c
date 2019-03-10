@@ -84,17 +84,17 @@ int main(int argc, char **argv)
     cvxm_map_data(&A, 0, 3, (cvx_float_t *)0);
     cvxm_map_data(&b, 0, 1, (cvx_float_t *)0);
 
-    cvx_dimset_alloc(&dims, 2, (int[]){4, 4, 0}, (int[]){3, 0});
+    cvx_dimset_alloc(&dims, 2, (cvx_size_t[]){4, 4, 0}, (cvx_size_t[]){3, 0});
 
     cvx_size_t nbytes = cvx_conelp_setup(&cp, &c, &G, &h, &A, &b, &dims, (cvx_kktsolver_t *)0);
     printf("conelp setup: %ld bytes\n", nbytes);
     if (nbytes == 0)
         exit(1);
-                                                                                      
+
     //cp.solver->debug = 2;
-    
+
     cvx_conelp_compute_start(&cp);
-    if (cvx_conelp_solve(&cp, &opts) == 0) 
+    if (cvx_conelp_solve(&cp, &opts) == 0)
         print_solution(&cp.solution);
 }
 

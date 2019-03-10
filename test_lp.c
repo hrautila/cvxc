@@ -57,8 +57,8 @@ int main(int argc, char **argv)
         .kkt_solver_name = 0,
         .show_progress = 1
     };
-    
-    // 
+
+    //
     cvxm_map_data(&c, 2, 1, cdata);
     // inequality constraints; G*x <= h
     cvxm_map_data(&G, 4, 2, gdata);
@@ -67,11 +67,11 @@ int main(int argc, char **argv)
     cvxm_map_data(&A, 0, 2, (cvx_float_t *)0);
     cvxm_map_data(&b, 0, 1, (cvx_float_t *)0);
 
-    cvx_dimset_alloc(&dims, 4, (int *)0, (int *)0);
+    cvx_dimset_alloc(&dims, 4, (cvx_size_t *)0, (cvx_size_t *)0);
 
     cvx_conelp_setup(&cp, &c, &G, &h, &A, &b, &dims, (cvx_kktsolver_t *)0);
     //cp.solver->debug = 2;
-    
+
     cvx_conelp_compute_start(&cp);
     cvx_conelp_solve(&cp, &opts);
     print_solution(&cp.solution);
