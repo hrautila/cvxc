@@ -1,6 +1,7 @@
 
-// Copyright: Harri Rautila, 2016 <harri.rautila@gmail.com>
+// Copyright: Harri Rautila, 2018 <harri.rautila@gmail.com>
 
+#include <assert.h>
 #include "convex.h"
 
 #define EFRM "%8.5f"
@@ -27,7 +28,7 @@ cvx_size_t __WORKBYTES(cvx_size_t n)
     return 8*n*n*sizeof(cvx_float_t);
 }
 
-static 
+static
 int cvx_res(cvx_problem_t *cp,
             cvx_matrix_t *ux,
             cvx_matrix_t *uy,
@@ -50,11 +51,11 @@ int cvx_res(cvx_problem_t *cp,
     cvx_matrix_t *lmbda = lmbda_g->mat;
 
     cvx_conelp_internal_t *cpi = &cp->u.conelp;
-    
+
     cvx_float_t tauplus, lscale, vkplus;
     cvx_matgrp_t ux_g = (cvx_matgrp_t){ .mat = ux, .index = (cvx_index_t *)0 };
     int err = 0;
-    
+
     //printf("res:start utau=%e, ukappa=%e, vtau=%e, vkappa=%e, dg=%e\n", utau, ukappa, *vtau, *vkappa, dg);
     // vx = vx - A^T*uy - G^T*W^-1*uz - c*utau/dg
     cvxm_mult(1.0, vx, -1.0, cp->A, uy, CVX_TRANSA);
@@ -83,7 +84,7 @@ int cvx_res(cvx_problem_t *cp,
     tauplus += cvxm_dot(cp->b, uy);
     tauplus += cvx_sdot(&cpi->h_g, &cpi->wz3_g);
     *vtau   += tauplus;
-    
+
     // vs = vs + lmbda o (uz + us)
     cvxm_copy(&cpi->ws3, us, 0);
     cvxm_axpy(&cpi->ws3, 1.0, uz);
@@ -94,9 +95,9 @@ int cvx_res(cvx_problem_t *cp,
     lscale = cvxm_get(lmbda, cp->cdim_diag, 0);
     vkplus = lscale * (utau + ukappa);
     *vkappa += vkplus;
-        
+
     //printf("res:end vtau=%e, vkappa=%e, tauplus=%e, lscale=%e, vkplus=%e\n", *vtau, *vkappa, tauplus, lscale, vkplus);
-    
+
     return err;
 }
 
@@ -122,19 +123,19 @@ int f6_no_ir(cvx_problem_t *cp,
              cvx_float_t *kappa)
 {
     cvx_conelp_internal_t *cpi = &cp->u.conelp;
-    
+
     cvx_matrix_t *s = s_g->mat, *z = z_g->mat;
 
-    
+
     //cvx_matrix_t r;
 
-    // Solve 
-    // 
-    // [  0   A'  G'    0   ] [ ux        ]   
-    // [ -A   0   0     b   ] [ uy        ]  
-    // [ -G   0   W'*W  h   ] [ W^{-1}*uz ] 
+    // Solve
+    //
+    // [  0   A'  G'    0   ] [ ux        ]
+    // [ -A   0   0     b   ] [ uy        ]
+    // [ -G   0   W'*W  h   ] [ W^{-1}*uz ]
     // [ -c' -b' -h'    k/t ] [ utau/dg   ]
-    // 
+    //
     //   [ bx                    ]
     //   [ by                    ]
     // = [ bz - W'*(lmbda o\ bs) ]
@@ -142,13 +143,13 @@ int f6_no_ir(cvx_problem_t *cp,
     //
     // us = -lmbda o\ bs - uz
     // ukappa = -bkappa/lmbdag - utau.
-    
-    // First solve 
-    // 
+
+    // First solve
+    //
     // [ 0  A' G'   ] [ ux        ]   [  bx                    ]
     // [ A  0  0    ] [ uy        ] = [ -by                    ]
     // [ G  0 -W'*W ] [ W^{-1}*uz ]   [ -bz + W'*(lmbda o\ bs) ]
-    
+
     //printf("f6_no_ir:start tau=%e, kappa=%e\n", *tau, *kappa);
     cvxm_scale(y, -1.0, 0);
     // s = -lmbda o\ s = - lmbda o\ bs
@@ -156,7 +157,7 @@ int f6_no_ir(cvx_problem_t *cp,
     cvx_sinv(s_g, &cpi->lmbda_g, &cp->work);
     cvxm_scale(s, -1.0, 0);
     //cvx_mat_printf(stdout, "%e", s, "f6_no_ir:s");
-    
+
     // z = -(z + W'*s) = -bz + W'(lmbda o\ bs)
     cvxm_copy(&cpi->ws3, s, CVX_ALL);
     //cvx_mat_printf(stdout, "%e", &cp->ws3, "f6_no_ir:ws3");
@@ -172,14 +173,14 @@ int f6_no_ir(cvx_problem_t *cp,
     cvx_kktsolve(cp->solver, x, y, z_g);
     //cvx_mat_printf(stdout, "%e", x, "f6_no_ir:solved(x)");
     //cvx_mat_printf(stdout, "%e", z, "f6_no_ir:solved(z)");
-    // Combine with solution of 
-    // 
+    // Combine with solution of
+    //
     // [ 0   A'  G'    ] [ x1         ]          [ c ]
     // [-A   0   0     ] [ y1         ] = -dgi * [ b ]
     // [-G   0   W'*W  ] [ W^{-1}*dzl ]          [ h ]
-    // 
+    //
     // to satisfy
-    // 
+    //
     // -c'*x - b'*y - h'*W^{-1}*z + dg*tau = btau - bkappa/tau. '
     cvx_float_t lkappa = - (*kappa) / cvxm_get(&cpi->lmbda, cp->cdim_diag, 0);
     cvx_float_t ltau  = *tau + lkappa/cp->u.conelp.dgi;
@@ -209,7 +210,7 @@ int f6_no_ir(cvx_problem_t *cp,
 }
 
 
-// f6(x, y, z, tau, s, kappa) solves the same system as f6_no_ir, 
+// f6(x, y, z, tau, s, kappa) solves the same system as f6_no_ir,
 // but applies iterative refinement.
 static
 int f6(cvx_problem_t *cp,
@@ -224,9 +225,9 @@ int f6(cvx_problem_t *cp,
     cvx_matrix_t *s = s_g->mat, *z = z_g->mat;
     int /*lags = 0,*/ err = 0;
     double wtau, wkappa, wtau2, wkappa2;
-    
+
     cvx_conelp_internal_t *cpi = &cp->u.conelp;
-    
+
     //printf("**f6:start tau=%e, kappa=%e, refinement=%d\n", *tau, *kappa, refinement);
 
     if (refinement > 0 /*|| (flags | CVX_DEBUG) != 0*/) {
@@ -256,7 +257,7 @@ int f6(cvx_problem_t *cp,
         //cvx_mat_printf(stdout, "%e", &cp->ws2, "f6:ws2");
         f6_no_ir(cp, &cpi->wx2, &cpi->wy2,
                  &cpi->wz2_g, &wtau2, &cpi->ws2_g, &wkappa2);
-        
+
         //cvx_mat_printf(stdout, "%e", &cp->wz2, "f6_no_ir:wz2");
         //cvx_mat_printf(stdout, "%e", &cp->ws2, "f6_no_ir:ws2");
 
@@ -264,7 +265,7 @@ int f6(cvx_problem_t *cp,
         cvxm_axpy(y, 1.0, &cpi->wy2);
         cvxm_axpy(s, 1.0, &cpi->ws2);
         cvxm_axpy(z, 1.0, &cpi->wz2);
-        
+
         *tau   += wtau2;
         *kappa += wkappa2;
     }
@@ -301,8 +302,8 @@ cvx_size_t cvx_conelp_bytes(int n, int m, const cvx_dimset_t *dims)
 
     // workspace for SDP constraint scaling; TODO: think about this.
     if (maxsdp > 0)
-        nbytes += __WORKBYTES(maxsdp);   
-    
+        nbytes += __WORKBYTES(maxsdp);
+
     cvx_size_t isize;
     // calculte space need for scaling matrix
     nbytes += cvx_scaling_bytes(&isize, dims);
@@ -348,22 +349,22 @@ do {                                                                    \
 
 /**
  * @brief Overlay problem variables onto memory block
- * 
- * @param[in,out] prob  
+ *
+ * @param[in,out] prob
  *      ConeLP problem structure
- * @param[in] n  
+ * @param[in] n
  *      Number of variables (length of x -vector)
- * @param[in] m  
+ * @param[in] m
  *      Number of equality constrains (rows of A matrix)
- * @param[in] 
+ * @param[in]
  *      dims Dimensions of inequality constraints, linear, scop and sdp
  * @param[in] memory
- *      Pointer to memory block 
+ *      Pointer to memory block
  * @param[in] nbytes
  *      Size of memory block in bytes
  *
  * @return Number of bytes of memory used, zero if memory was not large enough.
- * 
+ *
  */
 cvx_size_t cvx_conelp_make(cvx_problem_t *cp,
                            int n,
@@ -379,7 +380,7 @@ cvx_size_t cvx_conelp_make(cvx_problem_t *cp,
         cvx_dimset_sum_squared(dims, CVXDIM_CONELP);
 
     cvx_conelp_internal_t *cpi = &cp->u.conelp;
-    
+
     cp->cdim = cdim;
 
 #if 0
@@ -454,11 +455,11 @@ cvx_size_t cvx_conelp_make(cvx_problem_t *cp,
 
     cvx_size_t sdim   = cvx_dimset_sum(dims, CVXDIM_SDP);
     cvx_size_t maxsdp = cvx_dimset_max(dims, CVXDIM_SDP);
-    
+
     // sigs, sigz; space for eigenvalues; zero if no SDP constraints
     __INITC(used, sdim, &cpi->sigs, cvxm_make(&cpi->sigs, sdim, 1, &bytes[offset], nbytes));
     __INITC(used, sdim, &cpi->sigz, cvxm_make(&cpi->sigz, sdim, 1, &bytes[offset], nbytes));
-    
+
     // scaling matrix
     __INIT(used, cvx_scaling_make(&cp->W, dims, &bytes[offset], nbytes));
 
@@ -502,7 +503,7 @@ int cvx_conelp_isok(const cvx_matrix_t *c,
                     const cvx_matrix_t *b,
                     const cvx_dimset_t *dims)
 {
-    cvx_size_t mc, nc, mG, nG, mA, nA, mh, nh, mb, nb;  
+    cvx_size_t mc, nc, mG, nG, mA, nA, mh, nh, mb, nb;
 
     mc = nc = mG = nG = mA = nA = mh = nh = mb = nb = 0;
     if (!c) {
@@ -518,14 +519,14 @@ int cvx_conelp_isok(const cvx_matrix_t *c,
         cvxm_size(&mh, &nh, h);
     if (b)
         cvxm_size(&mb, &nb, b);
-    
+
     if (nc > 1 || mc < 1) {
         return CVX_ERR_DIMC;
     }
 
     cvx_size_t cdim      = cvx_dimset_sum_squared(dims, CVXDIM_CONELP);
-    cvx_size_t cdim_pckd = cvx_dimset_sum_packed(dims, CVXDIM_CONELP);   
-    
+    cvx_size_t cdim_pckd = cvx_dimset_sum_packed(dims, CVXDIM_CONELP);
+
     if (nh > 1 || mh != cdim) {
         return CVX_ERR_DIMH;
     }
@@ -563,7 +564,7 @@ cvx_size_t cvx_conelp_setup(cvx_problem_t *cp,
         cp->error = err;
         return 0;
     }
-    
+
     mc = nc = mb = nb = 0;
     cvxm_size(&mc, &nc, c);
     if (b)
@@ -575,7 +576,7 @@ cvx_size_t cvx_conelp_setup(cvx_problem_t *cp,
         cp->error = CVX_ERR_MEMORY;
         return 0;
     }
-                
+
     cp->c = c;
     cp->G = G;
     cp->h = h;
@@ -594,7 +595,7 @@ cvx_size_t cvx_conelp_setup(cvx_problem_t *cp,
     }
     cp->mlen = nbytes;
     cp->memory = memory;
-    // provide full index set 
+    // provide full index set
     cp->index_g = &cp->u.conelp.index_full;
 
     // init KKT solver
@@ -604,7 +605,6 @@ cvx_size_t cvx_conelp_setup(cvx_problem_t *cp,
         cvx_ldlsolver_init(&cp->__S, cp, mc, mb, dims);
         cp->solver = &cp->__S;
     }
-    
 
     return nbytes;
 }
@@ -660,9 +660,9 @@ int cvx_conelp_compute_start(cvx_problem_t *cp)
     int primalstart = ! (cp->primal_x && cp->primal_s);
     int dualstart = ! (cp->dual_y && cp->dual_z);
 
-    
-    if (primalstart || dualstart) {      
-        cvx_conelp_init_scaling(&cp->W);       
+
+    if (primalstart || dualstart) {
+        cvx_conelp_init_scaling(&cp->W);
         cvx_kktfactor(cp->solver, &cp->W, __cvxnil, __cvxnil);
     }
     if (primalstart) {
@@ -678,7 +678,7 @@ int cvx_conelp_compute_start(cvx_problem_t *cp)
         cvxm_copy(&cpi->dy, cp->b, 0);
         cvxm_copy(&cpi->s, cp->h, 0);
         //cvx_mat_printf(stdout, "%e", &cp->s, "initial s");
-        
+
         //cvx_scaling_printf(stdout, "%13.6e", &cp->W, "kktsolve.W");
         //cvx_mat_printf(stdout, "%13.6e", cp->G, "kktsolve.G");
         //cvx_mat_printf(stdout, "%13.6e", cp->A, "kktsolve.A");
@@ -727,7 +727,7 @@ int cvx_conelp_compute_start(cvx_problem_t *cp)
     }
     //cvx_mat_printf(stdout, "%e", &cpi->z, "dual z");
     //cvx_mat_printf(stdout, "%e", &cpi->y, "dual y");
-       
+
     cpi->tz = cvx_max_step(&cpi->z_g,  __nilgrp, &cp->work);
     //fprintf(stdout, "initial tz=%f\n", cpi->tz);
     if (cpi->tz >= 0.0 && ! dualstart) {
@@ -744,9 +744,9 @@ int cvx_conelp_compute_start(cvx_problem_t *cp)
     cpi->nrmz = cvx_snrm2(&cpi->z_g);
 
     //printf("initial nrms=%.5f, nrmz=%.5f\n", cpi->nrms, cpi->nrmz);
-    
+
     stats->gap = stats->pcost = stats->dcost = stats->relgap = 0.0;
-    
+
     return 0;
 }
 
@@ -755,7 +755,7 @@ int cvx_conelp_compute_start(cvx_problem_t *cp)
 int cvx_conelp_ready(cvx_problem_t *cp, cvx_stats_t *stats, int iter, int stat)
 {
     cvx_conelp_internal_t *cpi = &cp->u.conelp;
-    
+
     //cvx_stats_t *stats = &cp->stats;
 
     if (stat == CVX_STAT_OPTIMAL && iter == -1) {
@@ -771,9 +771,9 @@ int cvx_conelp_ready(cvx_problem_t *cp, cvx_stats_t *stats, int iter, int stat)
 
         // ry = b - A*x  ; TODO - computes -b - A*x ;; check
         cvxm_copy(&cpi->ry, cp->b, CVX_ALL);
-        cvxm_mvmult(-1.0, &cpi->ry, -1.0, cp->A, &cpi->x, CVX_TRANS); 
+        cvxm_mvmult(-1.0, &cpi->ry, -1.0, cp->A, &cpi->x, CVX_TRANS);
         stats->resy = cvxm_nrm2(&cpi->ry);
-        
+
         // rz = s + G*x - h
         cvxm_copy(&cpi->rz, &cpi->s, CVX_ALL);
         cvxm_mvmult(1.0, &cpi->rz, 1.0, cp->G, &cpi->x, 0);
@@ -785,7 +785,7 @@ int cvx_conelp_ready(cvx_problem_t *cp, cvx_stats_t *stats, int iter, int stat)
         stats->cx = cvxm_dot(cp->c, &cpi->x);
         stats->by = cvxm_dot(cp->b, &cpi->y);
         stats->hz = cvx_sdot(&cpi->h_g, &cpi->z_g);
-        
+
         cp->solution.x = &cpi->x;
         cp->solution.s = &cpi->s;
         cp->solution.y = &cpi->y;
@@ -813,7 +813,7 @@ int cvx_conelp_ready(cvx_problem_t *cp, cvx_stats_t *stats, int iter, int stat)
         cvx_mksymm(&cpi->z_g);
         cpi->ts = cvx_max_step(&cpi->s_g, __nilgrp, &cp->work);
         cpi->tz = cvx_max_step(&cpi->s_g, __nilgrp, &cp->work);
-        
+
         cp->error = stat == CVX_STAT_UNKNOWN ? CVX_ERR_MAXITER : 0;
         cp->solution.x = &cpi->x;
         cp->solution.s = &cpi->s;
@@ -898,10 +898,10 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
 {
     cvx_conelp_internal_t *cpi = &cp->u.conelp;
     cvx_stats_t *stats = &cp->stats;
-    
+
     cvx_float_t max_nrms, max_nrmz;
     cvx_matrix_t lk, sk, zk, ls, lz;
-    
+
     cvx_float_t abstol = CVX_ABSTOL;
     cvx_float_t reltol = CVX_RELTOL;
     cvx_float_t feastol = CVX_FEASTOL;
@@ -910,13 +910,13 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
     int refinement = opts->refinement > 0 ? opts->refinement : 0;
 
     if (cp->dims->qlen > 0 || cp->dims->slen > 0)
-        refinement = 1;   
+        refinement = 1;
 
     int primalstart = ! (cp->primal_x && cp->primal_s);
     int dualstart = ! (cp->dual_y && cp->dual_z);
-    
+
     cp->error = 0;
-    
+
     if (primalstart && dualstart) {
         // check for constructed initial point
         stats->gap = cvx_sdot(&cpi->s_g, &cpi->z_g);
@@ -938,7 +938,7 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
 
             // initial point is feasible and optimal
             return cvx_conelp_ready(cp, stats, -1, CVX_STAT_OPTIMAL);
-        }    
+        }
 
         max_nrms = __MAX2(1.0, cpi->nrms);
         max_nrmz = __MAX2(1.0, cpi->nrmz);
@@ -973,12 +973,12 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
     cvxm_copy(&cpi->hry, cp->b, 0);
 
     stats->gap = cvx_sdot(&cpi->s_g, &cpi->z_g);
-    
+
     //printf("preloop: resx0=%.4f, resy0=%.4f, resz0=%.4f\n", stats->resx0, stats->resy0, stats->resz0);
     // -----------------------------------------------------------------------------
 
     for (int iter = 0; iter <= maxiter; iter++) {
-        
+
         // hrx = -A'*y - G'*z
         cvxm_scale(&cpi->hrx, 0.0, CVX_ALL);
         cvxm_mvmult(0.0, &cpi->hrx, -1.0, cp->A, &cpi->y, CVX_TRANS);
@@ -987,7 +987,7 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
         //stats->hresx = cvxm_nrm2(&cpi->hrx);
         stats->hresx = SQRT(cvxm_dot(&cpi->hrx, &cpi->hrx));
         //if (iter == 0) cvx_mat_printf(stdout, "%e", &cpi->hrx, "hrx");
-        
+
         // rx  = hrx - c*tau
         //     = -A'*y - G'*z - c*tau
         cvxm_copy(&cpi->rx, &cpi->hrx, 0);
@@ -1039,6 +1039,9 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
         //printf("by   : %e\n", stats->by);
         //printf("hz   : %e\n", stats->hz);
 
+        assert(isfinite(stats->cx));
+        assert(isfinite(cpi->tau));
+
         // statistics for stopping
         stats->pcost = stats->cx / cpi->tau;
         stats->dcost = -(stats->by + stats->hz) / cpi->tau;
@@ -1052,7 +1055,7 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
 
         //printf("pres: max(%e/%e, %e/%e)\n", stats->resy, stats->resy0, stats->resz, stats->resz0);
         //printf("dres: %e/%e\n", stats->resx, stats->resx0);
-        
+
         stats->pres = __MAX2((stats->resy/stats->resy0), (stats->resz/stats->resz0));
         stats->dres = stats->resx / stats->resx0;
         stats->pinfres = __NaN();
@@ -1112,7 +1115,7 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
             //cvx_mat_printf(stdout, "%e", &cpi->lmbda, "lmbda");
             //printf("dg: %e, dgi: %e\n", cpi->dg, cpi->dgi);
         }
-        
+
         // lmdasq = lmda o lmbda
         cvx_ssqr(&cpi->lmbdasq_g, &cpi->lmbda_g/*, 0*/);
         cvx_float_t lambda_g0 = cvxm_get(&cpi->lmbda, cp->cdim_diag, 0);
@@ -1131,8 +1134,8 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
         cvxm_scale(&cpi->x1, -1.0, CVX_ALL);
         cvxm_copy(&cpi->y1, cp->b, CVX_ALL);
         cvxm_copy(&cpi->z1, cp->h, CVX_ALL);
-        
-#if 0       
+
+#if 0
         if (iter == 1) {
             cvx_scaling_printf(stdout, "%13.6e", &cp->W, "kktsolve.W");
             cvx_mat_printf(stdout, "%13.6e", cp->G, "kktsolve.G");
@@ -1172,38 +1175,38 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
         //cvx_mat_printf(stdout, "%e", &cpi->th, "scaled th");
 
         cvx_float_t nrm, mu, sigma, step, tt, tk;
-        
+
         // TODO: check this!!!
         nrm = cvxm_nrm2(&cpi->lmbda);
         mu  = (nrm * nrm) / (1.0 + (cvx_float_t)cp->cdim_diag);
         sigma = 0.0;
-        
+
         for (int i = 0; i < 2; i++) {
             // Solve
-            // 
+            //
             // [ 0         ]   [  0   A'  G'  c ] [ dx        ]
             // [ 0         ]   [ -A   0   0   b ] [ dy        ]
             // [ W'*ds     ] - [ -G   0   0   h ] [ W^{-1}*dz ]
             // [ dg*dkappa ]   [ -c' -b' -h'  0 ] [ dtau/dg   ]
-            // 
+            //
             //               [ rx   ]
             //               [ ry   ]
             // = - (1-sigma) [ rz   ]
             //               [ rtau ]
-            // 
+            //
             // lmbda o (dz + ds) = -lmbda o lmbda + sigma*mu*e
             // lmbdag * (dtau + dkappa) = - kappa * tau + sigma*mu
-            // 
+            //
             // ds = -lmbdasq                          if i == 0
             //    = -lmbdasq - dsa o dza + sigma*mu*e if i == 1
             // dkappa = -lambdasq[-1]                            if i == 0 
             //        = -lambdasq[-1] - dkappaa*dtaua + sigma*mu if i == 1.
-            
+
             cvx_mgrp_copy_lambda(&cpi->ds_g, &cpi->lmbdasq_g);
             cpi->dkappa = cvxm_get(&cpi->lmbdasq, cp->cdim_diag, 0);
             //cvx_mat_printf(stdout, "%e", &cpi->ds, "ds");
             //printf("dkappa=%e, mu=%e, sigma=%e, refinement=%d, i=%d\n", cpi->dkappa, mu, sigma, refinement, i);
-            
+
             if (i == 1) {
                 // ws3 holds ds o dz ; wkappa3 holds dtau*dkappa 
                 cvxm_axpy(&cpi->ds, 1.0, &cpi->ws3);
@@ -1262,7 +1265,7 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
                 cpi->ts = cvx_max_step(&cpi->ds_g, &cpi->sigs_g, &cp->work);
                 cpi->tz = cvx_max_step(&cpi->dz_g, &cpi->sigz_g, &cp->work);
             }
-            
+
             tt = -cpi->dtau / cvxm_get(&cpi->lmbda, cp->cdim_diag, 0);
             tk = -cpi->dkappa / cvxm_get(&cpi->lmbda, cp->cdim_diag, 0);
             cvx_float_t t = __maxvec(5, (cvx_float_t[]){0.0, cpi->ts, cpi->tz, tt, tk});
@@ -1295,10 +1298,10 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
         cvxm_axpy(&cpi->y, step, &cpi->dy);
         //cvx_mat_printf(stdout, "%e", &cpi->x, "update x");
 
-        // Replace 'l' and 'q' blocks of ds and dz with the updated 
+        // Replace 'l' and 'q' blocks of ds and dz with the updated
         // variables in the current scaling.
-        // Replace 's' blocks of ds and dz with the factors Ls, Lz in a 
-        // factorization Ls*Ls', Lz*Lz' of the updated variables in the 
+        // Replace 's' blocks of ds and dz with the factors Ls, Lz in a
+        // factorization Ls*Ls', Lz*Lz' of the updated variables in the
         // current scaling.
         //
         // ds := e + step*ds for 'l' and 'q' blocks.
@@ -1312,13 +1315,13 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
         //cvx_mat_printf(stdout, "%e", &cpi->dz, "update dz");
         //cvx_mat_printf(stdout, "%e", &cpi->ds, "update ds");
         // ds := H(lambda)^{-1/2} * ds and dz := H(lambda)^{-1/2} * dz.
-        // 
+        //
         // This replaces the 'l' and 'q' components of ds and dz with the
-        // updated variables in the current scaling.  
-        // The 's' components of ds and dz are replaced with 
-        // 
-        // diag(lmbda_k)^{1/2} * Qs * diag(lmbda_k)^{1/2} 
-        // diag(lmbda_k)^{1/2} * Qz * diag(lmbda_k)^{1/2} 
+        // updated variables in the current scaling.
+        // The 's' components of ds and dz are replaced with
+        //
+        // diag(lmbda_k)^{1/2} * Qs * diag(lmbda_k)^{1/2}
+        // diag(lmbda_k)^{1/2} * Qz * diag(lmbda_k)^{1/2}
         //cvx_mat_printf(stdout, "%e", &cpi->dz, "pre-scale2 dz");
 
         cvx_scale2(&cpi->ds_g, &cpi->lmbda_g, CVX_INV, &cp->work);
@@ -1347,7 +1350,7 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
         }
         //cvx_mat_printf(stdout, "%e", &cpi->sigs, "scaled sigs");
         //cvx_mat_printf(stdout, "%e", &cpi->sigz, "scaled sigz");
-        
+
         // TODO: missing somethings..!!!!
         // divide ds, dz by lmbda S blocks;; 
         for (int k = 0; k < cvx_mgrp_count(&cpi->ds_g, CVXDIM_SDP); k++) {
@@ -1356,7 +1359,7 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
             cvx_mgrp_elem(&zk, &cpi->dz_g, CVXDIM_SDP, k);
             cvx_mgrp_elem(&ls, &cpi->sigs_g, CVXDIM_SDP, k);
             cvx_mgrp_elem(&lz, &cpi->sigz_g, CVXDIM_SDP, k);
-                      
+
             for (int i = 0; i < m; i++) {
                 cvxm_view_map(&lk, &sk, 0, i, m, 1);
                 a = SQRT(cvxm_get(&ls, i, 0));
@@ -1375,10 +1378,10 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
         cvx_update_scaling(&cp->W, &cpi->lmbda_g, &cpi->ds_g, &cpi->dz_g, &cp->work);
         //cvx_scaling_printf(stdout, "%e", &cpi->W, "W");
         //cvx_mat_printf(stdout, "%e", &cpi->lmbda, "scaled lambda");
-        
-        // For kappa, tau block: 
+
+        // For kappa, tau block:
         //
-        //     dg := sqrt( (kappa + step*dkappa) / (tau + step*dtau) ) 
+        //     dg := sqrt( (kappa + step*dkappa) / (tau + step*dtau) )
         //         = dg * sqrt( (1 - step*tk) / (1 - step*tt) )
         //
         //     lmbda[-1] := sqrt((tau + step*dtau) * (kappa + step*dkappa))
@@ -1390,8 +1393,8 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
         cvxm_set(&cpi->lmbda, cp->cdim_diag, 0, a*g);
         //printf("dg=%e, dgi=%e\n", cpi->dg, cpi->dgi);
         //cvx_mat_printf(stdout, "%e", &cpi->lmbda, "updated lambda");
-        
-        // Unscale s, z, tau, kappa (unscaled variables are used only to 
+
+        // Unscale s, z, tau, kappa (unscaled variables are used only to
         // compute feasibility residuals).
         cvx_mgrp_copy_lambda(&cpi->s_g, &cpi->lmbda_g);
         cvx_scale(&cpi->s_g, &cp->W, CVX_TRANS, &cp->work);
