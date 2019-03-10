@@ -1,5 +1,5 @@
 
-// Copyright: Harri Rautila, 2016 <harri.rautila@gmail.com>
+// Copyright: Harri Rautila, 2018 <harri.rautila@gmail.com>
 
 #include "convex.h"
 
@@ -29,12 +29,12 @@ int cvx_scale_vector(cvx_matgrp_t *x_g, cvx_scaling_t *W, int flags, cvx_memblk_
 /*
  *  \brief Applies Nesterov-Todd scaling or its inverse.
  *
- *   Computes 
+ *   Computes
  *
- *        x := W*x        (trans is false 'N', inverse = false 'N')  
- *        x := W^T*x      (trans is true  'T', inverse = false 'N')  
- *        x := W^{-1}*x   (trans is false 'N', inverse = true  'T')  
- *        x := W^{-T}*x   (trans is true  'T', inverse = true  'T'). 
+ *        x := W*x        (trans is false 'N', inverse = false 'N')
+ *        x := W^T*x      (trans is true  'T', inverse = false 'N')
+ *        x := W^{-1}*x   (trans is false 'N', inverse = true  'T')
+ *        x := W^{-T}*x   (trans is true  'T', inverse = true  'T').
  *
  *   x is a dense m-by-n real matrix
  *
@@ -46,11 +46,11 @@ int cvx_scale_vector(cvx_matgrp_t *x_g, cvx_scaling_t *W, int flags, cvx_memblk_
  *   - W['di']: componentwise inverse of W['d']
  *   - W['v']: lists of 2nd order cone vectors with unit hyperbolic norms
  *   - W['beta']: list of positive numbers
- *   - W['r']: list of square matrices 
+ *   - W['r']: list of square matrices
  *   - W['rti']: list of square matrices.  rti[k] is the inverse transpose
  *     of r[k].
  *
- *   The 'dnl' and 'dnli' entries are optional, and only present when the 
+ *   The 'dnl' and 'dnli' entries are optional, and only present when the
  *   function is called from the nonlinear solver.
  *
  */
@@ -62,26 +62,32 @@ int cvx_scale(cvx_matgrp_t *x_g,
     cvx_matrix_t xk, xk0, Ak, w, v, dnl, dl, r, beta;
     cvx_size_t j, k, m, nrows, ncols, ind = 0;
     cvx_matrix_t *x = x_g->mat;
-    
+
     int inverse = (flags & CVX_INV) != 0;
 
     __mblk_clear(work);
-    
+
     ncols = 1;
     cvxm_size(&nrows, &ncols, x);
-#if 1
+
     if (ncols == 1)
         return cvx_scale_vector(x_g, W, flags, work);
-#endif    
+
     // NOTE:
     // x is M-by-ncols matrix; special case if ncols == 1
     // - linear and non-linear case update each x column
     // - Q, S space as m-by-ncol matrix
-    
-    // Scaling for nonlinear component xk is xk := dnl .* xk; 
-    // inverse scaling is xk ./ dnl = dnli .* xk, 
+
+    // Scaling for nonlinear component xk is xk := dnl .* xk;
+    // inverse scaling is xk ./ dnl = dnli .* xk,
     // where dnl = W['dnl'], dnli = W['dnli'].
-    if (W->dnlsz > 0) {
+    if (W->dnltsz > 0 && cvx_mgrp_count(x_g, CVXDIM_NLTARGET) > 0) {
+        m = cvx_scaling_elem(&dnl, W, (inverse ? CVXWS_DNLTI : CVXWS_DNLT), 0);
+        cvxm_view_map(&xk, x, ind, 0, m, ncols);
+        cvxm_mult_diag(&xk, 1.0, &dnl, CVX_LEFT);
+        ind += m;
+    }
+    if (W->dnlsz > 0 && cvx_mgrp_count(x_g, CVXDIM_NONLINEAR) > 0) {
         m = cvx_scaling_elem(&dnl, W, (inverse ? CVXWS_DNLI : CVXWS_DNL), 0);
         cvxm_view_map(&xk, x, ind, 0, m, ncols);
         cvxm_mult_diag(&xk, 1.0, &dnl, CVX_LEFT);
@@ -91,26 +97,26 @@ int cvx_scale(cvx_matgrp_t *x_g,
     // Scaling for linear 'l' component xk is xk := d .* xk;
     // inverse scaling is xk ./ d = di .* xk,
     // where d = W['d'], di = W['di'].
-    if (W->dsz > 0) {
+    if (W->dsz > 0 && cvx_mgrp_count(x_g, CVXDIM_LINEAR) > 0) {
         m = cvx_scaling_elem(&dl, W, (inverse ? CVXWS_DI : CVXWS_D), 0);
         cvxm_view_map(&xk, x, ind, 0, m, ncols);
         cvxm_mult_diag(&xk, 1.0, &dl, CVX_LEFT);
         ind += m;
     }
 
-    // Scaling for 'q' component is 
+    // Scaling for 'q' component is
     //
     //    xk := beta * (2*v*v' - J) * xk
     //        = beta * (2*v*(xk'*v)' - J*xk)
     //
-    // Inverse scaling for 'q' component is 
+    // Inverse scaling for 'q' component is
     //
     //    xk := 1/beta * (2*J*v*v'*J - J) * xk
-    //        = 1/beta * (-J) * (2*v*((-J*xk)'*v)' + xk). 
+    //        = 1/beta * (-J) * (2*v*((-J*xk)'*v)' + xk).
     //
     // where beta = W['beta'][k], v = W['v'][k], J = [1, 0; 0, -I].
     //
-    if (W->vcount > 0) {
+    if (W->vcount > 0 && cvx_mgrp_count(x_g, CVXDIM_SOCP) > 0) {
         cvx_float_t bk;
         cvxm_map_data(&w, ncols, 1, __mblk_offset(work, 0));
         cvx_scaling_elem(&beta, W, CVXWS_BETA, 0);
@@ -128,14 +134,14 @@ int cvx_scale(cvx_matgrp_t *x_g,
             // xk = xk + 2.0*v*w
             cvxm_mvupdate(&xk, 2.0, &v, &w);
             if (inverse) {
-                cvxm_scale(&xk0, -1.0, CVX_ALL);                
+                cvxm_scale(&xk0, -1.0, CVX_ALL);
                 bk = 1.0 / cvxm_get(&beta, k, 0);
             } else {
                 bk = cvxm_get(&beta, k, 0);
             }
             // TODO: xk is m-x-ncols matrix; scale is vector operator
             cvxm_scale(&xk, bk, CVX_ALL);
-            // next 
+            // next
             ind += m;
         }
     }
@@ -153,7 +159,7 @@ int cvx_scale(cvx_matgrp_t *x_g,
     //     xk := vec( rti' * mat(xk) * rti )  if trans = 'T'.
     //
     // rti is kth element of W['rti'].
-    if (W->rcount > 0) {
+    if (W->rcount > 0 && cvx_mgrp_count(x_g, CVXDIM_SDP) > 0) {
         cvx_matrix_t xd;
         int rflags = inverse ? flags & CVX_TRANS : (flags ^ CVX_TRANS);
         for (k = 0; k < W->rcount; k++) {
@@ -193,24 +199,29 @@ int cvx_scale_vector(cvx_matgrp_t *x_g,
 {
     cvx_matrix_t xk, v, r, dnl, dl;
     cvx_size_t m;
-    
+
     int inverse = (flags & CVX_INV) != 0;
-    
-    // Scaling for nonlinear component xk is xk := dnl .* xk; where dnl = W['dnl'], 
-    if (W->dnlsz > 0) {
+
+    // Scaling for nonlinear component xk is xk := dnl .* xk; where dnl = W['dnl'],
+    if (W->dnltsz > 0 && cvx_mgrp_count(x_g, CVXDIM_NLTARGET) > 0) {
+        cvx_scaling_elem(&dnl, W, (inverse ? CVXWS_DNLTI : CVXWS_DNLT), 0);
+        cvx_mgrp_elem(&xk, x_g, CVXDIM_NLTARGET, 0);
+        cvxm_mult_diag(&xk, 1.0, &dnl, CVX_LEFT);
+    }
+    if (W->dnlsz > 0 && cvx_mgrp_count(x_g, CVXDIM_NONLINEAR) > 0) {
         cvx_scaling_elem(&dnl, W, (inverse ? CVXWS_DNLI : CVXWS_DNL), 0);
         cvx_mgrp_elem(&xk, x_g, CVXDIM_NONLINEAR, 0);
         cvxm_mult_diag(&xk, 1.0, &dnl, CVX_LEFT);
     }
 
     // Scaling for linear 'l' component xk is xk := d .* xk; where d = W['d']
-    if (W->dsz > 0) {
+    if (W->dsz > 0 && cvx_mgrp_count(x_g, CVXDIM_LINEAR) > 0) {
         cvx_scaling_elem(&dl, W, (inverse ? CVXWS_DI : CVXWS_D), 0);
         cvx_mgrp_elem(&xk, x_g, CVXDIM_LINEAR, 0);
         cvxm_mult_diag(&xk, 1.0, &dl, CVX_LEFT);
     }
 
-    // Scaling for 'q' component is 
+    // Scaling for 'q' component is
     //
     //    xk := beta * (2*v*v' - J) * xk
     //        = beta * (2*v*(xk'*v)' - J*xk)
@@ -219,15 +230,15 @@ int cvx_scale_vector(cvx_matgrp_t *x_g,
     // Inverse scaling is
     //
     //    xk := 1/beta * (2*J*v*v'*J - J) * xk
-    //        = 1/beta * (-J) * (2*v*((-J*xk)'*v)' + xk). 
+    //        = 1/beta * (-J) * (2*v*((-J*xk)'*v)' + xk).
     //
     // where beta = beta(W, k), v = v(W, k), J = [1, 0; 0, -I].
-    if (W->vcount > 0) {
+    if (W->vcount > 0 && cvx_mgrp_count(x_g, CVXDIM_SOCP) > 0) {
         cvx_matrix_t beta;
         cvx_float_t w, bk;
         cvx_scaling_elem(&beta, W, CVXWS_BETA, 0);
         for (int k = 0; k < W->vcount; k++) {
-            m = cvx_scaling_elem(&v, W, CVXWS_V, k);           
+            m = cvx_scaling_elem(&v, W, CVXWS_V, k);
             cvx_mgrp_elem(&xk, x_g, CVXDIM_SOCP, k);
             if (inverse) {
                 // xk = -J*xk
@@ -239,10 +250,10 @@ int cvx_scale_vector(cvx_matgrp_t *x_g,
             cvxm_axpy(&xk, w, &v);
             bk = cvxm_get(&beta, k, 0);
             if (inverse) {
-                // xk = -J*xk  
+                // xk = -J*xk
                 cvxm_set(&xk, 0, 0, -cvxm_get(&xk, 0, 0));
                 bk = 1.0 / cvxm_get(&beta, k, 0);
-            } 
+            }
             cvxm_scale(&xk, bk, CVX_ALL);
         }
     }
@@ -253,7 +264,7 @@ int cvx_scale_vector(cvx_matgrp_t *x_g,
     //     xk := vec( r * mat(xk) * r' )  if trans = 'T'.
     //
     // r is kth element of W['r'].
-    if (W->rcount > 0) {
+    if (W->rcount > 0 && cvx_mgrp_count(x_g, CVXDIM_SDP) > 0) {
         cvx_matrix_t Ak, xd;
         int rflags = inverse ? flags & CVX_TRANS : (flags ^ CVX_TRANS);
         for (int k = 0; k < W->rcount; k++) {
@@ -279,8 +290,6 @@ int cvx_scale_vector(cvx_matgrp_t *x_g,
     }
     return 0;
 }
-
-
 
 /*
  *   Returns the Nesterov-Todd scaling W at points s and z, and stores the 
@@ -309,7 +318,30 @@ int cvx_compute_scaling(cvx_scaling_t *W,
 {
     cvx_matrix_t sk, zk, lk;
     cvx_size_t k, m, ind = 0;
-    
+
+    // For the nonlinear target block
+    // TODO: optimize to singleton matrix
+    if (W->dnltsz > 0) {
+        cvx_matrix_t dnlt, dnlti;
+        cvx_mgrp_elem(&sk, s_g, CVXDIM_NLTARGET, 0);
+        cvx_mgrp_elem(&zk, z_g, CVXDIM_NLTARGET, 0);
+        cvx_scaling_elem(&dnlt, W, CVXWS_DNLT, 0);
+        cvx_scaling_elem(&dnlti, W, CVXWS_DNLTI, 0);
+        // dnl = sk/zk
+        cvxm_copy(&dnlt, &sk, CVX_ALL);
+        cvxm_solve_diag(&dnlt, 1.0, &zk, CVX_LEFT);
+        cvxm_apply(&dnlt, fsqrt, CVX_ALL);
+        // dnli = 1/dnl
+        cvxm_copy(&dnlti, &dnlt, CVX_ALL);
+        cvxm_apply(&dnlti, finv, CVX_ALL);
+        // lmblda[:mnl]
+        cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_NLTARGET, 0);
+        cvxm_copy(&lk, &sk, CVX_ALL);
+        cvxm_mult_diag(&lk, 1.0, &zk, CVX_LEFT);  // element wise multiply
+        cvxm_apply(&lk, fsqrt, CVX_ALL);
+        ind = W->dnltsz;
+    }
+
     // For the nonlinear block:
     //
     //     W[dnl] = sqrt( s[:mnl] ./ z[:mnl] )
@@ -328,15 +360,15 @@ int cvx_compute_scaling(cvx_scaling_t *W,
         // dnli = 1/dnl
         cvxm_copy(&dnli, &dnl, CVX_ALL);
         cvxm_apply(&dnli, finv, CVX_ALL);
-        // lmblda[:mnl] 
+        // lmblda[:mnl]
         cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_NONLINEAR, 0);
         cvxm_copy(&lk, &sk, CVX_ALL);
         cvxm_mult_diag(&lk, 1.0, &zk, CVX_LEFT);  // element wise multiply
         cvxm_apply(&lk, fsqrt, CVX_ALL);
         ind = W->dnlsz;
-    } 
+    }
 
-    // For the 'l' block: 
+    // For the 'l' block:
     //
     //     W[d] = sqrt( sk ./ zk )
     //     W[di] = sqrt( zk ./ sk )
@@ -357,7 +389,7 @@ int cvx_compute_scaling(cvx_scaling_t *W,
         // di = 1/d
         cvxm_copy(&di, &d, CVX_ALL);
         cvxm_apply(&di, finv, CVX_ALL);
-        // lmblda[mnl:l] 
+        // lmblda[mnl:l]
         //cvxm_view_map(&lk, lmbda, ind, 0, W->dsz, 1);
         cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_LINEAR, 0);
         cvxm_copy(&lk, &sk, CVX_ALL);
@@ -368,14 +400,14 @@ int cvx_compute_scaling(cvx_scaling_t *W,
 
     // For the 'q' blocks, compute lists 'v', 'beta'.
     //
-    // The vector v[k] has unit hyperbolic norm: 
+    // The vector v[k] has unit hyperbolic norm:
     //
     //     (sqrt( v[k]' * J * v[k] ) = 1 with J = [1, 0; 0, -I]).
     //
     // beta[k] is a positive scalar.
     //
     // The hyperbolic Householder matrix H = 2*v[k]*v[k]' - J
-    // defined by v[k] satisfies 
+    // defined by v[k] satisfies
     //
     //    (beta[k] * H) * zk  = (beta[k] * H) \ sk = lambda_k
     //
@@ -387,7 +419,7 @@ int cvx_compute_scaling(cvx_scaling_t *W,
         cvx_float_t a, b, c, dd, zz, ss;
 
         cvx_scaling_elem(&beta, W, CVXWS_BETA, 0);
-        
+
         for (k = 0; k < W->vcount; k++) {
             m = cvx_scaling_elem(&v, W, CVXWS_V, k);
 
@@ -416,8 +448,8 @@ int cvx_compute_scaling(cvx_scaling_t *W,
             //
             //     d =  sk0/a + zk0/b + 2*c
             //     lambda_k = [ c; (c + zk0/b)/d * sk1/a + (c + sk0/a)/d * zk1/b ]
-            //              = [ c; (c + zk0/b)/(d*a) * sk1 + (c + sk0/a)/(d*b) * zk1 ]    
-            //              = [ c; z * sk1 + s * zk1 ]    
+            //              = [ c; (c + zk0/b)/(d*a) * sk1 + (c + sk0/a)/(d*b) * zk1 ]
+            //              = [ c; z * sk1 + s * zk1 ]
             //     lambda_k *= sqrt(a * b)
             cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_SOCP, k);
             cvxm_copy(&lk, &sk, CVX_ALL);
@@ -430,7 +462,7 @@ int cvx_compute_scaling(cvx_scaling_t *W,
             // lmbda[0] = c
             cvxm_set(&lk, 0, 0, c);
             cvxm_scale(&lk, SQRT(a*b), CVX_ALL);
-            
+
             ind += m;
         }
     }
@@ -443,12 +475,12 @@ int cvx_compute_scaling(cvx_scaling_t *W,
     // where sk and zk are the entries inds[k] : inds[k+1] of
     // s and z, reshaped into symmetric matrices.
     //
-    // rti[k] is the inverse of r[k]', so 
+    // rti[k] is the inverse of r[k]', so
     //
     //   rti[k]' * sk * rti[k] = diag(lambda_k)^{-1}
     //   rti[k]' * zk^{-1} * rti[k] = diag(lambda_k).
     //
-    // The vectors lambda_k are stored in 
+    // The vectors lambda_k are stored in
     //
     //   lmbda[ dims['l'] + sum(dims['q']) : -1 ]
     if (W->rcount > 0) {
@@ -456,7 +488,7 @@ int cvx_compute_scaling(cvx_scaling_t *W,
         cvx_memblk_t Tmp;
         cvx_size_t j, ind2 = ind;
         cvx_float_t a;
-        
+
         // here work is big enough to hold 4*SIZEMAX(S) matrices
         for (k = 0; k < W->rcount; k++) {
             m = cvx_scaling_elem(&r, W, CVXWS_R, k);
@@ -468,7 +500,7 @@ int cvx_compute_scaling(cvx_scaling_t *W,
             cvxm_map_data(&Ls,  m, m, __mblk_offset(work, m*m));
             cvxm_map_data(&Lz,  m, m, __mblk_offset(work, 2*m*m));
             __mblk_subblk(&Tmp, work, 3*m*m);
-            // 
+            //
             cvx_mgrp_elem(&sk, s_g, CVXDIM_SDP, k);
             cvx_mgrp_elem(&zk, z_g, CVXDIM_SDP, k);
             cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_SDP, k);
@@ -497,7 +529,7 @@ int cvx_compute_scaling(cvx_scaling_t *W,
                 cvxm_scale(&rk, a, CVX_ALL);
                 cvxm_view_map(&rk, &rti, 0, j, m, 1);
                 cvxm_scale(&rk, 1.0/a, CVX_ALL);
-            }            
+            }
             //
             ind2 += m*m;
             ind  += m;
@@ -530,14 +562,32 @@ int cvx_update_scaling(cvx_scaling_t *W,
     cvx_size_t m; //ind = 0;
     cvx_matrix_t sk, zk, lk, wrk, tmp;
     cvx_matrix_t dnl, dnli, dl, dli;
-    cvx_matrix_t *s = s_g->mat, *z = z_g->mat, *lmbda = lmbda_g->mat;
-    
+
     //   Nonlinear and 'l' blocks
     //
     //    d :=  d .* sqrt( s ./ z )
     //    lmbda := lmbda .* sqrt(s) .* sqrt(z)
     //
-#if 0
+#if 1
+    if  (W->dnltsz > 0) {
+        cvx_scaling_elem(&dnl,  W, CVXWS_DNLT, 0);
+        cvx_scaling_elem(&dnli, W, CVXWS_DNLTI, 0);
+        // s = sqrt(s) ; z = sqrt(z);
+        cvx_mgrp_elem(&sk, s_g, CVXDIM_NLTARGET, 0);
+        cvx_mgrp_elem(&zk, z_g, CVXDIM_NLTARGET, 0);
+        cvxm_apply(&sk, fsqrt, CVX_ALL);
+        cvxm_apply(&zk, fsqrt, CVX_ALL);
+        // lmbda = sqrt(s) .* sqrt(z)
+        cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_NLTARGET, 0);
+        cvxm_copy(&lk, &sk, CVX_ALL);
+        cvxm_mult_diag(&lk, 1.0, &zk, CVX_LEFT);
+        // dnl = dnl .* s .* z
+        cvxm_mult_diag(&dnl, 1.0, &sk, CVX_LEFT);
+        cvxm_solve_diag(&dnl, 1.0, &zk, CVX_LEFT);
+        // dnli = 1.0 ./ dnl
+        cvxm_copy(&dnli, &dnl, CVX_ALL);
+        cvxm_apply(&dnli, finv, CVX_ALL);
+    }
     if  (W->dnlsz > 0) {
         cvx_scaling_elem(&dnl,  W, CVXWS_DNL, 0);
         cvx_scaling_elem(&dnli, W, CVXWS_DNLI, 0);
@@ -577,7 +627,8 @@ int cvx_update_scaling(cvx_scaling_t *W,
         cvxm_apply(&dli, finv, CVX_ALL);
     }
 #endif
-#if 1
+#if 0
+    cvx_matrix_t *s = s_g->mat, *z = z_g->mat, *lmbda = lmbda_g->mat;
     if (W->dsz + W->dnlsz > 0) {
         if (W->dnlsz > 0) {
             cvx_scaling_elem(&dnl,  W, CVXWS_DNL, 0);
@@ -654,7 +705,7 @@ int cvx_update_scaling(cvx_scaling_t *W,
     if (W->vcount > 0) {
         cvx_matrix_t v, beta;
         cvx_float_t a, b, c, d, vs, vz, vq, vu, wk0, v0;
-        
+
         cvx_scaling_elem(&beta, W, CVXWS_BETA, 0);
         for (int k = 0; k < W->vcount; k++) {
             m = cvx_scaling_elem(&v, W, CVXWS_V, k);
@@ -801,11 +852,21 @@ int cvx_scale2(cvx_matgrp_t *x_g,
     cvx_size_t m;
     cvx_float_t lx, a, c, x0, l0;
 
-    // For the nonlinear and 'l' blocks, 
+    // For the nonlinear and 'l' blocks,
     //
     //     xk := xk ./ lk   (CVX_INV is not set)
     //     xk := xk .* lk   (CVX_INV is set)
     //
+    if (index->indnlt) {
+        m = cvx_mgrp_elem(&xk, x_g, CVXDIM_NLTARGET, 0);
+        cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_NLTARGET, 0);
+        if ((flags & CVX_INV) != 0) {
+            cvxm_mult_diag(&xk, 1.0, &lk, 0);
+        } else {
+            cvxm_solve_diag(&xk, 1.0, &lk, 0);
+        }
+    }
+
     if (index->indnl) {
         m = cvx_mgrp_elem(&xk, x_g, CVXDIM_NONLINEAR, 0);
         cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_NONLINEAR, 0);
@@ -828,12 +889,12 @@ int cvx_scale2(cvx_matgrp_t *x_g,
 
     // For 'q' blocks, if CVX_INV is not set,
     //
-    //     xk := 1/a * [ l'*J*xk;  
+    //     xk := 1/a * [ l'*J*xk;
     //         xk[1:] - (xk[0] + l'*J*xk) / (l[0] + 1) * l[1:] ].
     //
     // If CVX_INV is set,
     //
-    //     xk := a * [ l'*xk; 
+    //     xk := a * [ l'*xk;
     //         xk[1:] + (xk[0] + l'*xk) / (l[0] + 1) * l[1:] ].
     //
     // a = sqrt(lambda_k' * J * lambda_k), l = lambda_k / a.
@@ -881,11 +942,11 @@ int cvx_scale2(cvx_matgrp_t *x_g,
             m = cvx_mgrp_elem(&xk, x_g, CVXDIM_SDP, k);
             cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_SDP, k);
             cvxm_map_data(&lc, m, 1, __mblk_offset(work, 0));
-            for (int i = 0; i < m; i++) {
+            for (cvx_size_t i = 0; i < m; i++) {
                 lx = SQRT(cvxm_get(&lk, i, 0));
-                for (int k = 0; k < m; k++) {
-                    c = lx * SQRT(cvxm_get(&lk, k, 0));
-                    cvxm_set(&lc, k, 0, c);
+                for (cvx_size_t j = 0; j < m; j++) {   // changed:
+                    c = lx * SQRT(cvxm_get(&lk, j, 0));
+                    cvxm_set(&lc, j, 0, c);
                 }
                 cvxm_view_map(&xcol, &xk, 0, i, m, 1);
                 if ((flags & CVX_INV) == 0) {
