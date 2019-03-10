@@ -10,7 +10,7 @@
        0       : 0
        1       : length of non-linear
        2       : ind[1] + length-of-linear
-       
+
  */
 
 /**
@@ -19,16 +19,16 @@
  * @param[in] dims
  *    Dimension set to create indexing on.
  * @param[in] kind
- *    Indexing type for SDP-space sets. If dimension set does not include any 
+ *    Indexing type for SDP-space sets. If dimension set does not include any
  *    SDP sets then this parameter is not referenced.
  *
- * Parameter 'kind' spesifies indexing type for SDP ('S') space. 
+ * Parameter 'kind' spesifies indexing type for SDP ('S') space.
  *  0  : standard storage indexing (m*m elements)
  *  1  : packed storage indexing (m*(m+1)/2 elements)
  *  2  : diagonal storage indexing (m elements)
  *  3  : only 'S' space diagonal storage indexing
  *
- * @return 
+ * @return
  *    New index set or null;
  */
 cvx_index_t *cvx_index_new(const cvx_dimset_t *dims, int kind)
@@ -36,7 +36,7 @@ cvx_index_t *cvx_index_new(const cvx_dimset_t *dims, int kind)
     cvx_index_t *ind = (cvx_index_t *)malloc(sizeof(cvx_index_t));
     if (ind)
         return cvx_index_init(ind, dims, kind);
-    return ind;           
+    return ind;
 }
 
 cvx_size_t cvx_index_bytes(const cvx_dimset_t *dims, int kind)
@@ -50,6 +50,7 @@ cvx_size_t cvx_index_bytes(const cvx_dimset_t *dims, int kind)
             dims->qlen +
             (dims->ldim > 0 ? 1 : 0) +
             (dims->mnl > 0 ? 1 : 0) +
+            (dims->iscpt > 0 ? 1 : 0) +
             1;
     } else {
         n = dims->slen + 1;
@@ -71,18 +72,23 @@ cvx_size_t cvx_index_make(cvx_index_t *ind,
 {
     if (!ind || !dims)
         return 0;
-    
-    int n = cvx_index_bytes(dims, kind);
+
+    cvx_size_t n = cvx_index_bytes(dims, kind);
     if (nbytes < n)
         return 0;
 
-    int k = 0;
-    int off = 0;
-    ind->indnl = ind->indl = ind->indq = ind->inds = (cvx_size_t *)0;
+    cvx_size_t k = 0;
+    cvx_size_t off = 0;
+    ind->indnlt = ind->indnl = ind->indl = ind->indq = ind->inds = (cvx_size_t *)0;
     ind->dims = dims;
     ind->index = (cvx_size_t *)buf;
-    
-    if (kind != 3) {
+
+    if (kind != CVX_INDEX_SIGS) {
+        if (dims->iscpt > 0) {
+            ind->indnlt = &ind->index[k];
+            k++;
+            off += 1;
+        }
         if (dims->mnl > 0) {
             ind->indnl = &ind->index[k];
             ind->indnl[0] = off;
@@ -95,7 +101,7 @@ cvx_size_t cvx_index_make(cvx_index_t *ind,
             k++;
             off += dims->ldim;
         }
-        for (int j = 0; j < dims->qlen; j++) {
+        for (cvx_size_t j = 0; j < dims->qlen; j++) {
             if (j == 0)
                 ind->indq = &ind->index[k];
             ind->index[k] = off;
@@ -104,14 +110,14 @@ cvx_size_t cvx_index_make(cvx_index_t *ind,
         }
     }
 
-    for (int j = 0; j < dims->slen; j++) {
+    for (cvx_size_t j = 0; j < dims->slen; j++) {
         if (j == 0)
             ind->inds = &ind->index[k];
         ind->index[k] = off;
         k++;
-        off += kind == 0 ?
+        off += kind == CVX_INDEX_NORMAL ?
             dims->sdims[j] * dims->sdims[j] :           // normal storage for S
-            ( kind == 1 ?   
+            ( kind == CVX_INDEX_PACKED ?
               dims->sdims[j] * (dims->sdims[j] + 1)/2 : // packed storage for S
               dims->sdims[j]);                          // diagonal storage for S (kind == 2|3)
     }
@@ -131,12 +137,12 @@ cvx_size_t cvx_index_make(cvx_index_t *ind,
  * @param[in] dims
  *    Dimension set to create indexing on.
  * @param[in] kind
- *    Indexing type for SDP-space sets. 
+ *    Indexing type for SDP-space sets.
  *
  * @return
  *    Pointer to initialized indexing or null if no space allocation done.
  *
- * Parameter 'kind' spesifies indexing type for SDP ('S') space. 
+ * Parameter 'kind' spesifies indexing type for SDP ('S') space.
  *  0  : standard storage indexing (m*m elements)
  *  1  : packed storage indexing (m*(m+1)/2 elements)
  *  2  : diagonal storage indexing (m elements)
@@ -154,7 +160,7 @@ cvx_index_t *cvx_index_init(cvx_index_t *ind, const cvx_dimset_t *dims, int kind
     void *mem = calloc(nb, 1);
     if (!mem)
         return (cvx_index_t *)0;
-        
+
     cvx_index_make(ind, dims, kind, mem, nb);
     ind->__bytes = mem;
     return ind;
@@ -169,7 +175,7 @@ void cvx_index_release(cvx_index_t *ind)
         free(ind->__bytes);
         ind->__bytes = (void *)0;
     }
-    ind->index = ind->indnl = ind->indl = ind->indq = ind->inds = (cvx_size_t *)0;
+    ind->index = ind->indnlt = ind->indnl = ind->indl = ind->indq = ind->inds = (cvx_size_t *)0;
 }
 
 cvx_size_t cvx_index_count(const cvx_index_t *ind,
@@ -183,10 +189,47 @@ cvx_size_t cvx_index_count(const cvx_index_t *ind,
     case CVXDIM_LINEAR:
         return ind->indl ? 1 : 0;
     case CVXDIM_NONLINEAR:
-    default:
         return ind->indnl ? 1 : 0;
+    case CVXDIM_NLTARGET:
+        return ind->indnlt ? 1 : 0;
+    default:
+        break;
     }
     return 0;
+}
+
+/**
+ * @brief      Create subindex with given parts from source index.
+ *
+ * @param      ind
+ *     Result index
+ * @param      src
+ *     Source index
+ * @param      parts
+ *     Flags from cvx_dim_enum set to indicate which part are included.
+ *
+ */
+void cvx_subindex(cvx_index_t *ind, const cvx_index_t *src, int parts)
+{
+    ind->__bytes = (void *)0;
+    ind->index = ind->indnlt = ind->indnl = ind->indl = ind->indq = ind->inds = (cvx_size_t *)0;
+    if ((parts & CVXDIM_NLTARGET) != 0) {
+        ind->indnlt = src->indnlt;
+    }
+    if ((parts & CVXDIM_NONLINEAR) != 0) {
+        ind->indnl = src->indnl;
+    }
+    if ((parts & CVXDIM_LINEAR) != 0) {
+        ind->indl = src->indl;
+    }
+    if ((parts & CVXDIM_SOCP) != 0) {
+        ind->indq = src->indq;
+    }
+    if ((parts & CVXDIM_SDP) != 0) {
+        ind->inds = src->inds;
+    }
+    ind->index = src->index;
+    ind->indlen = src->indlen;
 }
 
 /**
@@ -225,6 +268,27 @@ cvx_size_t cvx_index_elem(cvx_matrix_t *x,
         cvxm_map_data(x, 0, 0, (cvx_float_t *)0);
 
     switch (name) {
+    case CVXDIM_CONVEX:
+        if (ind->indnlt && ind->indnl) {
+            m = ind->indnl[1] - ind->indnlt[0];
+            n = ind->indnlt[0];
+        } else if (ind->indnlt) {
+            m = ind->indnlt[1] - ind->indnlt[0];
+            n = ind->indnlt[0];
+        } else if (ind->indnl) {
+            m = ind->indnl[1] - ind->indnl[0];
+            n = ind->indnl[0];
+        }
+        if (x)
+            cvxm_map_data(x, m, 1, cvxm_data(y, n));
+        break;
+    case CVXDIM_NLTARGET:
+        if (ind->indnlt) {
+            m = ind->indnlt[1] - ind->indnlt[0];
+            if (x)
+                cvxm_map_data(x, m, 1, cvxm_data(y, ind->indnlt[0]));
+        }
+        break;
     case CVXDIM_NONLINEAR:
         if (ind->indnl) {
             m = ind->indnl[1] - ind->indnl[0];
@@ -238,14 +302,14 @@ cvx_size_t cvx_index_elem(cvx_matrix_t *x,
             if (x)
                 cvxm_map_data(x, m, 1, cvxm_data(y, ind->indl[0]));
         }
-        break; 
+        break;
     case CVXDIM_SOCP:
         if (ind->indq) {
             m = ind->indq[k+1] - ind->indq[k];
             if (x)
                 cvxm_map_data(x, m, 1, cvxm_data(y, ind->indq[k]));
         }
-        break; 
+        break;
     case CVXDIM_SDP:
         if (ind->inds) {
             m = ind->dims->sdims[k];
@@ -270,6 +334,20 @@ cvx_size_t cvx_index_elem(cvx_matrix_t *x,
             cvxm_map_data(x, m, 1, cvxm_data(y, n));
         break;
     case CVXDIM_CONVEXLP:
+        // map all but non-linear target function
+        if (ind->indnl)
+            n = ind->indnl[0];  // have linear part
+        else if (ind->indl)
+            n = ind->indl[0];  // have linear part
+        else if (ind->indq)
+            n = ind->indq[0];  // have socp part
+        else if (ind->inds)
+            n = ind->inds[0];  // last resort; must have sdp part
+        m = ind->index[ind->indlen] - n;
+        if (x)
+            cvxm_map_data(x, m, 1, cvxm_data(y, (ind->indnlt ? 1 : 0)));
+        break;
+    case CVXDIM_CONVEXPROG:
         // map all parts
         m = ind->index[ind->indlen];
         if (x)
