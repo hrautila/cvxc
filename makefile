@@ -2,12 +2,13 @@
 ##NETLIB = ../armas/src/.libs/libarmasd.so
 NETLIB = ../armas/src/.libs/libarmasd.a
 
-CFLAGS = -g -O0 -I../armas/src -Wall -pthread
+CFLAGS = -g -O0 -I../armas/src -I${HOME}/.local/include -Wall -pthread
 
 CVXOBJ = dims.o \
 	sfunc.o \
 	scale.o \
 	conelp.o \
+	kkt.o \
 	kktldl.o \
 	mgrp.o \
 	index.o \
@@ -20,20 +21,22 @@ CVXOBJ = dims.o \
 MATOBJ = cvxm.o cvxmio.o
 
 LIBOBJ = $(CVXOBJ) $(MATOBJ)
-OBJS   = test_lp.o test_conelp.o test_socp.o test_sdp.o
+OBJS   = test_lp.o test_conelp.o test_socp.o test_sdp.o test_cpl.o
 
 $(LIBOBJ): convex.h cvxm.h
 $(OBJS): convex.h cvxm.h
 
 json.o: json.h cvxm.h convex.h
 cpl.o:  cpl.c cpl.h convex.h cvxm.h
-conelp2.o: conelp2.c convex.h cvxm.h
+cp.o:  cpl.o convex.h cvxm.h
 
 libcvx.a : $(LIBOBJ)
 	$(AR) rs $@ $(LIBOBJ)
 
-test_cpl: test_cpl.o libcvx.a
-	$(CC) $(CFLAGS) -o $@ test_cpl.o libcvx.a $(NETLIB) -lm
+test_cp: test_cp.o cp.o cpl.o libcvx.a
+	$(CC) $(CFLAGS) -o $@ test_cp.o cp.o cpl.o libcvx.a $(NETLIB) -lm
+test_cpl: test_cpl.o cpl.o libcvx.a
+	$(CC) $(CFLAGS) -o $@ test_cpl.o cpl.o libcvx.a $(NETLIB) -lm
 test_lp: test_lp.o libcvx.a
 	$(CC) $(CFLAGS) -o $@ test_lp.o libcvx.a $(NETLIB) -lm
 test_socp: test_socp.o libcvx.a
