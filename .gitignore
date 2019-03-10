@@ -5,6 +5,11 @@
 *.log
 *.trs
 
+# gtags files
+GPATH
+GRTAGS
+GTAGS
+
 # Libtool libraries
 *.lo
 *.la
