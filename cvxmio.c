@@ -1,5 +1,5 @@
 
-// Copyright: Harri Rautila, 2016 <harri.rautila@gmail.com>
+// Copyright: Harri Rautila, 2018 <harri.rautila@gmail.com>
 
 #include <stdio.h>
 #include <string.h>
@@ -32,7 +32,6 @@ int cvxm_read_sbuffer(cvx_matrix_t *m, const char *s)
     for (sp = endp; *sp && *sp != ',' && !isspace(*sp); sp++)
     if (*sp == '\0')
         return -1;
-    //if (*sp == ',') sp++;
 
     ncols = strtoul(sp, &endp, 0);
     for (sp = endp; *sp && *sp != ',' && !isspace(*sp); sp++)
@@ -69,10 +68,8 @@ int cvxm_read_sbuffer(cvx_matrix_t *m, const char *s)
         k++;
         nelems--;
         for (sp = endp; *sp && *sp != ',' && !isspace(*sp); sp++)
-        //sp = endp;
         if (*sp == ']')
             break;
-        //if (*sp == ',') sp++;
 
     }
     return 0;
@@ -86,7 +83,8 @@ int cvxm_read_sbuffer(cvx_matrix_t *m, const char *s)
 static
 int get_tok(char *buf, size_t blen, FILE *fp)
 {
-    int c, i;
+    int c;
+    size_t i;
     int exp_seen = 0, dot_seen = 0;
     do {
         c = fgetc(fp);
@@ -213,7 +211,7 @@ int cvxm_read_file(cvx_matrix_t *m, FILE *fp)
 
     cvxm_init(m, nrows, ncols);
 
-    for (int i = 0; i < nrows*ncols; i++) {
+    for (size_t i = 0; i < nrows*ncols; i++) {
         tok = get_tok(buf, sizeof(buf), fp);
         if (tok == ',')
             tok = get_tok(buf, sizeof(buf), fp);
@@ -221,7 +219,7 @@ int cvxm_read_file(cvx_matrix_t *m, FILE *fp)
         if (tok != T_FLOAT && tok != T_INT)
             goto release;
         val = strtod(buf, &endp);
-        m->elems[i] = val;
+        m->data.elems[i] = val;
     }
     tok = get_tok(buf, sizeof(buf), fp);
     if (tok != ']')
@@ -240,9 +238,9 @@ int cvxm_read_file(cvx_matrix_t *m, FILE *fp)
 int cvxm_write_file(FILE *fp, const cvx_matrix_t *m)
 {
     int n = 0;
-    n += fprintf(fp, "{%d, %d, [", m->rows, m->cols);
-    for (int j = 0; j < m->cols; j++) {
-        for (int i = 0; i < m->rows; i++) {
+    n += fprintf(fp, "{%d, %d, [", m->data.rows, m->data.cols);
+    for (int j = 0; j < m->data.cols; j++) {
+        for (int i = 0; i < m->data.rows; i++) {
             if ((j == 0 && i > 0) || j > 0) {
                 fputc(',', fp);             
                 n++;
@@ -257,9 +255,9 @@ int cvxm_write_file(FILE *fp, const cvx_matrix_t *m)
 int cvxm_json_write_file(FILE *fp, const cvx_matrix_t *m)
 {
     int n = 0;
-    n += fprintf(fp, "{\"rows\":%d, \"cols\": %d, \"data\":[", m->rows, m->cols);
-    for (int j = 0; j < m->cols; j++) {
-        for (int i = 0; i < m->rows; i++) {
+    n += fprintf(fp, "{\"rows\":%d, \"cols\": %d, \"data\":[", m->data.rows, m->data.cols);
+    for (int j = 0; j < m->data.cols; j++) {
+        for (int i = 0; i < m->data.rows; i++) {
             if ((j == 0 && i > 0) || j > 0) {
                 fputc(',', fp);             
                 n++;
