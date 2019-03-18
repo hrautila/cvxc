@@ -37,6 +37,7 @@ int acenter_F(cvx_matrix_t *f,
     if (z) {
         z0 = cvxm_get(z, 0, 0);
         cvxm_set_all(H, 0.0);
+        //printf("acenter z0: %.7f\n", z0);
     }
 
     //  f = [1, 1]; Df = [1, 3]; H = [3, 3]
@@ -49,7 +50,7 @@ int acenter_F(cvx_matrix_t *f,
         cvxm_set(Df, 0, i, 2.0*xv/u);
         if (z) {
             // H[i,i] =  2*z0* (1 + u**2)/u**2 == 2*z0*(1 + 1/u**2)
-            cvxm_set(H, i, i, 2*z0*(1.0 + 1.0/u*u));
+            cvxm_set(H, i, i, 2*z0*((1.0 + u*u)/(u*u)));
         }
         usum += log(u);
     }
@@ -90,7 +91,7 @@ int main(int argc, char **argv)
     };
     cvx_convex_program_t F;
     acenter_t Acenter = (acenter_t){ .rows = 3, .cols = 1};
-   
+
     while ((opt = getopt(argc, argv, "N:")) != -1) {
         switch (opt) {
         case 'N':
@@ -100,11 +101,11 @@ int main(int argc, char **argv)
             break;
         }
     }
-    
+
     cvx_dimset_alloc(&dims, 0, (cvx_size_t []){4, 0}, (cvx_size_t []){3, 0});
     dims.iscpt = 1;
     cvx_convex_program_init(&F, acenter_F, &Acenter);
-    
+
     cvxm_map_data(&h, 13, 1, hdata);
     cvxm_map_data(&G, 13, 3, gdata);;
     cvxm_map_data(&A, 0, 3, (cvx_float_t *)0);
@@ -115,7 +116,6 @@ int main(int argc, char **argv)
 
     cvx_cp_setup(&cp, &F, &G, &h, &A, &b, &dims, (cvx_kktsolver_t *)0);
     cvx_cp_compute_start(&cp);
-    cvx_mat_printf(stdout, "%.7f", cp.h, "h.initial");
     cvx_cp_solve(&cp, &opts);
     return 0;
 }
