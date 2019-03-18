@@ -22,9 +22,84 @@ cvx_size_t __WORKBYTES(cvx_size_t n)
     return 8*n*n*sizeof(cvx_float_t);
 }
 
+/**
+ * @brief Compute memory allocation needed for CONVEXLP problem
+ *
+ * @param[in] n  Number of variables
+ * @param[in] m  Number of equality constrains (rows of A matrix)
+ * @param[in] dims Dimensions of inequality constraints, linear, scop and sdp
+ *
+ * @return Number of bytes of memory needed.
+ */
 cvx_size_t cvx_cp_bytes(int n, int m, const cvx_dimset_t *dims)
 {
-    return cvx_cpl_bytes(n, m, dims, 1);
+    cvx_size_t cdim_mnl  = cvx_dimset_sum_squared(dims, CVXDIM_CONVEXPROG);
+    cvx_size_t cdim_diag = cvx_dimset_sum(dims, CVXDIM_CONELP);
+    cvx_size_t sdim      = cvx_dimset_sum(dims, CVXDIM_SDP);
+    cvx_size_t maxsdp    = cvx_dimset_max(dims, CVXDIM_SDP);
+    cvx_size_t mnl       = cvx_dimset_sum(dims, CVXDIM_NONLINEAR) + 1;
+    cvx_size_t total = 0;
+    cvx_size_t nbytes = 0;
+
+    // size of standard index set (2 times; 1 with CONVEXLP and 1 for CONVEXPROG)
+    nbytes += cvx_index_bytes(dims, CVX_INDEX_NORMAL) * 2;
+    // size of packed index set
+    nbytes += cvx_index_bytes(dims, CVX_INDEX_PACKED);
+    // size of diagonal index set
+    nbytes += cvx_index_bytes(dims, CVX_INDEX_DIAG);
+    // size of SDP diagonal index set
+    nbytes += cvx_index_bytes(dims, CVX_INDEX_SIGS);
+
+    //fprintf(stderr, "cpl size:  indexes %ld\n", nbytes);
+
+    // SIZES
+    // cdim_mnl: (23)
+    //   z, dz, dz0, dz2, dz20, z0, rz, rz0, newz, newrz, wz, wz2, wz3 (13)
+    //   s, ds, ds0, ds2, ds20, s0, news, ws, ws2, ws3  (10)
+    // n: (9)
+    //   x, dx, x0, rx, rx0, newx, newrx, wx, wx2
+    // m: (8)
+    //   y, dy, y0, ry, ry0, newy, wy, wy2
+    // cdim_diag+mnl: (2)
+    //   lmbda, lmbdasq
+    // sdim: (2)
+    //   sigs, sigz
+    //
+    // rz -> rznl + rzl; rz0 -> rznl0 + rzl0; wz2 -> wz2nl + wz2l
+    total += 10*n;              // for x, dx, rx, x0, newx, rx0, wx, wx2, newrz
+    total += 8*m;               // for y, dy, ry, y0, newy, ry0, wy, wy2
+    total += 10*cdim_mnl;       // for s, ds,     s0, news,      ws, ws2, ds0, ds2, ds20, ws3
+    total += 13*cdim_mnl;       // for z, dz, rz, z0, newz, rz0, wz, wz2, dz0, dz2, dz20, wz3, newrz0
+
+    //fprintf(stderr, "cpl size: vectors    %ld\n", nbytes+total*sizeof(cvx_float_t));
+
+    total += 2*(cdim_diag+mnl) + 2;   // for lmbda, lmbdasq
+    total += 2*sdim;            // for sigs, sigz
+
+    //fprintf(stderr, "cpl size: eigen space %ld\n", nbytes+total*sizeof(cvx_float_t));
+
+    // f, Df, H
+    total += mnl*2;       // for f, newf
+    total += mnl*n*2;     // for Df, newDf
+    total += n*n;         // for H
+
+    //fprintf(stderr, "cpl size: f, Df, H %ld  [mnl:%ld, nl:%d, n:%d]\n",
+    //      nbytes+total*sizeof(cvx_float_t), mnl, nonlinear, n);
+
+    nbytes += total*sizeof(cvx_float_t);
+
+    // workspace for SDP constraint scaling; TODO: think about this.
+    if (maxsdp > 0)
+        nbytes += __WORKBYTES(maxsdp);
+
+    cvx_size_t isize, szw;
+    // calculte space need for scaling matrix (second for state save)
+    szw     = cvx_scaling_bytes(&isize, dims);
+    nbytes += 2*szw;
+
+    //fprintf(stderr, "cpl size: scaling %ld [%ld]\n", nbytes, szw);
+
+    return nbytes;
 }
 
 #define __INIT(a, fn)                                           \
@@ -89,17 +164,21 @@ cvx_size_t cvx_cp_make(cvx_problem_t *cp,
 
     cvx_size_t cdim_mnl  = cvx_dimset_sum_squared(dims, CVXDIM_CONVEXPROG);
 
-    int nl = 1;
-    //cdim_mnl += nl;
     cp->cdim  = cdim_mnl;
-    printf("cdim_mnl: %ld\n", cdim_mnl);
+    //printf("cdim_mnl: %ld\n", cdim_mnl);
 
     // __INIT macro assumes variables offset and nbytes;
     // overlay index sets
-    __INIT(used, cvx_index_make(&cpi->index_full, dims, 0, bytes,  nbytes));
-    __INIT(used, cvx_index_make(&cpi->index_packed, dims, 1, &bytes[offset],  nbytes));
-    __INIT(used, cvx_index_make(&cpi->index_diag, dims, 2, &bytes[offset],  nbytes));
-    __INIT(used, cvx_index_make(&cpi->index_sig, dims, 3, &bytes[offset],  nbytes));
+    __INIT(used, cvx_index_make(&cpi->index_full, dims, CVX_INDEX_NORMAL, bytes,  nbytes));
+    __INIT(used, cvx_index_make(&cpi->index_packed, dims, CVX_INDEX_PACKED, &bytes[offset],  nbytes));
+    __INIT(used, cvx_index_make(&cpi->index_diag, dims, CVX_INDEX_DIAG, &bytes[offset],  nbytes));
+    __INIT(used, cvx_index_make(&cpi->index_sig, dims, CVX_INDEX_SIGS, &bytes[offset],  nbytes));
+
+    // set convex target function indicator to zero
+    cvx_dimset_t *__ldims  = (cvx_dimset_t *)dims;
+    __ldims->iscpt = 0;
+    __INIT(used, cvx_index_make(&cpi->index_cpt, __ldims, CVX_INDEX_NORMAL, &bytes[offset],  nbytes));
+    __ldims->iscpt = 1;
 
     //fprintf(stderr, "cpl make: indexes %ld\n", offset);
 
@@ -186,11 +265,11 @@ cvx_size_t cvx_cp_make(cvx_problem_t *cp,
     //fprintf(stderr, "cpl make: eigen space %ld\n", offset);
 
     // f, Df, H matrices
-    int mnl = cvx_dimset_sum(dims, CVXDIM_NONLINEAR);
-    __INIT(used, cvxm_make(&cpi->f, mnl+nl, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->newf, mnl+nl, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->Df, (mnl+nl), n, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->newDf, (mnl+nl), n, &bytes[offset], nbytes));
+    int mnl = cvx_dimset_sum(dims, CVXDIM_NONLINEAR) + 1;
+    __INIT(used, cvxm_make(&cpi->f, mnl, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&cpi->newf, mnl, 1, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&cpi->Df, mnl, n, &bytes[offset], nbytes));
+    __INIT(used, cvxm_make(&cpi->newDf, mnl, n, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->H, n, n, &bytes[offset], nbytes));
 
     //fprintf(stderr, "cpl make: f, Df, H %ld [mnl:%d, nl:%d, n:%d]\n", offset, mnl, nl, n);
@@ -206,7 +285,7 @@ cvx_size_t cvx_cp_make(cvx_problem_t *cp,
     }
 
     // setup matrix group variables
-    cvx_mgrp_init(&cpi->h_g,   cp->h,    &cpi->index_full); // TODO: not correct
+    cvx_mgrp_init(&cpi->h_g,    cp->h,    &cpi->index_cpt);
     cvx_mgrp_init(&cpi->s_g,   &cpi->s,   &cpi->index_full);
     cvx_mgrp_init(&cpi->z_g,   &cpi->z,   &cpi->index_full);
     cvx_mgrp_init(&cpi->z0_g,  &cpi->z0,  &cpi->index_full);
@@ -293,6 +372,10 @@ int cp_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *x, cvx_matrix_
     cvxm_size(&nr, &nc, &cpi->Df);
     cvxm_view_map(&Dfc, &cpi->Df, 1, 0, nr-1, nc);
     F2(cp->F, __cvxnil, &cpi->Df, &cpi->H, x, z);
+    //cvx_mat_printf(stdout, "%.7f", z, "z");
+    //cvx_mat_printf(stdout, "%.7f", &cpi->H, "H");
+    //cvx_mat_printf(stdout, "%.7f", x, "x.m()");
+    //cvx_mat_printf(stdout, "%.7f", &cpi->Df, "Df");
     //
     return cvx_kktfactor(cp_solver->next, W, &cpi->H, &Dfc);
 }
@@ -309,22 +392,35 @@ int cp_solve(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_t 
     cvx_float_t znlt, epi_x, dnlt0;
     cvx_size_t nr, nc;
 
+    //cvx_mat_printf(stdout, "%.7f", z_g->mat, "presolve z");
     cvxm_size(&nr, &nc, &cpi->Df);
     cvxm_view_map(&gradf, &cpi->Df, 0, 0, 1, nc);
     cvx_scaling_elem(&dnlt, &cp->W, CVXWS_DNLT, 0);
     cvx_mgrp_elem(&z_nlt, z_g, CVXDIM_NLTARGET, 0);
+    cvx_mgrp_elem(&z_cpl, z_g, CVXDIM_CONVEXLP, 0);
 
     cvx_subindex(&index_cpl, &cpi->index_full, CVXDIM_CONVEXLP);
-    cvx_mgrp_init(&z_cpl_g, z_g->mat, &index_cpl);
+    cvx_mgrp_init(&z_cpl_g, &z_cpl, &cpi->index_cpt);
 
     dnlt0 = cvxm_get(&dnlt, 0, 0);
     epi_x = cvxm_get_epi(x);
     znlt  = cvxm_get(&z_nlt, 0, 0);
     cvxm_axpy(x, epi_x, &gradf);
 
+    //printf("dnlt0 : %.7f\n", dnlt0);
+    //printf("znlt  : %.7f\n", znlt);
+    //printf("epi(x): %.7f\n", epi_x);
+    //cvx_mat_printf(stdout, "%.7f", x, "presolve x");
+
     int err = cvx_kktsolve(cp_solver->next, x, y, &z_cpl_g);
 
+    //cvx_mat_printf(stdout, "%.7f", x, "postsolve x");
+
     cvxm_set(&z_nlt, 0, 0, -epi_x*dnlt0);
+    //cvx_mat_printf(stdout, "%.7f", &gradf, "gradf0");
+    //printf("grd*x    : %.7f\n", cvxm_dot(&gradf, x));
+    //printf("d*d*x.t  : %.7f\n", dnlt0*dnlt0*epi_x);
+    //printf("z0       : %.7f\n", znlt);
     epi_x = cvxm_dot(&gradf, x) + dnlt0*dnlt0*epi_x - znlt;
     cvxm_set_epi(x, epi_x);
     return err;
@@ -342,6 +438,7 @@ cvx_chainsolver_t *cvx_cp_solver_init(cvx_chainsolver_t *cs, cvx_problem_t *cp, 
     cs->cp = cp;
     return cs;
 }
+
 
 cvx_size_t cvx_cp_setup(cvx_problem_t *cp,
                         cvx_convex_program_t *F,
@@ -402,8 +499,8 @@ cvx_size_t cvx_cp_setup(cvx_problem_t *cp,
 
     cp->c = &cpi->c0;
 
-    // provide full index set
-    cp->index_g = &cp->u.cpl.index_full;
+    // provide full index set G/h matrices
+    cp->index_g = &cp->u.cpl.index_cpt;
 
     // init KKT solver
     if (kktsolver) {
