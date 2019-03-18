@@ -129,8 +129,9 @@ int ldl_factor(cvx_kktsolver_t *S,
         cvxm_set(&ldl->K, k, k, -1.0);
     }
     //cvx_mat_printf(stdout, "%4.1f", &ldl->K, "K");
+    //cvx_mat_print_ifenv("LDLKKT_PREFACTOR_K", &ldl->K, "unfactored K");
     int err = cvxm_ldlfactor(&ldl->K, ldl->ipiv, CVX_LOWER, &ldl->work);
-    //cvx_mat_printf(stdout, "%4.1f", &ldl->K, "factored(K)");
+    //cvx_mat_print_ifenv("LDLKKT_POSTFACTOR_K", &ldl->K, "factored K");
     //cvx_mat_test_nan("LDLKKT_POSTFACTOR_K", &ldl->K);
 
     return err;
