@@ -64,7 +64,8 @@ cvx_float_t cvx_sdot(cvx_matgrp_t *x_g, cvx_matgrp_t *y_g)
     int k;
     cvx_size_t j;
 
-    ind = x_g->index->dims->mnl +
+    ind = cvx_dimset_sum(x_g->index->dims, CVXDIM_NLTARGET) +
+        cvx_dimset_sum(x_g->index->dims, CVXDIM_NONLINEAR) +
         cvx_dimset_sum(x_g->index->dims, CVXDIM_LINEAR) +
         cvx_dimset_sum(x_g->index->dims, CVXDIM_SOCP);
 
