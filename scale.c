@@ -675,31 +675,31 @@ int cvx_update_scaling(cvx_scaling_t *W,
     //
     // and a = sqrt(st' * J * st),  b = sqrt(zt' * J * zt).
     //
-    // 1. Compute the hyperbolic Householder transformation 2*q*q' - J 
+    // 1. Compute the hyperbolic Householder transformation 2*q*q' - J
     //    that maps st/a to zt/b.
-    // 
-    //        c = sqrt( (1 + st'*zt/(a*b)) / 2 ) 
-    //        q = (st/a + J*zt/b) / (2*c). 
     //
-    //    The new scaling point is 
+    //        c = sqrt( (1 + st'*zt/(a*b)) / 2 )
+    //        q = (st/a + J*zt/b) / (2*c).
     //
-    //        wk := betak * sqrt(a/b) * (2*v[k]*v[k]' - J) * q 
+    //    The new scaling point is
+    //
+    //        wk := betak * sqrt(a/b) * (2*v[k]*v[k]' - J) * q
     //
     //    with betak = W['beta'][k].
-    // 
+    //
     // 3. The scaled variable:
     //
     //        lambda_k0 = sqrt(a*b) * c
     //        lambda_k1 = sqrt(a*b) * ( (2vk*vk' - J) * (-d*q + u/2) )_1
     //
-    //    where 
+    //    where
     //
-    //        u = st/a - J*zt/b 
+    //        u = st/a - J*zt/b
     //        d = ( vk0 * (vk'*u) + u0/2 ) / (2*vk0 *(vk'*q) - q0 + 1).
     //
     // 4. Update scaling
-    //   
-    //        v[k] := wk^1/2 
+    //
+    //        v[k] := wk^1/2
     //              = 1 / sqrt(2*(wk0 + 1)) * (wk + e).
     //        beta[k] *=  sqrt(a/b)
     if (W->vcount > 0) {
@@ -770,16 +770,16 @@ int cvx_update_scaling(cvx_scaling_t *W,
     }
 
     // 's' blocks
-    // 
+    //
     // Let st, zt be the updated variables in the old scaling:
-    // 
+    //
     //     st = Ls * Ls', zt = Lz * Lz'.
     //
     // where Ls and Lz are the 's' components of s, z.
     //
     // 1.  SVD Lz'*Ls = Uk * lambda_k^+ * Vk'.
     //
-    // 2.  New scaling is 
+    // 2.  New scaling is
     //
     //         r[k] := r[k] * Ls * Vk * diag(lambda_k^+)^{-1/2}
     //         rti[k] := r[k] * Lz * Uk * diag(lambda_k^+)^{-1/2}.
@@ -790,7 +790,7 @@ int cvx_update_scaling(cvx_scaling_t *W,
         cvx_float_t a;
         cvx_size_t k;
         cvx_memblk_t Tmp;
-        
+
         for (k = 0; k < W->rcount; k++) {
             cvx_size_t j;
             m = cvx_scaling_elem(&r, W, CVXWS_R, k);
@@ -857,6 +857,16 @@ int cvx_scale2(cvx_matgrp_t *x_g,
     //     xk := xk ./ lk   (CVX_INV is not set)
     //     xk := xk .* lk   (CVX_INV is set)
     //
+    if (cvx_mgrp_count(x_g, CVXDIM_NLTARGET) > 0) {
+        m = cvx_mgrp_elem(&xk, x_g, CVXDIM_NLTARGET, 0);
+        cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_NLTARGET, 0);
+        if ((flags & CVX_INV) != 0) {
+            cvxm_mult_diag(&xk, 1.0, &lk, 0);
+        } else {
+            cvxm_solve_diag(&xk, 1.0, &lk, 0);
+        }
+    }
+ #if 0
     if (index->indnlt) {
         m = cvx_mgrp_elem(&xk, x_g, CVXDIM_NLTARGET, 0);
         cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_NLTARGET, 0);
@@ -866,7 +876,7 @@ int cvx_scale2(cvx_matgrp_t *x_g,
             cvxm_solve_diag(&xk, 1.0, &lk, 0);
         }
     }
-
+#endif
     if (index->indnl) {
         m = cvx_mgrp_elem(&xk, x_g, CVXDIM_NONLINEAR, 0);
         cvx_mgrp_elem(&lk, lmbda_g, CVXDIM_NONLINEAR, 0);
