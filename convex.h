@@ -271,6 +271,8 @@ extern cvx_size_t cvx_index_make(cvx_index_t *ind, const cvx_dimset_t *dims, int
 extern cvx_index_t *cvx_index_init(cvx_index_t *index, const cvx_dimset_t *dims, int packed);
 extern void cvx_index_release(cvx_index_t *dims);
 extern cvx_size_t cvx_index_elem(cvx_matrix_t *x, const cvx_matrix_t *y, const cvx_index_t *ind, cvx_dim_enum name, int k);
+extern cvx_size_t cvx_index_length(const cvx_index_t *ind, int bits);
+
 extern void cvx_index_create(cvx_matrix_t *x, cvx_index_t *index, const cvx_dimset_t *dims, cvx_index_type kind);
 extern void cvx_subindex(cvx_index_t *ind, const cvx_index_t *src, int parts);
 
@@ -758,7 +760,7 @@ typedef struct cvx_cpl_internal {
     cvx_index_t index_packed;           // indexing to matrix group with packed 'S' space
     cvx_index_t index_diag;             // indexing to matrix group with diagonal 'S' space
     cvx_index_t index_sig;              // indexing to matrix group with only diagonal 'S" space
-
+    cvx_index_t index_cpt;              // indexing for G/h matrix with convex target function
     cvx_scaling_t W0;
 
 } cvx_cpl_internal_t;
