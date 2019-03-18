@@ -200,15 +200,24 @@ int cvx_sinv(cvx_matgrp_t *x_g,
     // the nonlinear and 'l' blocks
     //   xk = yk o\ xk = yk / xk
 
+    if (cvx_mgrp_count(x_g, CVXDIM_NLTARGET) > 0) {
+        cvx_mgrp_elem(&xk, x_g, CVXDIM_NLTARGET, 0);
+        cvx_mgrp_elem(&yk, y_g, CVXDIM_NLTARGET, 0);
+        cvxm_solve_diag(&xk, 1.0, &yk, 0);
+    }
     // Non-linear blocks
-    cvx_mgrp_elem(&xk, x_g, CVXDIM_NONLINEAR, 0);
-    cvx_mgrp_elem(&yk, y_g, CVXDIM_NONLINEAR, 0);
-    cvxm_solve_diag(&xk, 1.0, &yk, 0);
+    if (cvx_mgrp_count(x_g, CVXDIM_NONLINEAR) > 0) {
+        cvx_mgrp_elem(&xk, x_g, CVXDIM_NONLINEAR, 0);
+        cvx_mgrp_elem(&yk, y_g, CVXDIM_NONLINEAR, 0);
+        cvxm_solve_diag(&xk, 1.0, &yk, 0);
+    }
 
     // 'L' blocks
-    cvx_mgrp_elem(&xk, x_g, CVXDIM_LINEAR, 0);
-    cvx_mgrp_elem(&yk, y_g, CVXDIM_LINEAR, 0);
-    cvxm_solve_diag(&xk, 1.0, &yk, 0);
+    if (cvx_mgrp_count(x_g, CVXDIM_LINEAR) > 0) {
+        cvx_mgrp_elem(&xk, x_g, CVXDIM_LINEAR, 0);
+        cvx_mgrp_elem(&yk, y_g, CVXDIM_LINEAR, 0);
+        cvxm_solve_diag(&xk, 1.0, &yk, 0);
+    }
 
     // For the 'Q' (SOCP) blocks:
     //
@@ -277,7 +286,7 @@ int cvx_sprod(cvx_matgrp_t *x_g,
     cvx_matrix_t xk, yk, x1, y1, A;
     cvx_size_t m;
     cvx_float_t dd, y0, x0;
-    cvx_index_t *index = x_g->index;
+    // cvx_index_t *index = x_g->index;
     int k;
 
     // For the nonlinear and 'l' blocks:
@@ -286,15 +295,20 @@ int cvx_sprod(cvx_matgrp_t *x_g,
     // the nonlinear and 'l' blocks
     //   xk = yk o\ xk = yk / xk
 
+    if (cvx_mgrp_count(x_g, CVXDIM_NLTARGET) > 0) {
+        cvx_mgrp_elem(&xk, x_g, CVXDIM_NLTARGET, 0);
+        cvx_mgrp_elem(&yk, y_g, CVXDIM_NLTARGET, 0);
+        cvxm_mult_diag(&xk, 1.0, &yk, 0);
+    }
     // Non-linear blocks
-    if (index->indnl) {
+    if (cvx_mgrp_count(x_g, CVXDIM_NONLINEAR) > 0) {
         cvx_mgrp_elem(&xk, x_g, CVXDIM_NONLINEAR, 0);
         cvx_mgrp_elem(&yk, y_g, CVXDIM_NONLINEAR, 0);
         cvxm_mult_diag(&xk, 1.0, &yk, 0);
     }
 
     // 'L' blocks
-    if (index->indl) {
+    if (cvx_mgrp_count(x_g, CVXDIM_LINEAR) > 0) {
         cvx_mgrp_elem(&xk, x_g, CVXDIM_LINEAR, 0);
         cvx_mgrp_elem(&yk, y_g, CVXDIM_LINEAR, 0);
         cvxm_mult_diag(&xk, 1.0, &yk, 0);
