@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <ctype.h>
 #include <unistd.h>
 #include "convex.h"
 
@@ -123,19 +124,37 @@ static void
 cvxm_print_cdata(FILE *f, const cvx_matrix_t *A)
 {
     cvx_size_t n, i, j, nr, nc;
+    char *rowmajor = getenv("ROWMAJOR");
+
     cvxm_size(&nr, &nc, A);
     n = 0;
-    fprintf(f, "/* column order: [%ld %ld] */\n", nr, nc);
-    fprintf(f, "{\n");
-    for (j = 0; j < nc; j++) {
-        fprintf(f, "/* col:%3ld */ ", j);
+    if (rowmajor && tolower(*rowmajor) == 'y') {
+        fprintf(f, "/* row major order: [%ld %ld] */\n", nr, nc);
+        fprintf(f, "{\n");
         for (i = 0; i < nr; i++) {
-            if (n > 0)
-                fprintf(f, ",");
-            fprintf(f, "%.7e", cvxm_get(A, i, j));
-            n++;
+            fprintf(f, "/* row:%3ld */ ", i);
+            for (j = 0; j < nc; j++) {
+                if (n > 0)
+                    fprintf(f, ",");
+                fprintf(f, "%11.4e", cvxm_get(A, i, j));
+                n++;
+            }
+            fprintf(f, "\n");
         }
-        fprintf(f, "\n");
+    }
+    else {
+        fprintf(f, "/* column major order: [%ld %ld] */\n", nr, nc);
+        fprintf(f, "{\n");
+        for (j = 0; j < nc; j++) {
+            fprintf(f, "/* col:%3ld */ ", j);
+            for (i = 0; i < nr; i++) {
+                if (n > 0)
+                    fprintf(f, ",");
+                fprintf(f, "%11.4e", cvxm_get(A, i, j));
+                n++;
+            }
+            fprintf(f, "\n");
+        }
     }
     fprintf(f, "}\n");
 }
