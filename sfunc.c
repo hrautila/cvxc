@@ -413,7 +413,7 @@ int cvx_ssqr(cvx_matgrp_t *x_g,
         cvx_mgrp_elem(&yk, y_g, CVXDIM_NONLINEAR, 0);
         cvxm_copy(&xk, &yk, CVX_ALL);
         cvxm_mult_diag(&xk, 1.0, &yk, 0);
-        ind += index->dims->mnl;
+        ind += cvx_index_length(index, CVXDIM_NONLINEAR);
     }
 
     // 'L' blocks
@@ -422,7 +422,7 @@ int cvx_ssqr(cvx_matgrp_t *x_g,
         cvx_mgrp_elem(&yk, y_g, CVXDIM_LINEAR, 0);
         cvxm_copy(&xk, &yk, CVX_ALL);
         cvxm_mult_diag(&xk, 1.0, &yk, 0);
-        ind += index->dims->ldim;
+        ind += cvx_index_length(index, CVXDIM_LINEAR);
     }
 
     //  'Q' part
@@ -440,7 +440,7 @@ int cvx_ssqr(cvx_matgrp_t *x_g,
         ind += m;
     }
     // 'S' part
-    m = cvx_dimset_sum(index->dims, CVXDIM_SDP);
+    m = cvx_index_length(index, CVXDIM_SDP);
     cvxm_view_map(&xk, x_g->mat, ind, 0, m, 1);
     cvxm_view_map(&yk, y_g->mat, ind, 0, m, 1);
     cvxm_copy(&xk, &yk, CVX_ALL);
