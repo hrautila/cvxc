@@ -64,10 +64,10 @@ cvx_float_t cvx_sdot(cvx_matgrp_t *x_g, cvx_matgrp_t *y_g)
     int k;
     cvx_size_t j;
 
-    ind = cvx_dimset_sum(x_g->index->dims, CVXDIM_NLTARGET) +
-        cvx_dimset_sum(x_g->index->dims, CVXDIM_NONLINEAR) +
-        cvx_dimset_sum(x_g->index->dims, CVXDIM_LINEAR) +
-        cvx_dimset_sum(x_g->index->dims, CVXDIM_SOCP);
+    ind = cvx_index_length(x_g->index, CVXDIM_NLTARGET) +
+        cvx_index_length(x_g->index, CVXDIM_NONLINEAR) +
+        cvx_index_length(x_g->index, CVXDIM_LINEAR) +
+        cvx_index_length(x_g->index, CVXDIM_SOCP);
 
     cvxm_view_map(&x0, x, 0, 0, ind, 1);
     cvxm_view_map(&y0, y, 0, 0, ind, 1);
@@ -115,8 +115,8 @@ cvx_float_t cvx_sdot_elem(cvx_matgrp_t *x_g, cvx_matgrp_t *y_g, cvx_dim_enum nam
     case CVXDIM_CONVEX:
         break;
     case CVXDIM_NONLINEAR:
-        cvx_mgrp_elem(&xs, x_g, CVXDIM_LINEAR, 0);
-        cvx_mgrp_elem(&ys, y_g, CVXDIM_LINEAR, 0);
+        cvx_mgrp_elem(&xs, x_g, CVXDIM_NONLINEAR, 0);
+        cvx_mgrp_elem(&ys, y_g, CVXDIM_NONLINEAR, 0);
         sdot += cvxm_dot(&xs, &ys);
         break;
     case CVXDIM_LINEAR:

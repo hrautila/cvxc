@@ -37,26 +37,9 @@ void cvx_pack(cvx_matrix_t *y, cvx_matrix_t *x, const cvx_index_t *index)
     cvx_size_t j, k;
     cvx_matrix_t x1, y1, xk;
 
-#if 0
-    if (cvx_index_count(index, CVXDIM_NONLINEAR) > 0) {
-        cvx_index_elem(&y1, y, index, CVXDIM_NONLINEAR, 0);
-        cvx_index_elem(&x1, x, index, CVXDIM_NONLINEAR, 0);
-        cvxm_copy(&y1, &x1, CVX_ALL);
-    }
-    if (cvx_index_count(index, CVXDIM_LINEAR) > 0) {
-        cvx_index_elem(&y1, y, index, CVXDIM_LINEAR, 0);
-        cvx_index_elem(&x1, x, index, CVXDIM_LINEAR, 0);
-        cvxm_copy(&y1, &x1, CVX_ALL);
-    }
-    for (j = 0; j < cvx_index_count(index, CVXDIM_SOCP) > 0; j++) {
-        cvx_index_elem(&y1, y, index, CVXDIM_SOCP, j);
-        cvx_index_elem(&x1, x, index, CVXDIM_SOCP, j);
-        cvxm_copy(&y1, &x1, CVX_ALL);
-    }
-#endif
-    nlq = cvx_dimset_sum(index->dims, CVXDIM_NONLINEAR) +
-        cvx_dimset_sum(index->dims, CVXDIM_LINEAR) +
-        cvx_dimset_sum(index->dims, CVXDIM_SOCP);
+    nlq = cvx_index_length(index, CVXDIM_NONLINEAR) +
+        cvx_index_length(index, CVXDIM_LINEAR) +
+        cvx_index_length(index, CVXDIM_SOCP);
 
     if (nlq > 0) {
         cvxm_view_map(&x1, x, 0, 0, nlq, 1);
@@ -98,9 +81,9 @@ void cvx_unpack(cvx_matrix_t *y, cvx_matrix_t *x, const cvx_index_t *index)
     cvx_size_t j, k;
     cvx_matrix_t x1, yk, y1;
 
-    nlq = cvx_dimset_sum(index->dims, CVXDIM_NONLINEAR) +
-        cvx_dimset_sum(index->dims, CVXDIM_LINEAR) +
-        cvx_dimset_sum(index->dims, CVXDIM_SOCP);
+    nlq = cvx_index_length(index, CVXDIM_NONLINEAR) +
+        cvx_index_length(index, CVXDIM_LINEAR) +
+        cvx_index_length(index, CVXDIM_SOCP);
 
     if (nlq > 0) {
         cvxm_view_map(&x1, x, 0, 0, nlq, 1);
@@ -144,9 +127,10 @@ void cvx_pack2(cvx_matrix_t *x, const cvx_index_t *index, cvx_memblk_t *work)
     cvx_size_t i, j, k;
     cvx_matrix_t xk, row;
 
-    iu = ip = cvx_dimset_sum(index->dims, CVXDIM_NONLINEAR) +
-        cvx_dimset_sum(index->dims, CVXDIM_LINEAR) +
-        cvx_dimset_sum(index->dims, CVXDIM_SOCP);
+    iu = ip =
+        cvx_index_length(index, CVXDIM_NONLINEAR) +
+        cvx_index_length(index, CVXDIM_LINEAR) +
+        cvx_index_length(index, CVXDIM_SOCP);
 
     cvxm_size(&nr, &nc, x);
     cvxm_map_data(&row, nc, 1, __mblk_offset(work, 0));
