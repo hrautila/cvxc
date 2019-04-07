@@ -261,7 +261,9 @@ typedef struct cvx_index {
     cvx_size_t *indnl;          ///< Index to non-linear
     cvx_size_t *indnlt;         ///< Index to non-linear target
     cvx_size_t indlen;          ///< Total number of  index elements
-    const cvx_dimset_t *dims;
+    cvx_size_t qlen;            ///< Number of SOCP dimensions
+    cvx_size_t slen;            ///< Number of SDP dimensions
+    cvx_index_type type;        ///< Index type
     void *__bytes;
 } cvx_index_t;
 
@@ -271,7 +273,7 @@ extern cvx_size_t cvx_index_make(cvx_index_t *ind, const cvx_dimset_t *dims, int
 extern cvx_index_t *cvx_index_init(cvx_index_t *index, const cvx_dimset_t *dims, int packed);
 extern void cvx_index_release(cvx_index_t *dims);
 extern cvx_size_t cvx_index_elem(cvx_matrix_t *x, const cvx_matrix_t *y, const cvx_index_t *ind, cvx_dim_enum name, int k);
-extern cvx_size_t cvx_index_length(const cvx_index_t *ind, int bits);
+extern cvx_size_t cvx_index_length(const cvx_index_t *ind, cvx_dim_enum name);
 
 extern void cvx_index_create(cvx_matrix_t *x, cvx_index_t *index, const cvx_dimset_t *dims, cvx_index_type kind);
 extern void cvx_subindex(cvx_index_t *ind, const cvx_index_t *src, int parts);
@@ -870,6 +872,23 @@ extern int cvx_cpl_isok(const cvx_matrix_t *c,
                         const cvx_matrix_t *b,
                         const cvx_dimset_t *dims);
 
+extern int cvx_cpl_setvars(cvx_problem_t *cp,
+                           cvx_convex_program_t *F,
+                           cvx_size_t n, cvx_size_t m,
+                           cvx_matrix_t *c,
+                           cvx_matrix_t *G,
+                           cvx_matrix_t *h,
+                           cvx_matrix_t *A,
+                           cvx_matrix_t *b,
+                           const cvx_dimset_t *dims,
+                           cvx_kktsolver_t *kktsolver);
+
+extern cvx_size_t cvx_cpl_allocate(cvx_problem_t *cp,
+                                   int nl,
+                                   cvx_size_t n,
+                                   cvx_size_t m,
+                                   cvx_size_t extra,
+                                   const cvx_dimset_t *dims);
 extern cvx_size_t cvx_cpl_make(cvx_problem_t *cp,
                                int n,
                                int m,
@@ -898,18 +917,37 @@ cvx_cp_solve(cvx_problem_t *cp, cvx_solopts_t *opts);
 extern cvx_size_t
 cvx_cp_setup(cvx_problem_t *cp, cvx_convex_program_t *F,
              cvx_matrix_t *G, cvx_matrix_t *h, cvx_matrix_t *A,
+             cvx_matrix_t *b,  const cvx_dimset_t *dims, cvx_kktsolver_t *kktsolver);
+
+extern int
+cvx_cp_setvars(cvx_problem_t *cp, cvx_convex_program_t *F,
+               cvx_size_t n, cvx_size_t m,
+               cvx_matrix_t *G, cvx_matrix_t *h, cvx_matrix_t *A,
+               cvx_matrix_t *b,  const cvx_dimset_t *dims, cvx_kktsolver_t *kktsolver);
+
+extern cvx_size_t
+cvx_cp_make(cvx_problem_t *cp, int n, int m,
+            const cvx_dimset_t *dims, void *memory, cvx_size_t nbytes);
+
+extern cvx_size_t
+cvx_cp_bytes(int n, int m, const cvx_dimset_t *dims);
+
+
+extern int
+cvx_gp_setup(cvx_problem_t *cp, cvx_size_t *K,
+             cvx_matrix_t *F, cvx_matrix_t *g,
+             cvx_matrix_t *G, cvx_matrix_t *h, cvx_matrix_t *A,
              cvx_matrix_t *b,  cvx_dimset_t *dims, cvx_kktsolver_t *kktsolver);
-    
-extern cvx_size_t cvx_cp_make(cvx_problem_t *cp,
-                              int n,
-                              int m,
-                              const cvx_dimset_t *dims,
-                              void *memory,
-                              cvx_size_t nbytes);
 
-extern cvx_size_t cvx_cp_bytes(int n, int m, const cvx_dimset_t *dims);
+extern int
+cvx_gp_set_start(cvx_problem_t *cp,
+                 cvx_matrix_t *x0,
+                 cvx_matrix_t *s0,
+                 cvx_matrix_t *y0,
+                 cvx_matrix_t *z0);
 
-
+extern int
+cvx_gp_solve(cvx_problem_t *cp, cvx_solopts_t *opts);
 
 
 
