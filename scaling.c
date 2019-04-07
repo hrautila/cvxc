@@ -61,7 +61,6 @@ cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *me
     ntotal = cvx_scaling_bytes(&itotal, dims);
 
     if (nbytes < ntotal) {
-        fprintf(stderr, "scaling make: need %ld, provided %ld\n", ntotal, nbytes);
         return 0;
     }
 
