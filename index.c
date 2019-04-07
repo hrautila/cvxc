@@ -80,7 +80,8 @@ cvx_size_t cvx_index_make(cvx_index_t *ind,
     cvx_size_t k = 0;
     cvx_size_t off = 0;
     ind->indnlt = ind->indnl = ind->indl = ind->indq = ind->inds = (cvx_size_t *)0;
-    ind->dims = dims;
+    //ind->dims = dims;
+    ind->type = kind;
     ind->index = (cvx_size_t *)buf;
 
     if (kind != CVX_INDEX_SIGS) {
@@ -108,6 +109,7 @@ cvx_size_t cvx_index_make(cvx_index_t *ind,
             k++;
             off += dims->qdims[j];
         }
+        ind->qlen = dims->qlen;
     }
 
     for (cvx_size_t j = 0; j < dims->slen; j++) {
@@ -121,6 +123,7 @@ cvx_size_t cvx_index_make(cvx_index_t *ind,
               dims->sdims[j] * (dims->sdims[j] + 1)/2 : // packed storage for S
               dims->sdims[j]);                          // diagonal storage for S (kind == 2|3)
     }
+    ind->slen = dims->slen;
 
     // offset past the last entry;
     ind->index[k] = off;
@@ -183,13 +186,32 @@ cvx_size_t cvx_index_count(const cvx_index_t *ind,
 {
     switch (name) {
     case CVXDIM_SOCP:
-        return ind->dims->qlen;
+        return ind->qlen;
     case CVXDIM_SDP:
-        return ind->dims->slen;
+        return ind->slen;
     case CVXDIM_LINEAR:
         return ind->indl ? 1 : 0;
     case CVXDIM_NONLINEAR:
         return ind->indnl ? 1 : 0;
+    case CVXDIM_NLTARGET:
+        return ind->indnlt ? 1 : 0;
+    default:
+        break;
+    }
+    return 0;
+}
+
+cvx_size_t cvx_index_length(const cvx_index_t *ind, cvx_dim_enum name)
+{
+    switch (name) {
+    case CVXDIM_SOCP:
+        return ind->indq ? ind->indq[ind->qlen] - ind->indq[0] : 0;
+    case CVXDIM_SDP:
+        return ind->inds ? ind->inds[ind->slen] - ind->inds[0] : 0;
+    case CVXDIM_LINEAR:
+        return ind->indl ? ind->indl[1] -ind->indl[0] : 0;
+    case CVXDIM_NONLINEAR:
+        return ind->indnl ? ind->indnl[1] - ind->indnl[0] : 0;
     case CVXDIM_NLTARGET:
         return ind->indnlt ? 1 : 0;
     default:
@@ -312,11 +334,13 @@ cvx_size_t cvx_index_elem(cvx_matrix_t *x,
         break;
     case CVXDIM_SDP:
         if (ind->inds) {
-            m = ind->dims->sdims[k];
+            //m = ind->dims->sdims[k];
+            n = ind->inds[k+1] - ind->inds[k];
+            m = ind->type == CVX_INDEX_NORMAL ? (cvx_size_t)floor(sqrt(n)) : n;
             // TODO: what if indexing is not standard storage??
             if (x) {
-                n = ind->inds[k+1] - ind->inds[k];
-                n = n == m ? 1 : m;  // standard vs. diagonal storage
+                // standard vs. diagonal storage
+                n = ind->type == CVX_INDEX_NORMAL ? m : 1;
                 cvxm_map_data(x, m, n, cvxm_data(y, ind->inds[k]));
             }
         }
