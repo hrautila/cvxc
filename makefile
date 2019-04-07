@@ -21,7 +21,7 @@ CVXOBJ = dims.o \
 MATOBJ = cvxm.o cvxmio.o
 
 LIBOBJ = $(CVXOBJ) $(MATOBJ)
-OBJS   = test_lp.o test_conelp.o test_socp.o test_sdp.o test_cpl.o
+OBJS   = test_lp.o test_conelp.o test_socp.o test_sdp.o test_cpl.o test_cp.o
 
 $(LIBOBJ): convex.h cvxm.h
 $(OBJS): convex.h cvxm.h
