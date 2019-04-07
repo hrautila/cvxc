@@ -86,12 +86,11 @@ void cvx_mgrp_copy_lambda(cvx_matgrp_t *ds_g, cvx_matgrp_t *lmbda_g)
 {
     cvx_matrix_t dk, lk, d;
 
-    const cvx_dimset_t *dims = ds_g->index->dims;
     cvx_size_t n =
-        cvx_dimset_sum(dims, CVXDIM_NLTARGET) +
-        cvx_dimset_sum(dims, CVXDIM_NONLINEAR) +
-        cvx_dimset_sum(dims, CVXDIM_LINEAR) +
-        cvx_dimset_sum(dims, CVXDIM_SOCP);
+        cvx_index_length(ds_g->index, CVXDIM_NLTARGET) +
+        cvx_index_length(ds_g->index, CVXDIM_NONLINEAR) +
+        cvx_index_length(ds_g->index, CVXDIM_LINEAR) +
+        cvx_index_length(ds_g->index, CVXDIM_SOCP);
 
     cvxm_map_data(&dk, n, 1, cvxm_data(ds_g->mat, 0));
     cvxm_map_data(&lk, n, 1, cvxm_data(lmbda_g->mat, 0));
