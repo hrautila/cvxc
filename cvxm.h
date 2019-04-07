@@ -288,18 +288,24 @@ void cvxm_make_trm(cvx_matrix_t *X, int flags)
 __CVX_INLINE
 void cvxm_copy(cvx_matrix_t *X, const cvx_matrix_t *Y, int flags)
 {
-    armas_d_mcopy(&X->data, (armas_d_dense_t *)&Y->data);
-    X->t = Y->t;
+    if (X && Y) {
+        armas_d_mcopy(&X->data, (armas_d_dense_t *)&Y->data);
+        X->t = Y->t;
+    }
 }
 
 // \brief axpy; y = y + alpha*x
 __CVX_INLINE
 int cvxm_axpy(cvx_matrix_t *Y, cvx_float_t alpha, const cvx_matrix_t *X)
 {
-    armas_conf_t cf = *armas_conf_default();
-    int err = armas_d_axpy(&Y->data, alpha, &X->data, &cf);
-    if (cvxm_isepi(Y) && cvxm_isepi(X)) {
-        Y-> t += X->t * alpha;
+    armas_conf_t cf;
+    int err = 0;
+    if (X && Y) {
+        cf = *armas_conf_default();
+        err = armas_d_axpy(&Y->data, alpha, &X->data, &cf);
+        if (cvxm_isepi(Y) && cvxm_isepi(X)) {
+            Y-> t += X->t * alpha;
+        }
     }
     return err;
 }
@@ -307,10 +313,14 @@ int cvxm_axpy(cvx_matrix_t *Y, cvx_float_t alpha, const cvx_matrix_t *X)
 __CVX_INLINE
 int cvxm_axpby(cvx_float_t beta, cvx_matrix_t *Y, cvx_float_t alpha, const cvx_matrix_t *X)
 {
-    armas_conf_t cf = *armas_conf_default();
-    int err = armas_d_axpby(beta, &Y->data, alpha, &X->data, &cf);
-    if (cvxm_isepi(X) && cvxm_isepi(Y)) {
-        Y->t = beta*Y->t + alpha*X->t;
+    armas_conf_t cf;
+    int err = 0;
+    if (X && Y) {
+        cf = *armas_conf_default();
+        err = armas_d_axpby(beta, &Y->data, alpha, &X->data, &cf);
+        if (cvxm_isepi(X) && cvxm_isepi(Y)) {
+            Y->t = beta*Y->t + alpha*X->t;
+        }
     }
     return err;
 }
