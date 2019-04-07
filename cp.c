@@ -79,7 +79,6 @@ int cp_solve(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_t 
     cvx_float_t znlt, epi_x, dnlt0;
     cvx_size_t nr, nc;
 
-    //cvx_mat_printf(stdout, "%.7f", z_g->mat, "presolve z");
     cvxm_size(&nr, &nc, &cpi->Df);
     cvxm_view_map(&gradf, &cpi->Df, 0, 0, 1, nc);
     cvx_scaling_elem(&dnlt, &cp->W, CVXWS_DNLT, 0);
@@ -94,20 +93,9 @@ int cp_solve(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_t 
     znlt  = cvxm_get(&z_nlt, 0, 0);
     cvxm_axpy(x, epi_x, &gradf);
 
-    //printf("dnlt0 : %.7f\n", dnlt0);
-    //printf("znlt  : %.7f\n", znlt);
-    //printf("epi(x): %.7f\n", epi_x);
-    //cvx_mat_printf(stdout, "%.7f", x, "presolve x");
-
     int err = cvx_kktsolve(cp_solver->next, x, y, &z_cpl_g);
 
-    //cvx_mat_printf(stdout, "%.7f", x, "postsolve x");
-
     cvxm_set(&z_nlt, 0, 0, -epi_x*dnlt0);
-    //cvx_mat_printf(stdout, "%.7f", &gradf, "gradf0");
-    //printf("grd*x    : %.7f\n", cvxm_dot(&gradf, x));
-    //printf("d*d*x.t  : %.7f\n", dnlt0*dnlt0*epi_x);
-    //printf("z0       : %.7f\n", znlt);
     epi_x = cvxm_dot(&gradf, x) + dnlt0*dnlt0*epi_x - znlt;
     cvxm_set_epi(x, epi_x);
     return err;
