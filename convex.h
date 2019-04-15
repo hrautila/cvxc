@@ -296,7 +296,6 @@ typedef struct cvx_scaling {
     cvx_size_t *indr;           // Offsets to R matrices
     cvx_size_t *indrti;         // Offsets to RTI matrices
     int rcount;                 // # of R/RTI matrices, equal to dims->slen
-    const cvx_dimset_t *dims;
     unsigned char *__bytes;
     cvx_size_t nbytes;
 } cvx_scaling_t;
@@ -643,6 +642,26 @@ typedef struct cvx_conelp_internal {
 
 } cvx_conelp_internal_t;
 
+typedef struct cvx_gpindex {
+    cvx_size_t p;
+    cvx_size_t *index;
+    void *__bytes;
+} cvx_gpindex_t;
+
+typedef struct cvx_gp_params {
+    cvx_matrix_t *F;
+    cvx_matrix_t *g;
+    cvx_matrix_t y;
+    cvx_gpindex_t gpi;
+} cvx_gp_params_t;
+
+typedef struct cvx_gp_program {
+    cvx_convex_program_t gp;
+    cvx_gp_params_t gp_params;
+} cvx_gp_program_t;
+
+
+
 typedef struct cvx_cpl_internal {
     cvx_float_t tau, kappa;
     cvx_float_t dkappa, dtau;
@@ -764,7 +783,7 @@ typedef struct cvx_cpl_internal {
     cvx_index_t index_sig;              // indexing to matrix group with only diagonal 'S" space
     cvx_index_t index_cpt;              // indexing for G/h matrix with convex target function
     cvx_scaling_t W0;
-
+    cvx_gp_program_t gp;                // Internal GP program structure.
 } cvx_cpl_internal_t;
 
 typedef struct cvx_problem {
@@ -773,7 +792,7 @@ typedef struct cvx_problem {
     cvx_matrix_t *h;                    ///< Inequality constraint limits
     cvx_matrix_t *A;                    ///< Equality constraint coefficients
     cvx_matrix_t *b;                    ///< Equality constraint limits
-    cvx_dimset_t *dims;                 ///< Problems dimensions
+    // const cvx_dimset_t *dims;           ///< Problems dimensions
     cvx_kktsolver_t *solver;            ///< KKT solver
 
     // user defined starting points for CONELP solver
@@ -862,7 +881,7 @@ cvx_cpl_solve(cvx_problem_t *cp, cvx_solopts_t *opts);
 extern cvx_size_t
 cvx_cpl_setup(cvx_problem_t *cp, cvx_convex_program_t *F,
               cvx_matrix_t *c, cvx_matrix_t *G, cvx_matrix_t *h, cvx_matrix_t *A,
-              cvx_matrix_t *b,  cvx_dimset_t *dims, cvx_kktsolver_t *kktsolver);
+              cvx_matrix_t *b,  const cvx_dimset_t *dims, cvx_kktsolver_t *kktsolver);
 
 extern int cvx_cpl_isok(const cvx_matrix_t *c,
                         const cvx_convex_program_t *F,
