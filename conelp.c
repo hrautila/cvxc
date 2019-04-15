@@ -582,7 +582,6 @@ cvx_size_t cvx_conelp_setup(cvx_problem_t *cp,
     cp->h = h;
     cp->A = A;
     cp->b = b;
-    cp->dims = dims;
 
     cp->primal_x = (cvx_matrix_t *)0;
     cp->primal_s = (cvx_matrix_t *)0;
@@ -909,7 +908,8 @@ int cvx_conelp_solve(cvx_problem_t *cp, cvx_solopts_t *opts)
     int maxiter = opts->max_iter > 0 ? opts->max_iter : CVX_MAXITER;
     int refinement = opts->refinement > 0 ? opts->refinement : 0;
 
-    if (cp->dims->qlen > 0 || cp->dims->slen > 0)
+    if (cvx_index_count(&cpi->index_full, CVXDIM_SOCP) > 0 ||
+        cvx_index_count(&cpi->index_full, CVXDIM_SDP) > 0)
         refinement = 1;
 
     int primalstart = ! (cp->primal_x && cp->primal_s);
