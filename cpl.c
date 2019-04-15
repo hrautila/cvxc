@@ -589,7 +589,7 @@ int cvx_cpl_setvars(cvx_problem_t *cp,
                     cvx_matrix_t *h,
                     cvx_matrix_t *A,
                     cvx_matrix_t *b,
-                    cvx_dimset_t *dims,
+                    const cvx_dimset_t *dims,
                     cvx_kktsolver_t *kktsolver)
 {
     cp->c = c;
@@ -597,7 +597,6 @@ int cvx_cpl_setvars(cvx_problem_t *cp,
     cp->h = h;
     cp->A = A;
     cp->b = b;
-    cp->dims = dims;
     cp->F = F;
 
     cp->primal_x = (cvx_matrix_t *)0;
@@ -639,7 +638,7 @@ cvx_size_t cvx_cpl_setup(cvx_problem_t *cp,
                          cvx_matrix_t *h,
                          cvx_matrix_t *A,
                          cvx_matrix_t *b,
-                         cvx_dimset_t *dims,
+                         const cvx_dimset_t *dims,
                          cvx_kktsolver_t *kktsolver)
 {
     cvx_size_t mc, nc, mb, nb;
@@ -999,8 +998,8 @@ int cvx_cpl_solve(cvx_problem_t *cp,
     int refinement = opts->refinement > 0 ? opts->refinement : 0;
 
     refinement = opts->refinement == 0 &&
-        (cvx_dimset_count(cp->dims, CVXDIM_SDP) > 0 ||
-         cvx_dimset_count(cp->dims, CVXDIM_SOCP) > 0);
+        (cvx_index_count(&cpi->index_full, CVXDIM_SDP) > 0 ||
+         cvx_index_count(&cpi->index_full, CVXDIM_SOCP) > 0);
 
     cp->error = 0;
 
@@ -1016,11 +1015,10 @@ int cvx_cpl_solve(cvx_problem_t *cp,
 
     cpi->gap = cvx_sdot(&cpi->s_g, &cpi->z_g);
 
-    range  = cvx_dimset_count(cp->dims, CVXDIM_SDP);
-    //range += cvx_dimset_sum(cp->dims, CVXDIM_NLTARGET);
-    range += cvx_dimset_sum(cp->dims, CVXDIM_NONLINEAR);
-    range += cvx_dimset_sum(cp->dims, CVXDIM_LINEAR);
-    range += cvx_dimset_sum(cp->dims, CVXDIM_SOCP);
+    range  = cvx_index_count(&cpi->index_full, CVXDIM_SDP);
+    range += cvx_index_length(&cpi->index_full, CVXDIM_NONLINEAR);
+    range += cvx_index_length(&cpi->index_full, CVXDIM_LINEAR);
+    range += cvx_index_length(&cpi->index_full, CVXDIM_SOCP);
 
     // make non-linear and linear mappings
     cvx_mgrp_elem(&s_nl,  &cpi->s_g,  CVXDIM_NONLINEAR|CVXDIM_NLTARGET, 0);
