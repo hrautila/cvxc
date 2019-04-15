@@ -236,6 +236,9 @@ void cvxm_apply(cvx_matrix_t *A, cvx_oper_t f, int flags)
 __CVX_INLINE
 cvx_float_t cvxm_dot(const cvx_matrix_t *X, const cvx_matrix_t *Y)
 {
+    if (!X || !Y)
+        return 0;
+
     armas_conf_t cf = *armas_conf_default();
     cvx_float_t val = armas_d_dot(&X->data, &Y->data, &cf);
     if (cvxm_isepi(X) && cvxm_isepi(Y)) {
@@ -244,12 +247,24 @@ cvx_float_t cvxm_dot(const cvx_matrix_t *X, const cvx_matrix_t *Y)
     return  val;
 }
 
-// \brief sum of absolute values
+// \brief absolute maximum element
 __CVX_INLINE
 cvx_float_t cvxm_amax(const cvx_matrix_t *X)
 {
     armas_conf_t cf = *armas_conf_default();
-    return armas_d_amax(&X->data, &cf);
+    if (X)
+        return armas_d_amax(&X->data, &cf);
+    return 0.0;
+}
+
+// \brief sum of absolute values
+__CVX_INLINE
+cvx_float_t cvxm_asum(const cvx_matrix_t *X)
+{
+    armas_conf_t cf = *armas_conf_default();
+    if (X)
+        return armas_d_asum(&X->data, &cf);
+    return 0.0;
 }
 
 // \brief vector nrm2
@@ -257,7 +272,9 @@ __CVX_INLINE
 cvx_float_t cvxm_nrm2(const cvx_matrix_t *X)
 {
     armas_conf_t cf = *armas_conf_default();
-    return armas_d_nrm2(&X->data, &cf);
+    if (X)
+        return armas_d_nrm2(&X->data, &cf);
+    return 0.0;
 }
 
 // \brief element-wise scale with constant

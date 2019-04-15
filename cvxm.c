@@ -44,6 +44,7 @@ void cvxm_apply(cvx_matrix_t *A, cvx_oper_t f, int flags);
 cvx_float_t cvxm_dot(const cvx_matrix_t *X, const cvx_matrix_t *Y);
 cvx_float_t cvxm_nrm2(const cvx_matrix_t *X);
 cvx_float_t cvxm_amax(const cvx_matrix_t *X);
+cvx_float_t cvxm_asum(const cvx_matrix_t *X);
 int cvxm_scale(cvx_matrix_t *X, cvx_float_t alpha, int flags);
 int cvxm_add(cvx_matrix_t *X, cvx_float_t alpha, int flags);
 void cvxm_make_trm(cvx_matrix_t *X, int flags);
