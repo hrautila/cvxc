@@ -5,6 +5,10 @@
 *.log
 *.trs
 
+# directories
+build*
+tmp
+
 # gtags files
 GPATH
 GRTAGS
