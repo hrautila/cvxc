@@ -20,7 +20,7 @@
 #  endif
 #endif
 
-#include <armas/dmatrix.h>
+#include <armas/ddense.h>
 
 typedef uint64_t cvx_size_t;
 typedef double cvx_float_t;
@@ -281,7 +281,8 @@ cvx_float_t cvxm_nrm2(const cvx_matrix_t *X)
 __CVX_INLINE
 int cvxm_scale(cvx_matrix_t *X, cvx_float_t alpha, int flags)
 {
-    int err = armas_d_mscale(&X->data, alpha, flags);
+    armas_conf_t cf = *armas_conf_default();
+    int err = armas_d_mscale(&X->data, alpha, flags, &cf);
     if (cvxm_isepi(X)) {
         X->t *= alpha;
     }
@@ -292,7 +293,8 @@ int cvxm_scale(cvx_matrix_t *X, cvx_float_t alpha, int flags)
 __CVX_INLINE
 int cvxm_add(cvx_matrix_t *X, cvx_float_t alpha, int flags)
 {
-    return armas_d_madd(&X->data, alpha, flags);
+    armas_conf_t cf = *armas_conf_default();
+    return armas_d_madd(&X->data, alpha, flags, &cf);
 }
 
 __CVX_INLINE
@@ -305,8 +307,9 @@ void cvxm_make_trm(cvx_matrix_t *X, int flags)
 __CVX_INLINE
 void cvxm_copy(cvx_matrix_t *X, const cvx_matrix_t *Y, int flags)
 {
+    armas_conf_t cf = *armas_conf_default();
     if (X && Y) {
-        armas_d_mcopy(&X->data, (armas_d_dense_t *)&Y->data);
+        armas_d_mcopy(&X->data, (armas_d_dense_t *)&Y->data, flags, &cf);
         X->t = Y->t;
     }
 }
@@ -315,10 +318,9 @@ void cvxm_copy(cvx_matrix_t *X, const cvx_matrix_t *Y, int flags)
 __CVX_INLINE
 int cvxm_axpy(cvx_matrix_t *Y, cvx_float_t alpha, const cvx_matrix_t *X)
 {
-    armas_conf_t cf;
     int err = 0;
     if (X && Y) {
-        cf = *armas_conf_default();
+        armas_conf_t cf = *armas_conf_default();
         err = armas_d_axpy(&Y->data, alpha, &X->data, &cf);
         if (cvxm_isepi(Y) && cvxm_isepi(X)) {
             Y-> t += X->t * alpha;
@@ -330,10 +332,9 @@ int cvxm_axpy(cvx_matrix_t *Y, cvx_float_t alpha, const cvx_matrix_t *X)
 __CVX_INLINE
 int cvxm_axpby(cvx_float_t beta, cvx_matrix_t *Y, cvx_float_t alpha, const cvx_matrix_t *X)
 {
-    armas_conf_t cf;
     int err = 0;
     if (X && Y) {
-        cf = *armas_conf_default();
+        armas_conf_t cf = *armas_conf_default();
         err = armas_d_axpby(beta, &Y->data, alpha, &X->data, &cf);
         if (cvxm_isepi(X) && cvxm_isepi(Y)) {
             Y->t = beta*Y->t + alpha*X->t;
@@ -361,7 +362,7 @@ __CVX_INLINE
 int cvxm_mvupdate(cvx_matrix_t *A, cvx_float_t alpha, const cvx_matrix_t *X, const cvx_matrix_t *Y)
 {
     armas_conf_t cf = *armas_conf_default();
-    return armas_d_mvupdate(&A->data, alpha, &X->data, &Y->data, &cf);
+    return armas_d_mvupdate(1.0, &A->data, alpha, &X->data, &Y->data, &cf);
 }
 
 //  \brief diag solve; X = alpha*diag(A).-1*X
