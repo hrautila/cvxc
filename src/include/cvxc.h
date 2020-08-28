@@ -550,7 +550,7 @@ int cvx_kktsolve(cvx_kktsolver_t *S,
     return (*S->u.fnc->solve)(S, x, y, z_g);
 }
 
-typedef struct __solution_s {
+typedef struct cvx_solution {
     int status;
     cvx_matrix_t *x;
     cvx_matrix_t *s;
@@ -569,7 +569,7 @@ typedef struct __solution_s {
     int iterations;
 } cvx_solution_t;
 
-typedef struct __solopts_s {
+typedef struct cvx_solopts {
     cvx_float_t abstol;         ///< Absolute tolerance
     cvx_float_t reltol;         ///< Relative tolerance
     cvx_float_t feastol;        ///< Feasibility tolerance
