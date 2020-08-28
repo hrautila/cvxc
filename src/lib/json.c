@@ -29,7 +29,7 @@ int cvx_solver_number(const char *name)
         return CVX_KKTSOL_CHOL;
     } else if (strncmp(name, "qr", 2) == 0) {
         return CVX_KKTSOL_QR;
-    } 
+    }
     return CVX_KKTSOL_LDL;
 }
 
@@ -50,12 +50,21 @@ int cvx_json_read_token(char *iob, size_t len, cvx_stream_t *ios)
 
 int cvx_json_matrix_read(cvx_matrix_t **A, cvx_stream_t *ios)
 {
-    return armas_d_json_read(A, ios);
+    if (! *A) {
+        cvx_matrix_t *m = malloc(sizeof(cvx_matrix_t));
+        if (!m)
+            return -1;
+        m->t = 0.0;
+        m->bits = 0;
+        *A = m;
+    }
+    armas_d_dense_t *amat = &(*A)->data;
+    return armas_d_json_read(&amat, ios);
 }
 
 int cvx_json_matrix_write(cvx_stream_t *ios, const cvx_matrix_t *A)
 {
-    return armas_d_json_write(ios, A, 0);
+    return armas_d_json_write(ios, &A->data, 0);
 }
 
 enum cvx_json_states {
@@ -185,7 +194,6 @@ int cvx_json_dimset_write(cvx_stream_t *ios, const cvx_dimset_t *dims)
  * JSON: 
  *   {"nl":int, "l":int, "q":int, "s":int, "qdims":[int,..], "sdims":[int,...]}
  */
-    
 int cvx_json_dimset_read(cvx_dimset_t **dims, cvx_stream_t *ios)
 {
     char iob[64];
@@ -195,7 +203,7 @@ int cvx_json_dimset_read(cvx_dimset_t **dims, cvx_stream_t *ios)
     cvx_dimset_t *dd;
 
     nldim = ldim = qdim = sdim = -1;
-    
+
     dd = *dims;
     tok = cvx_json_read_token(iob, sizeof(iob), ios);
     if (tok != '{') {
@@ -220,11 +228,11 @@ int cvx_json_dimset_read(cvx_dimset_t **dims, cvx_stream_t *ios)
             if (iob[0] == 'l' && iob[1] == '\0') {
                 state = JSON_STATE_LSEP;
             } else if (strncmp(iob, "nq", 2) == 0) {
-                state = JSON_STATE_QSEP;                
+                state = JSON_STATE_QSEP;
             } else if (strncmp(iob, "ns", 2) == 0) {
-                state = JSON_STATE_SSEP;                
+                state = JSON_STATE_SSEP;
             } else if (strncmp(iob, "nl", 2) == 0) {
-                state = JSON_STATE_NLSEP;                
+                state = JSON_STATE_NLSEP;
             } else {
                 return -1;
             }
@@ -294,7 +302,7 @@ int cvx_json_dimset_read(cvx_dimset_t **dims, cvx_stream_t *ios)
     // read dimension arrays; TODO: error handling, release reservations on error?
     int read_bits = 0;
     state = JSON_STATE_SEP;
-    
+
     for (; state != JSON_STATE_HAVE_ALL ;) {
         tok = cvx_json_read_token(iob, sizeof(iob), ios);
         switch (state) {
@@ -307,7 +315,7 @@ int cvx_json_dimset_read(cvx_dimset_t **dims, cvx_stream_t *ios)
                 goto error_exit;
             }
             break;
-            
+
         case JSON_STATE_SEP:
             if (tok != ',') goto error_exit;
             state = JSON_STATE_KEY;
@@ -321,7 +329,7 @@ int cvx_json_dimset_read(cvx_dimset_t **dims, cvx_stream_t *ios)
             if (tok != ':') goto error_exit;
             state = JSON_STATE_SDIMS_VAL;
             break;
-            
+
         case JSON_STATE_QDIMS_VAL:
             if (tok != '[')
                 goto error_exit;
@@ -339,7 +347,7 @@ int cvx_json_dimset_read(cvx_dimset_t **dims, cvx_stream_t *ios)
             read_bits |= HAVE_QDIMS;
             state = JSON_STATE_SEP;
             break;
-            
+
         case JSON_STATE_SDIMS_VAL:
             if (tok != '[')
                 goto error_exit;
@@ -361,7 +369,7 @@ int cvx_json_dimset_read(cvx_dimset_t **dims, cvx_stream_t *ios)
         }
         if ((read_bits & (HAVE_QDIMS|HAVE_SDIMS)) == (HAVE_QDIMS|HAVE_SDIMS)) {
             state = JSON_STATE_HAVE_ALL;
-        }               
+        }
     }
     // next need to be object closing brace
     if (cvx_json_read_token(iob, sizeof(iob), ios) != '}') {
@@ -370,11 +378,11 @@ int cvx_json_dimset_read(cvx_dimset_t **dims, cvx_stream_t *ios)
     if (have_new)
         *dims = dd;
     return 0;
-    
+
  error_exit:
     if (have_new)
         cvx_dimset_free(dd);
-    else 
+    else
         cvx_dimset_release(dd);
     return -1;
 }
@@ -383,7 +391,7 @@ int cvx_json_dimset_read(cvx_dimset_t **dims, cvx_stream_t *ios)
 /*
  *  JSON: problem parameters
  *   { "opts": { ...opts... },
- *     "dims": { ...dimset... }, 
+ *     "dims": { ...dimset... },
  *        "c": { ...matrix... },
  *        "G": { ...matrix... },
  *        "h": { ...matrix... },
@@ -393,7 +401,7 @@ int cvx_json_dimset_read(cvx_dimset_t **dims, cvx_stream_t *ios)
  *   {...matrix...}  = {"rows":m, "cols":n, "data":[...numbers...]} | null
  *   [...numbers...] = [] | [array of numbers] (length = m*n)
  *
- *   JSON: result 
+ *   JSON: result
  *   { "status": INT,
  *     "result": { ...result... },
  *          "x": { ...matrix... },
@@ -459,7 +467,7 @@ int cvx_json_read_options(cvx_solopts_t **opts, cvx_stream_t *ios)
     int tok, ntok, state;
     char iob[64];
     cvx_solopts_t *lopts;
-    
+
     if (*opts)
         lopts = *opts;
     else {
@@ -468,7 +476,7 @@ int cvx_json_read_options(cvx_solopts_t **opts, cvx_stream_t *ios)
             return -1;
     }
     memset(lopts, 0, sizeof(*lopts));
-    
+
     tok = cvx_json_read_token(iob, sizeof(iob), ios);
     // first token ...
     switch (tok) {
@@ -584,7 +592,7 @@ int cvx_json_write_params(cvx_stream_t *ios,
     ONERR(cvx_json_write_simple_token(ios, ':'));
     ONERR(cvx_json_dimset_write(ios, dims));
     ONERR(cvx_json_write_simple_token(ios, ','));
-    
+
     ONERR(cvx_json_write_token(ios, CVX_JSON_STRING, "c", 1));
     ONERR(cvx_json_write_simple_token(ios, ':'));
     ONERR(cvx_json_matrix_write(ios, c));
@@ -621,11 +629,11 @@ int cvx_json_write_params(cvx_stream_t *ios,
 int cvx_json_read_params(cvx_params_t **pars, cvx_stream_t *ios)
 {
     int tok, ntok, state, err, bits = 0;
-    cvx_params_t *pptr;
+    cvx_params_t *pptr = (cvx_params_t *)0;
     char iob[64];
     if (*pars)
         pptr = *pars;
-    
+
     tok = cvx_json_read_token(iob, sizeof(iob), ios);
     if (tok != '{') {
         return -1;
@@ -635,7 +643,7 @@ int cvx_json_read_params(cvx_params_t **pars, cvx_stream_t *ios)
         if (!pptr)
             return -1;
     }
-    
+
     state = JSON_STATE_KEY;
     for (ntok = 0; state != JSON_STATE_HAVE_ALL; ntok++) {
         tok = cvx_json_read_token(iob, sizeof(iob), ios);
@@ -666,7 +674,7 @@ int cvx_json_read_params(cvx_params_t **pars, cvx_stream_t *ios)
             if (tok != ',') goto error_exit;
             state = JSON_STATE_KEY;
             break;
-            
+
         case JSON_STATE_MATC_SEP:
             if (tok != ':') goto error_exit;
             if ((err = cvx_json_matrix_read(&pptr->c, ios)) < 0)
@@ -757,8 +765,8 @@ int cvx_json_read_params(cvx_params_t **pars, cvx_stream_t *ios)
     if (pptr->opts) {
         free(pptr->opts);
     }
-    if (! *pars)
-        free(pptr);   
+    if (pptr)
+        free(pptr);
     return -1;
 }
 
@@ -800,9 +808,9 @@ int cvx_json_write_solution(cvx_stream_t *ios, const cvx_solution_t *sol)
         ONERR(cvx_json_matrix_write(ios, sol->x));
     else
         ONERR(cvx_json_write_simple_token(ios, CVX_JSON_NULL));
-        
+
     ONERR(cvx_json_write_simple_token(ios, ','));
-        
+
     // "s": {matrix}
     ONERR(cvx_json_write_token(ios, CVX_JSON_STRING, "s", 1));
     ONERR(cvx_json_write_simple_token(ios, ':'));
@@ -810,7 +818,7 @@ int cvx_json_write_solution(cvx_stream_t *ios, const cvx_solution_t *sol)
         ONERR(cvx_json_matrix_write(ios, sol->s));
     else
         ONERR(cvx_json_write_simple_token(ios, CVX_JSON_NULL));
-        
+
     ONERR(cvx_json_write_simple_token(ios, ','));
 
     // "y": {matrix}
@@ -820,7 +828,7 @@ int cvx_json_write_solution(cvx_stream_t *ios, const cvx_solution_t *sol)
         ONERR(cvx_json_matrix_write(ios, sol->y));
     else
         ONERR(cvx_json_write_simple_token(ios, CVX_JSON_NULL));
-    
+
     ONERR(cvx_json_write_simple_token(ios, ','));
 
     // "z": {matrix}
@@ -830,13 +838,8 @@ int cvx_json_write_solution(cvx_stream_t *ios, const cvx_solution_t *sol)
         ONERR(cvx_json_matrix_write(ios, sol->z));
     else
         ONERR(cvx_json_write_simple_token(ios, CVX_JSON_NULL));
-    
+
     ONERR(cvx_json_write_simple_token(ios, '}'));
 
     return 0;
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:
