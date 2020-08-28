@@ -21,6 +21,19 @@ GTAGS
 .deps
 .dirstamp
 
+# Autoconf files
+*.in
+aclocal.m4
+autom4te.cache
+compile
+configure
+config.*
+depcomp
+install-sh
+ltmain.sh
+m4
+missing
+
 # Object files
 *.o
 *.ko
