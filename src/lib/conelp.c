@@ -2,7 +2,7 @@
 // Copyright: Harri Rautila, 2018 <harri.rautila@gmail.com>
 
 #include <assert.h>
-#include "convex.h"
+#include "cvxc.h"
 
 #define EFRM "%8.5f"
 //#define EFRM "%9.2e"

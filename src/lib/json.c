@@ -3,7 +3,7 @@
 
 #include "json.h"
 #if 0
-#include "convex.h"
+#include "cvxc.h"
 
 #include <armas/armas.h>
 

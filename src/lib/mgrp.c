@@ -1,7 +1,7 @@
 
 // Copyright: Harri Rautila, 2018 <harri.rautila@gmail.com>
 
-#include "convex.h"
+#include "cvxc.h"
 
 void cvx_mgrp_copy(cvx_matgrp_t *x_g, cvx_matgrp_t *y_g, cvx_dim_enum name)
 {

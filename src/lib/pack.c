@@ -2,7 +2,7 @@
 // Copyright: Harri Rautila, 2018 <harri.rautila@gmail.com>
 
 #include <stdio.h>
-#include "convex.h"
+#include "cvxc.h"
 
 
 

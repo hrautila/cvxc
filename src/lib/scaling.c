@@ -1,7 +1,7 @@
 
 // Copyright: Harri Rautila, 2018 <harri.rautila@gmail.com>
 
-#include "convex.h"
+#include "cvxc.h"
 #include "cvxm.h"
 
 /**

@@ -11,7 +11,7 @@
 #include <ctype.h>
 #include <errno.h>
 
-#include "convex.h"
+#include "cvxc.h"
 
 #if __STDC_VERSION__
 // inline function reference

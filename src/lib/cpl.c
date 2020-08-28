@@ -2,7 +2,7 @@
 // Copyright: Harri Rautila, 2018-2019 <harri.rautila@gmail.com>
 
 #include "epi.h"
-#include "convex.h"
+#include "cvxc.h"
 
 #ifndef __ZERO
 #define __ZERO 0.0

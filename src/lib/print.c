@@ -6,7 +6,7 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include <unistd.h>
-#include "convex.h"
+#include "cvxc.h"
 
 
 void cvx_mgrp_printf(FILE *f, const char *format, cvx_matgrp_t *g, const char *s)

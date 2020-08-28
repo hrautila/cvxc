@@ -1,7 +1,7 @@
 
 // Copyright: Harri Rautila, 2018-2019 <harri.rautila@gmail.com>
 
-#include "convex.h"
+#include "cvxc.h"
 
 cvx_size_t cvx_gp_program_bytes(cvx_size_t p, cvx_size_t m)
 {
