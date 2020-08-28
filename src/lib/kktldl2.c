@@ -82,7 +82,7 @@ int ldl2_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matri
     cvx_size_t rG, cG;
     cvx_matrix_t Kt, Dfk, Gk, g0, g1;
     cvx_matgrp_t g_g;
-    int mnl = cvx_dimset_sum(cp->dims, CVXDIM_NONLINEAR);
+    int mnl = cvx_dimset_sum(ldl->dims, CVXDIM_NONLINEAR);
     int err;
 
     cvxm_size(&rG, &cG, cp->G);
@@ -158,7 +158,7 @@ int ldl2_solve(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_
     cvx_matrix_t u0, u1;
     cvx_matgrp_t g_g, x_g;
     cvx_float_t beta = 0.0;
-    int mnl = cvx_dimset_sum(cp->dims, CVXDIM_NONLINEAR);
+    int mnl = cvx_dimset_sum(ldl->dims, CVXDIM_NONLINEAR);
     int err = 0;
 
     cvxm_view_map(&u0, &ldl->u, 0,      0, ldl->n, 1);
