@@ -2,8 +2,9 @@
 // Copyright: Harri Rautila, 2016 <harri.rautila@gmail.com>
 
 #include <unistd.h>
-#include "convex.h"
+#include "cvxc.h"
 
+extern int print_solution(cvxc_solution_t *sol);
 
 /*
  * The analytic centering with cone constraints example in section 9.1 of CVXBook.
@@ -83,7 +84,7 @@ int main(int argc, char **argv)
         .abstol = 0.0,
         .reltol = 0.0,
         .feastol = 0.0,
-        .max_iter = 1,
+        .max_iter = 30,
         .debug = 0,
         .refinement = 0,
         .kkt_solver_name = 0,
@@ -117,6 +118,5 @@ int main(int argc, char **argv)
     cvxc_cp_setup(&cp, &F, &G, &h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
     cvxc_cp_compute_start(&cp);
     cvxc_cp_solve(&cp, &opts);
-    return 0;
+    return print_solution(&cp.solution);
 }
-

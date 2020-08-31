@@ -2,7 +2,7 @@
 // Copyright: Harri Rautila, 2016 <harri.rautila@gmail.com>
 
 #include <unistd.h>
-#include "convex.h"
+#include "cvxc.h"
 
 
 /*
@@ -52,6 +52,8 @@
  *     -w5 + Amin5 / h5 <= 0
  */
 
+extern int print_solution(cvxc_solution_t *sol);
+
 typedef struct floorplan {
     cvxc_matrix_t Amin;
 } floorplan_t;
@@ -74,10 +76,10 @@ int floorplan_F(cvxc_matrix_t *f,
                 void *user)
 {
     floorplan_t *p = (floorplan_t *)user;
-    
+
     cvxc_matrix_t x1, x2, Df1, Df2, H1;
     cvxc_float_t x1val, x2val, aval, xval, zval;
-    
+
     if (!x && !z) {
         // F0; assume len(f) is 
         // 5 last elements to 1.0
@@ -86,7 +88,12 @@ int floorplan_F(cvxc_matrix_t *f,
         return 0;
     }
     // F1
-    
+
+    cvxm_init(&x1, 0, 0);
+    cvxm_init(&x2, 0, 0);
+    cvxm_init(&Df1, 0, 0);
+    cvxm_init(&Df2, 0, 0);
+
     cvxm_view_map(&x1, x, 12, 0, 5, 1);
     cvxm_view_map(&x2, x, 17, 0, 5, 1);
     cvxm_view_map(&Df1, Df, 0, 12, 5, 5);
@@ -104,7 +111,8 @@ int floorplan_F(cvxc_matrix_t *f,
 
     if (!z)
         return 0;
-        
+
+    cvxm_init(&H1, 0, 0);
     cvxm_view_map(&H1, H, 17, 17, 5, 5);
     for (int i = 0; i < 5; i++) {
         aval = cvxm_get(&p->Amin, i, 0);
@@ -156,85 +164,85 @@ void floorplan_constraints(cvxc_matrix_t *c,
     cvxm_set(G, 6, 15, 1.0);
     cvxm_set(h, 6, 0, -rho);
 
-    // -W + x5 + w5 <= 0  
+    // -W + x5 + w5 <= 0
     cvxm_set(G, 7, 0, -1.0);
     cvxm_set(G, 7, 6,  1.0);
     cvxm_set(G, 7, 16, 1.0);
 
-    // -y2 <= 0  
+    // -y2 <= 0
     cvxm_set(G, 8, 8, -1.0);
 
-    // -y3 <= 0  
+    // -y3 <= 0
     cvxm_set(G, 9, 9, -1.0);
 
-    // -y5 <= 0  
+    // -y5 <= 0
     cvxm_set(G, 10, 11, -1.0);
 
-    // -y1 + y2 + h2 <= -rho  
+    // -y1 + y2 + h2 <= -rho
     cvxm_set(G, 11, 7, -1.0);
     cvxm_set(G, 11, 8,  1.0);
     cvxm_set(G, 11, 18, 1.0);
     cvxm_set(h, 11, 0, -rho);
 
-    // y1 - y4 + h1 <= -rho  
+    // y1 - y4 + h1 <= -rho
     cvxm_set(G, 12, 7,  1.0);
     cvxm_set(G, 12, 10,-1.0);
     cvxm_set(G, 12, 17, 1.0);
     cvxm_set(h, 12, 0, -rho);
 
-    // y3 - y4 + h3 <= -rho  
+    // y3 - y4 + h3 <= -rho
     cvxm_set(G, 13, 9,  1.0);
     cvxm_set(G, 13, 10,-1.0);
     cvxm_set(G, 13, 19, 1.0);
     cvxm_set(h, 13, 0, -rho);
 
-    // -H + y4 + h4 <= 0  
+    // -H + y4 + h4 <= 0
     cvxm_set(G, 14, 1, -1.0);
     cvxm_set(G, 14, 10, 1.0);
     cvxm_set(G, 14, 20, 1.0);
 
-    // -H + y5 + h5 <= 0  
+    // -H + y5 + h5 <= 0
     cvxm_set(G, 15, 1, -1.0);
     cvxm_set(G, 15, 11, 1.0);
     cvxm_set(G, 15, 21, 1.0);
 
-    // -w1 + h1/gamma <= 0  
+    // -w1 + h1/gamma <= 0
     cvxm_set(G, 16, 12,-1.0);
     cvxm_set(G, 16, 17, 1.0/gamma);
 
-    // w1 - gamma * h1 <= 0  
+    // w1 - gamma * h1 <= 0
     cvxm_set(G, 17, 12, 1.0);
     cvxm_set(G, 17, 17, -gamma);
 
-    // -w2 + h2/gamma <= 0  
+    // -w2 + h2/gamma <= 0
     cvxm_set(G, 18, 13,-1.0);
     cvxm_set(G, 18, 18, 1.0/gamma);
 
-    //  w2 - gamma * h2 <= 0  
+    //  w2 - gamma * h2 <= 0
     cvxm_set(G, 19, 13, 1.0);
     cvxm_set(G, 19, 18, -gamma);
 
-    // -w3 + h3/gamma <= 0  
+    // -w3 + h3/gamma <= 0
     cvxm_set(G, 20, 14,-1.0);
     cvxm_set(G, 20, 18, 1.0/gamma);
 
-    //  w3 - gamma * h3 <= 0  
+    //  w3 - gamma * h3 <= 0
     cvxm_set(G, 21, 14, 1.0);
     cvxm_set(G, 21, 19, -gamma);
 
-    // -w4  + h4/gamma <= 0  
+    // -w4  + h4/gamma <= 0
     cvxm_set(G, 22, 15,-1.0);
     cvxm_set(G, 22, 19, 1.0/gamma);
 
-    //  w4 - gamma * h4 <= 0  
+    //  w4 - gamma * h4 <= 0
     cvxm_set(G, 23, 15, 1.0);
     cvxm_set(G, 23, 20, -gamma);
 
-    // -w5 + h5/gamma <= 0  
+    // -w5 + h5/gamma <= 0
     cvxm_set(G, 24, 16,-1.0);
     cvxm_set(G, 24, 21, 1.0/gamma);
 
-    //  w5 - gamma * h5 <= 0.0  
+    //  w5 - gamma * h5 <= 0.0
     cvxm_set(G, 25, 16, 1.0);
     cvxm_set(G, 25, 21, -gamma);
 }
@@ -247,13 +255,13 @@ int main(int argc, char **argv)
     cvxc_dimset_t dims;
     cvxc_float_t rho, gamma;
     int opt;
-    
+
     cvxc_float_t amin_data[] = {100.0, 100.0, 100.0, 100.0, 100.0};
     cvxc_solopts_t opts = (cvxc_solopts_t){
         .abstol = 0.0,
         .reltol = 0.0,
         .feastol = 0.0,
-        .max_iter = 1,
+        .max_iter = 30,
         .debug = 0,
         .refinement = 0,
         .kkt_solver_name = 0,
@@ -261,8 +269,7 @@ int main(int argc, char **argv)
     };
     floorplan_t Fplan;
     cvxc_convex_program_t F;
-    
-    
+
     while ((opt = getopt(argc, argv, "N:")) != -1) {
         switch (opt) {
         case 'N':
@@ -272,13 +279,12 @@ int main(int argc, char **argv)
             break;
         }
     }
-    
 
     cvxc_dimset_create(&dims, 5, 26, 0, 0);
 
     cvxm_map_data(&Fplan.Amin, 5, 1, amin_data);
     cvxc_convex_program_init(&F, floorplan_F, &Fplan);
-    
+
     rho = 1.0; gamma = 5.0;
     c = cvxm_new(22, 1);
     h = cvxm_new(26, 1);
@@ -295,10 +301,5 @@ int main(int argc, char **argv)
     cvxc_cpl_setup(&cpl, &F, c, G, h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
     cvxc_cpl_compute_start(&cpl);
     cvxc_cpl_solve(&cpl, &opts);
-    return 0;
+    return print_solution(&cpl.solution);
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

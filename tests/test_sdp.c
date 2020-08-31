@@ -2,16 +2,8 @@
 // Copyright: Harri Rautila, 2016 <harri.rautila@gmail.com>
 
 #include <unistd.h>
-#include "cvxm.h"
-#include "convex.h"
+#include "cvxc.h"
 
-char *solution_name[] = {
-    "Optimal",
-    "Unknown",
-    "Primal Infeasible",
-    "Dual Infeasible",
-    "Singular"
-};
 
 // one linear [2,1], one sdp of size [3,3]
 cvxc_float_t gdata[] = {
@@ -26,27 +18,7 @@ cvxc_float_t cdata[] = {-6., -4., -5.};
 cvxc_float_t hdata[] = {
     -3., 5.,/**/ 68., -30., -19., -30., 99., 23., -19., 23., 10.};
 
-void print_solution(cvxc_solution_t *sol)
-{
-    printf("status      : %2d [%s]\n", sol->status, solution_name[sol->status]);
-    printf("primal obj  : %13.6e\n", sol->primal_objective);
-    printf("dual obj    : %13.6e\n", sol->dual_objective);
-    printf("primal inf  : %13.6e\n", sol->primal_infeasibility);
-    printf("dual int    : %13.6e\n", sol->dual_infeasibility);
-    printf("primal slack: %13.6e\n", sol->primal_slack);
-    printf("dual slack  : %13.6e\n", sol->dual_slack);
-    printf("primal cert : %13.6e\n", sol->primal_residual_cert);
-    printf("dual cert   : %13.6e\n", sol->dual_residual_cert);
-    printf("gap         : %13.6e\n", sol->gap);
-    printf("relative gap: %13.6e\n", sol->relative_gap);
-    printf("iterations  : %d\n", sol->iterations);
-    if (sol->status != CVXC_STAT_OPTIMAL) 
-        return;
-    cvxc_mat_printf(stdout, "%13.6e", sol->x, "x");
-    cvxc_mat_printf(stdout, "%13.6e", sol->s, "s");
-    cvxc_mat_printf(stdout, "%13.6e", sol->y, "y");
-    cvxc_mat_printf(stdout, "%13.6e", sol->z, "z");
-}
+extern int print_solution(cvxc_solution_t *sol);
 
 int main(int argc, char **argv)
 {
@@ -59,7 +31,7 @@ int main(int argc, char **argv)
         .abstol = 0.0,
         .reltol = 0.0,
         .feastol = 0.0,
-        .max_iter = 1,
+        .max_iter = 30,
         .debug = 0,
         .refinement = 0,
         .kkt_solver_name = 0,
@@ -90,11 +62,6 @@ int main(int argc, char **argv)
     //cp.solver->debug = 2;
 
     cvxc_conelp_compute_start(&cp);
-    if (cvxc_conelp_solve(&cp, &opts) == 0)
-        print_solution(&cp.solution);
+    cvxc_conelp_solve(&cp, &opts);
+    return print_solution(&cp.solution);
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:
