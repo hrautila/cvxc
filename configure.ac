@@ -30,7 +30,6 @@ AS_IF([test "x$armas_dense_found" != "xyes"],
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_INLINE
 AC_TYPE_INT64_T
-AC_C_RESTRICT
 AC_CHECK_HEADER_STDBOOL
 AC_TYPE_UINT64_T
 
@@ -41,6 +40,7 @@ AC_CHECK_FUNCS([gettimeofday sqrt])
 AC_CONFIG_FILES([
    Makefile
    src/Makefile
+   tests/Makefile
 ])
 
 AC_OUTPUT
