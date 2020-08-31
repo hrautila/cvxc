@@ -2,9 +2,9 @@
 
 CMDDIR=$(dirname $0)
 
-CONVEX_H="${CMDDIR}/src/include/convex.h"
+CONVEX_H="${CMDDIR}/src/include/cvxc.h"
 if [ ! -f "$CONVEX_H" ]; then
-    echo "abi-version.sh: header convex.h not available"
+    echo "abi-version.sh: header cvxc.h not available"
     exit 1
 fi
 
