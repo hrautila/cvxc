@@ -31,7 +31,7 @@ lib_LTLIBRARIES = libcvxc.la
 libcvxc_la_SOURCES = $(LIBFILES)
 libcvxc_la_LDFLAGS = -version-info @SOVERSION@
 
-nobase_include_HEADERS = include/convex.h
+nobase_include_HEADERS = include/cvxc.h
 
 noinst_HEADERS = \
 	include/cpl.h \
