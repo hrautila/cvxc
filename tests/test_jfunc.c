@@ -8,8 +8,8 @@
 
 int test_jdot(int N, int verbose)
 {
-    cvx_matrix_t x, y;
-    cvx_float_t jval = 0.0, exp;
+    cvxc_matrix_t x, y;
+    cvxc_float_t jval = 0.0, exp;
     int ok, k, dot = 0;
     
     cvxm_init(&x, N, 1);
@@ -19,11 +19,11 @@ int test_jdot(int N, int verbose)
         cvxm_set(&y, k, 0, N-k);
         dot += (N-k)*(N-k);
     }
-    exp = (cvx_float_t)dot;
+    exp = (cvxc_float_t)dot;
     cvxm_set(&x, 0, 0, SQRT(exp));
     cvxm_set(&y, 0, 0, SQRT(exp));
 
-    jval = cvx_jdot(&x, &y);
+    jval = cvxc_jdot(&x, &y);
     ok = abs(jval) < DBL_EPSILON;
     printf("jdot :  %e == %e: %s\n", jval, 0.0, ok ? "OK" : "NOT OK");
     return ok;
@@ -40,8 +40,8 @@ int test_jdot(int N, int verbose)
  */
 int test_jnrm2(int N, int verbose)
 {
-    cvx_matrix_t x, x1;
-    cvx_float_t exp, jval = 0.0, abs_x1;
+    cvxc_matrix_t x, x1;
+    cvxc_float_t exp, jval = 0.0, abs_x1;
     int ok, k;
     
     cvxm_init(&x, N, 1);
@@ -52,7 +52,7 @@ int test_jnrm2(int N, int verbose)
     abs_x1 = cvxm_nrm2(&x1);
     // set x[0] = |X1|
     cvxm_set(&x, 0, 0, abs_x1);
-    jval = cvx_jnrm2(&x);
+    jval = cvxc_jnrm2(&x);
     exp = 0.0;
     ok = abs(jval - 0.0) < DBL_EPSILON;
     printf("jnrm2:  %e == %e: %s\n", jval, exp, ok ? "OK" : "NOT OK");
@@ -67,36 +67,36 @@ int test_jnrm2(int N, int verbose)
  */
 int test_pack(int N, int verbose)
 {
-    cvx_float_t data[] = {
+    cvxc_float_t data[] = {
         1.0,    invsq2, invsq2, invsq2, invsq2,
         invsq2, 1.0,    invsq2, invsq2, invsq2,
         invsq2, invsq2, 1.0,    invsq2, invsq2,
         invsq2, invsq2, invsq2, 1.0,    invsq2,
         invsq2, invsq2, invsq2, invsq2, 1.0
     };
-    cvx_matrix_t x, xc, y, x0, y0;
-    cvx_dimset_t dims;
-    cvx_index_t index;
-    cvx_float_t res;
+    cvxc_matrix_t x, xc, y, x0, y0;
+    cvxc_dimset_t dims;
+    cvxc_index_t index;
+    cvxc_float_t res;
 
     // one 5x5 symmetric matrix
-    cvx_dimset_alloc(&dims, 0, (int *)0, (int[]){5, 0});
-    cvx_index_init(&index, &dims, CVX_INDEX_NORMAL);
+    cvxc_dimset_alloc(&dims, 0, (int *)0, (int[]){5, 0});
+    cvxc_index_init(&index, &dims, CVXC_INDEX_NORMAL);
     
     cvxm_map_data(&x, 5, 5, data);
-    cvxm_make_trm(&x, CVX_LOWER);
+    cvxm_make_trm(&x, CVXC_LOWER);
     cvxm_init(&y,  5, 5); 
     cvxm_init(&xc, 5*3, 1);   // packed size is N*(N+1)/2
 
     //printf("x\n"); cvxm_printf(stdout, "%6.2f", &x);
-    cvx_pack(&xc, &x, &index);
+    cvxc_pack(&xc, &x, &index);
     //printf("xc\n"); cvxm_printf(stdout, "%6.2f", &xc);
 
     // result: packed storage of ones
     res = cvxm_asum(&xc);
     int ok = abs(res - 1.0*15) < DBL_EPSILON;
     printf("pack:  %s\n", ok ? "OK" : "NOT OK");
-    cvx_unpack(&y, &xc, &index);
+    cvxc_unpack(&y, &xc, &index);
     //printf("y\n"); cvxm_printf(stdout, "%6.2f", &y);
 
     // compute ||y -x||; map matrices to vectors; substract 
@@ -108,17 +108,17 @@ int test_pack(int N, int verbose)
     ok = abs(res) < DBL_EPSILON;
     printf("unpack:  %s\n", ok ? "OK" : "NOT OK");
 
-    cvx_dimset_release(&dims);
-    cvx_index_release(&index);
+    cvxc_dimset_release(&dims);
+    cvxc_index_release(&index);
     return ok;
 }
 
-extern int cvxm_read_sbuffer(cvx_matrix_t *, const char *);
+extern int cvxm_read_sbuffer(cvxc_matrix_t *, const char *);
 
 void test_read()
 {
     const char *s = "{2 2 [1.0 2.0 3.0 4.0]}";
-    cvx_matrix_t m;
+    cvxc_matrix_t m;
     cvxm_read_sbuffer(&m, s);
     printf("m\n");
     cvxm_printf(stdout, "%6.2f", &m);

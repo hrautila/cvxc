@@ -4,12 +4,11 @@
 #include <getopt.h>
 #include <string.h>
 
-#include "cvxm.h"
-#include "convex.h"
+#include "cvxc.h"
 
 enum long_opt_enum {
     OPT_SPDA = 260,
-    OPT_JSON = 261   
+    OPT_JSON = 261
 };
 
 
@@ -31,14 +30,14 @@ static struct option long_options[] = {
 
 //#define SHORT_OPTS "A:G:c:h:b:L:Q:S:"
 #define SHORT_OPTS "L:Q:S:M:I:"
-    
+
 int *parse_intlist(int *n, char *arg)
 {
     char *tok, *cp;
     int k, count = 0;
     if (strlen(arg) == 0)
         return (int *)0;
-    
+
     for (cp = strchr(arg, ','); cp; cp = strchr(cp+1, ',')) {
         count += 1;
     }
@@ -65,7 +64,7 @@ int *parse_intlist(int *n, char *arg)
 }
 
 // read matrix market formatted file
-int mmread_file(cvx_matrix_t *A, const char *path)
+int mmread_file(cvxc_matrix_t *A, const char *path)
 {
     cvxm_init(A, 0, 0);
     if (!path) {
@@ -83,7 +82,7 @@ int mmread_file(cvx_matrix_t *A, const char *path)
 
 #define MM_MASK_DEFAULT "matrix_%c.mtx"
 
-void print_solution(cvx_solution_t *sol)
+void print_solution(cvxc_solution_t *sol)
 {
     printf("status      : %2d [%s]\n", sol->status, solution_name[sol->status]);
     printf("primal obj  : %13.6e\n", sol->primal_objective);
@@ -97,12 +96,12 @@ void print_solution(cvx_solution_t *sol)
     printf("gap         : %13.6e\n", sol->gap);
     printf("relative gap: %13.6e\n", sol->relative_gap);
     printf("iterations  : %d\n", sol->iterations);
-    if (sol->status != CVX_STAT_OPTIMAL) 
+    if (sol->status != CVXC_STAT_OPTIMAL) 
         return;
-    cvx_mat_printf(stdout, "%13.6e", sol->x, "x");
-    cvx_mat_printf(stdout, "%13.6e", sol->s, "s");
-    cvx_mat_printf(stdout, "%13.6e", sol->y, "y");
-    cvx_mat_printf(stdout, "%13.6e", sol->z, "z");
+    cvxc_mat_printf(stdout, "%13.6e", sol->x, "x");
+    cvxc_mat_printf(stdout, "%13.6e", sol->s, "s");
+    cvxc_mat_printf(stdout, "%13.6e", sol->y, "y");
+    cvxc_mat_printf(stdout, "%13.6e", sol->z, "z");
 }
 
 
@@ -110,7 +109,7 @@ int main(int argc, char **argv)
 {
     char *mm_mask = MM_MASK_DEFAULT;
     char name[512];
-    
+
     int *dim_Q = (int *)0;
     int *dim_S = (int *)0;
     int nQ, nS;
@@ -118,10 +117,10 @@ int main(int argc, char **argv)
     int dim_L;
     int option_index;
     int max_iter = 100;
-    
-    cvx_matrix_t A, G, c, b, h;
-    cvx_dimset_t dims;
-    
+
+    cvxc_matrix_t A, G, c, b, h;
+    cvxc_dimset_t dims;
+
     while ((opt = getopt_long(argc, argv, SHORT_OPTS, long_options, &option_index)) != -1) {
         switch (opt) {
         case 'M':
@@ -141,8 +140,8 @@ int main(int argc, char **argv)
             break;
         }
     }
-    
-    cvx_dimset_alloc(&dims, dim_L, dim_Q, dim_S);
+
+    cvxc_dimset_alloc(&dims, dim_L, dim_Q, dim_S);
 
     snprintf(name, sizeof(name), mm_mask, 'c');
     mmread_file(&c, name);
@@ -159,8 +158,8 @@ int main(int argc, char **argv)
     snprintf(name, sizeof(name), mm_mask, 'b');
     mmread_file(&b, name);
 
-    cvx_conelp_problem_t cp;
-    cvx_solopts_t opts = (cvx_solopts_t){
+    cvxc_conelp_problem_t cp;
+    cvxc_solopts_t opts = (cvxc_solopts_t){
         .abstol = 0.0,
         .reltol = 0.0,
         .feastol = 0.0,
@@ -171,17 +170,17 @@ int main(int argc, char **argv)
         .show_progress = 1
     };
 
-    cvx_size_t nbytes =
-        cvx_conelp_setup(&cp, &c, &G, &h, &A, &b, &dims, (cvx_kktsolver_t *)0);
+    cvxc_size_t nbytes =
+        cvxc_conelp_setup(&cp, &c, &G, &h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
     if (nbytes == 0) {
         fprintf(stderr, "Conelp problem setup failed\n");
         exit(1);
     }
-    cvx_conelp_compute_start(&cp);
-    cvx_conelp_solve(&cp, &opts);
+    cvxc_conelp_compute_start(&cp);
+    cvxc_conelp_solve(&cp, &opts);
     print_solution(&cp.solution);
 }
- 
+
 // Local Variables:
 // indent-tabs-mode: nil
 // c-basic-offset: 4

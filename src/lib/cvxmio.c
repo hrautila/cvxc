@@ -16,11 +16,11 @@
  * \retval 0 OK
  * \retval -1 Parse error
  */
-int cvxm_read_sbuffer(cvx_matrix_t *m, const char *s)
+int cvxm_read_sbuffer(cvxc_matrix_t *m, const char *s)
 {
     const char *sp = s;
     char *endp;
-    cvx_size_t nrows, ncols, nelems;
+    cvxc_size_t nrows, ncols, nelems;
     
     while (*sp && *sp != '{')
         sp++;
@@ -52,7 +52,7 @@ int cvxm_read_sbuffer(cvx_matrix_t *m, const char *s)
     sp++;
 
     // parse data elements;
-    cvx_float_t eval, *ep;
+    cvxc_float_t eval, *ep;
     int k = 0;
     ep = cvxm_data(m, 0);
     
@@ -179,13 +179,13 @@ int get_tok(char *buf, size_t blen, FILE *fp)
     return T_ERROR;
 }
 
-int cvxm_read_file(cvx_matrix_t *m, FILE *fp)
+int cvxm_read_file(cvxc_matrix_t *m, FILE *fp)
 {
     int tok;
     double val;
     char buf[64], *endp;
     
-    cvx_size_t nrows, ncols;
+    cvxc_size_t nrows, ncols;
     
     tok = get_tok(buf, sizeof(buf), fp);
     if (tok != '{')
@@ -235,7 +235,7 @@ int cvxm_read_file(cvx_matrix_t *m, FILE *fp)
     return -1;
 }
 
-int cvxm_write_file(FILE *fp, const cvx_matrix_t *m)
+int cvxm_write_file(FILE *fp, const cvxc_matrix_t *m)
 {
     int n = 0;
     n += fprintf(fp, "{%d, %d, [", m->data.rows, m->data.cols);
@@ -245,14 +245,14 @@ int cvxm_write_file(FILE *fp, const cvx_matrix_t *m)
                 fputc(',', fp);             
                 n++;
             } 
-            n += fprintf(fp, "%.9e", cvxm_get((cvx_matrix_t *)m, i, j));
+            n += fprintf(fp, "%.9e", cvxm_get((cvxc_matrix_t *)m, i, j));
         }
     }
     n += fprintf(fp, "]}\n");
     return n;
 }
 
-int cvxm_json_write_file(FILE *fp, const cvx_matrix_t *m)
+int cvxm_json_write_file(FILE *fp, const cvxc_matrix_t *m)
 {
     int n = 0;
     n += fprintf(fp, "{\"rows\":%d, \"cols\": %d, \"data\":[", m->data.rows, m->data.cols);
@@ -262,7 +262,7 @@ int cvxm_json_write_file(FILE *fp, const cvx_matrix_t *m)
                 fputc(',', fp);             
                 n++;
             } 
-            n += fprintf(fp, "%.9e", cvxm_get((cvx_matrix_t *)m, i, j));
+            n += fprintf(fp, "%.9e", cvxm_get((cvxc_matrix_t *)m, i, j));
         }
     }
     n += fprintf(fp, "]}\n");

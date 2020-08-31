@@ -13,14 +13,14 @@ typedef struct acenter {
     int cols;
 } acenter_t;
 
-int acenter_F(cvx_matrix_t *f,
-              cvx_matrix_t *Df,
-              cvx_matrix_t *H,
-              const cvx_matrix_t *x,
-              const cvx_matrix_t *z,
+int acenter_F(cvxc_matrix_t *f,
+              cvxc_matrix_t *Df,
+              cvxc_matrix_t *H,
+              const cvxc_matrix_t *x,
+              const cvxc_matrix_t *z,
               void *user)
 {
-    cvx_size_t r, c;
+    cvxc_size_t r, c;
     acenter_t *p = (acenter_t *)user;
     if (!x && !z) {
         cvxm_size(&r, &c, f);
@@ -33,7 +33,7 @@ int acenter_F(cvx_matrix_t *f,
         return -1;
 
     // compute u := 1 - x**2 ; f = u
-    cvx_float_t z0, xv, u, usum = 0.0;
+    cvxc_float_t z0, xv, u, usum = 0.0;
     if (z) {
         z0 = cvxm_get(z, 0, 0);
         cvxm_set_all(H, 0.0);
@@ -64,22 +64,22 @@ int acenter_F(cvx_matrix_t *f,
 
 int main(int argc, char **argv)
 {
-    cvx_matrix_t G, h, A, b;
-    cvx_problem_t cp;
-    cvx_dimset_t dims;
+    cvxc_matrix_t G, h, A, b;
+    cvxc_problem_t cp;
+    cvxc_dimset_t dims;
     int opt;
 
     // 39x3
-    cvx_float_t gdata[39] = {
+    cvxc_float_t gdata[39] = {
         0., -1.,  0.,  0., -21., -11.,   0., -11.,  10.,   8.,   0.,   8., 5.,
         0.,  0., -1.,  0.,   0.,  10.,  16.,  10., -10., -10.,  16., -10., 3.,
         0.,  0.,  0., -1.,  -5.,   2., -17.,   2.,  -6.,   8., -17.,  -7., 6.
     };
-    cvx_float_t hdata[13] = {
+    cvxc_float_t hdata[13] = {
         1.0, 0.0, 0.0, 0.0, 20., 10., 40., 10., 80., 10., 40., 10., 15.
     };
 
-    cvx_solopts_t opts = (cvx_solopts_t){
+    cvxc_solopts_t opts = (cvxc_solopts_t){
         .abstol = 0.0,
         .reltol = 0.0,
         .feastol = 0.0,
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
         .kkt_solver_name = 0,
         .show_progress = 1
     };
-    cvx_convex_program_t F;
+    cvxc_convex_program_t F;
     acenter_t Acenter = (acenter_t){ .rows = 3, .cols = 1};
 
     while ((opt = getopt(argc, argv, "N:")) != -1) {
@@ -102,21 +102,21 @@ int main(int argc, char **argv)
         }
     }
 
-    cvx_dimset_alloc(&dims, 0, (cvx_size_t []){4, 0}, (cvx_size_t []){3, 0});
+    cvxc_dimset_alloc(&dims, 0, (cvxc_size_t []){4, 0}, (cvxc_size_t []){3, 0});
     dims.iscpt = 1;
-    cvx_convex_program_init(&F, acenter_F, &Acenter);
+    cvxc_convex_program_init(&F, acenter_F, &Acenter);
 
     cvxm_map_data(&h, 13, 1, hdata);
     cvxm_map_data(&G, 13, 3, gdata);;
-    cvxm_map_data(&A, 0, 3, (cvx_float_t *)0);
-    cvxm_map_data(&b, 0, 1,  (cvx_float_t *)0);
+    cvxm_map_data(&A, 0, 3, (cvxc_float_t *)0);
+    cvxm_map_data(&b, 0, 1,  (cvxc_float_t *)0);
 
     if (opts.max_iter == 0)
         return 0;
 
-    cvx_cp_setup(&cp, &F, &G, &h, &A, &b, &dims, (cvx_kktsolver_t *)0);
-    cvx_cp_compute_start(&cp);
-    cvx_cp_solve(&cp, &opts);
+    cvxc_cp_setup(&cp, &F, &G, &h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
+    cvxc_cp_compute_start(&cp);
+    cvxc_cp_solve(&cp, &opts);
     return 0;
 }
 

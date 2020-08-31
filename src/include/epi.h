@@ -1,16 +1,16 @@
 
-#ifndef __CVX_EPI_H
-#define __CVX_EPI_H
+#ifndef __CVXC_EPI_H
+#define __CVXC_EPI_H
 
 #include "cvxm.h"
 
-typedef struct cvx_epi_t {
-    cvx_matrix_t *mat;
-    cvx_int_t val;
-} cvx_epi_t;
+typedef struct cvxc_epi_t {
+    cvxc_matrix_t *mat;
+    cvxc_int_t val;
+} cvxc_epi_t;
 
-__CVX_INLINE
-void cvx_epi_init(cvx_epi_t *e, cvx_matrix_t *m, cvx_int_t v)
+__CVXC_INLINE
+void cvxc_epi_init(cvxc_epi_t *e, cvxc_matrix_t *m, cvxc_int_t v)
 {
     if (e) {
         e->mat = m;
@@ -18,30 +18,30 @@ void cvx_epi_init(cvx_epi_t *e, cvx_matrix_t *m, cvx_int_t v)
     }
 }
 
-__CVX_INLINE
-cvx_float_t cvx_epi_dot(const cvx_epi_t *a, cvx_epi_t *b)
+__CVXC_INLINE
+cvxc_float_t cvxc_epi_dot(const cvxc_epi_t *a, cvxc_epi_t *b)
 {
-    cvx_float_t r = cvxm_dot(a->mat, b->mat);
+    cvxc_float_t r = cvxm_dot(a->mat, b->mat);
     r += a->val * b->val;
     return r;
 }
 
-__CVX_INLINE
-void cvx_epi_scale(cvx_epi_t *e, cvx_float_t c)
+__CVXC_INLINE
+void cvxc_epi_scale(cvxc_epi_t *e, cvxc_float_t c)
 {
     cvxm_scale(e->mat, c, 0);
     e->val *= c;
 }
 
-__CVX_INLINE
-void cvx_epi_axpy(cvx_epi_t *y, cvx_float_t c, const cvx_epi_t *x)
+__CVXC_INLINE
+void cvxc_epi_axpy(cvxc_epi_t *y, cvxc_float_t c, const cvxc_epi_t *x)
 {
     cvxm_axpy(y->mat, c, x->mat);
     y->val += c * x->val;
 }
 
-__CVX_INLINE
-void cvx_epi_copy(cvx_epi_t *y, const cvx_epi_t *x)
+__CVXC_INLINE
+void cvxc_epi_copy(cvxc_epi_t *y, const cvxc_epi_t *x)
 {
     cvxm_copy(y->mat, x->mat, 0);
     y->val = x->val;
@@ -49,7 +49,7 @@ void cvx_epi_copy(cvx_epi_t *y, const cvx_epi_t *x)
 
 
 
-#endif // __CVX_EPI_H
+#endif // __CVXC_EPI_H
 
 // Local Variables:
 // indent-tabs-mode: nil

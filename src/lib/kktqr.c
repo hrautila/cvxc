@@ -5,46 +5,46 @@
 
 // forward declarations
 static
-int qr_init(cvx_kktsolver_t *S,
-            cvx_conelp_problem_t *cp,
+int qr_init(cvxc_kktsolver_t *S,
+            cvxc_conelp_problem_t *cp,
             int n,
             int m,
-            const cvx_dimset_t *dims);
+            const cvxc_dimset_t *dims);
 
 static
-int qr_factor(cvx_kktsolver_t *S,
-              cvx_scaling_t *W,
-              cvx_matrix_t *H,
-              cvx_matrix_t *Df);
+int qr_factor(cvxc_kktsolver_t *S,
+              cvxc_scaling_t *W,
+              cvxc_matrix_t *H,
+              cvxc_matrix_t *Df);
 static
-int qr_solve(cvx_kktsolver_t *S,
-             cvx_matrix_t *x,
-             cvx_matrix_t *y,
-             cvx_matgrp_t *z_g);
+int qr_solve(cvxc_kktsolver_t *S,
+             cvxc_matrix_t *x,
+             cvxc_matrix_t *y,
+             cvxc_matgrp_t *z_g);
 
 static
-cvx_size_t qr_bytes(int n, int m, const cvx_dimset_t *dims);
+cvxc_size_t qr_bytes(int n, int m, const cvxc_dimset_t *dims);
 
 static
-cvx_size_t qr_make(cvx_kktsolver_t *kkt,
-                   cvx_conelp_problem_t *cp,
+cvxc_size_t qr_make(cvxc_kktsolver_t *kkt,
+                   cvxc_conelp_problem_t *cp,
                    int n,
                    int m,
-                   const cvx_dimset_t *dims,
+                   const cvxc_dimset_t *dims,
                    void *mem,
-                   cvx_size_t nbytes);
+                   cvxc_size_t nbytes);
 
 static
-cvx_kktsolver_t *qr_new(cvx_conelp_problem_t *cp,
+cvxc_kktsolver_t *qr_new(cvxc_conelp_problem_t *cp,
                         int n,
                         int m,
-                        const cvx_dimset_t *dims);
+                        const cvxc_dimset_t *dims);
 
 static
-void qr_free(cvx_kktsolver_t *S);
+void qr_free(cvxc_kktsolver_t *S);
 
 // function table
-static cvx_kktfuncs_t qrfunctions = {
+static cvxc_kktfuncs_t qrfunctions = {
     .new    = qr_new,
     .factor = qr_factor,
     .solve  = qr_solve,
@@ -79,25 +79,25 @@ static cvx_kktfuncs_t qrfunctions = {
 
 
 static
-int qr_factor(cvx_kktsolver_t *S,
-              cvx_scaling_t *W,
-              cvx_matrix_t *H,
-              cvx_matrix_t *Df)
+int qr_factor(cvxc_kktsolver_t *S,
+              cvxc_scaling_t *W,
+              cvxc_matrix_t *H,
+              cvxc_matrix_t *Df)
 {
-    cvx_qrsolver_t *qr = (cvx_qrsolver_t *)S;
-    cvx_conelp_problem_t *cp = qr->cp;
-    cvx_matgrp_t Gs_g;
+    cvxc_qrsolver_t *qr = (cvxc_qrsolver_t *)S;
+    cvxc_conelp_problem_t *cp = qr->cp;
+    cvxc_matgrp_t Gs_g;
 
     qr->W = W;
 
     // Gs = W^{-T}*G in packed storage
     cvxm_copy(&qr->Gs, cp->G, 0);
-    cvx_mgrp_init(&Gs_g, &qr->Gs, &cp->index_full);
-    cvx_scale(&Gs_g, W, CVX_INV|CVX_TRANS, &cp->work);
-    cvx_pack2(&Gs_g);
+    cvxc_mgrp_init(&Gs_g, &qr->Gs, &cp->index_full);
+    cvxc_scale(&Gs_g, W, CVXC_INV|CVXC_TRANS, &cp->work);
+    cvxc_pack2(&Gs_g);
 
     // Gs = [Gs1, Gs2] = Gs * [Q1; Q2]^T
-    cvxm_lqmult(&Gs, &qr.QA, &qr.tauA, &qr.work, CVX_RIGHT|CVX_TRANS);
+    cvxm_lqmult(&Gs, &qr.QA, &qr.tauA, &qr.work, CVXC_RIGHT|CVXC_TRANS);
 }
 
 // Solve
@@ -112,33 +112,33 @@ int qr_factor(cvx_kktsolver_t *S,
 // the solution ux, uy, W*uz.
 
 static
-int qr_solve(cvx_kktsolver_t *S,
-             cvx_matrix_t *x,
-             cvx_matrix_t *y,
-             cvx_matgrp_t *z_g)
+int qr_solve(cvxc_kktsolver_t *S,
+             cvxc_matrix_t *x,
+             cvxc_matrix_t *y,
+             cvxc_matgrp_t *z_g)
 {
-    cvx_matrix_t vv1, Gs1, Gs2;
-    cvx_qrsolver_t *qr = (cvx_qrsolver_t *)S;
-    cvx_conelp_problem_t *cp = qr->cp;
+    cvxc_matrix_t vv1, Gs1, Gs2;
+    cvxc_qrsolver_t *qr = (cvxc_qrsolver_t *)S;
+    cvxc_conelp_problem_t *cp = qr->cp;
 
 #if 0
     cvxm_view_map(&Gs1, &qr->Gs, 0, qr->p, cp->cdim_packed, qr->n - qr->p);
     cvxm_view_map(&Gs2, &qr->Gs, 0, qr->p, cp->cdim_packed, qr->n - qr->p);
 
-    cvx_scale(z_g, &cp->W, CVX_INV|CVX_TRANS, &cp->work);
-    cvx_pack(z_g);
+    cvxc_scale(z_g, &cp->W, CVXC_INV|CVXC_TRANS, &cp->work);
+    cvxc_pack(z_g);
 
     // vv := [ vv0, vv1 ] = [Q1*bx, R3^{-T}*Q2*bx]
     cvxm_copy(&qr->vv, x);
     cvxm_lqmult(&qr->vv, &qr->QA, &qr->tauA, 0);
     // 
     cvxm_view_map(&vv1, &qr->vv, qr->p, 0, qr->n-qr->p, 1);
-    cvxm_mvsolve(&vv1, 1.0, &Gs2, CVX_LOWER);
+    cvxm_mvsolve(&vv1, 1.0, &Gs2, CVXC_LOWER);
 
     // x[:p] = R1^{-T} * by
     if (qr->p > 0) {
         cvxm_copy(x, y, 0);
-        cvxm_mvsolve(x0, 1.0, &qr->QA, CVX_LOWER);
+        cvxm_mvsolve(x0, 1.0, &qr->QA, CVXC_LOWER);
     }
     // w = w - Gs1 * x[:p]  = W^{-T}*bz - Gs1*y
     cvxm_mvmult(1.0, &qr->w, -1.0, &Gs1, x);
@@ -148,13 +148,13 @@ int qr_solve(cvx_kktsolver_t *S,
 
 
 static
-int qr_init(cvx_kktsolver_t *S,
-            cvx_conelp_problem_t *cp,
+int qr_init(cvxc_kktsolver_t *S,
+            cvxc_conelp_problem_t *cp,
             int n,
             int m,
-            const cvx_dimset_t *dims)
+            const cvxc_dimset_t *dims)
 {
-    cvx_qrsolver_t *qr = (cvx_qrsolver_t *)S;
+    cvxc_qrsolver_t *qr = (cvxc_qrsolver_t *)S;
     qr->cp = cp;
     qr->n = n;
     qr->p = m;
@@ -174,40 +174,40 @@ int qr_init(cvx_kktsolver_t *S,
 
 
 static
-cvx_size_t qr_bytes(int n, int m, const cvx_dimset_t *dims)
+cvxc_size_t qr_bytes(int n, int m, const cvxc_dimset_t *dims)
 {
     return 0;
 }
 
 static
-cvx_size_t qr_make(cvx_kktsolver_t *kkt,
-                   cvx_conelp_problem_t *cp,
+cvxc_size_t qr_make(cvxc_kktsolver_t *kkt,
+                   cvxc_conelp_problem_t *cp,
                    int n,
                    int m,
-                   const cvx_dimset_t *dims,
+                   const cvxc_dimset_t *dims,
                    void *mem,
-                   cvx_size_t nbytes)
+                   cvxc_size_t nbytes)
 {
     return 0;
 }
 
 static
-cvx_kktsolver_t *qr_new(cvx_conelp_problem_t *cp,
+cvxc_kktsolver_t *qr_new(cvxc_conelp_problem_t *cp,
                         int n,
                         int m,
-                        const cvx_dimset_t *dims)
+                        const cvxc_dimset_t *dims)
 {
-    return (cvx_kktsolver_t *)0;
+    return (cvxc_kktsolver_t *)0;
 }
 
 static
-void qr_free(cvx_kktsolver_t *kkt)
+void qr_free(cvxc_kktsolver_t *kkt)
 {
     if (!kkt)
         return;
 }
 
-cvx_kktfuncs_t *cvx_qrload()
+cvxc_kktfuncs_t *cvxc_qrload()
 {
     return &qrfunctions;
 }

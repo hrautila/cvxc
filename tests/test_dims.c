@@ -7,52 +7,52 @@
 
 void test_dims()
 {
-    cvx_dimset_t dims;
-    cvx_index_t index;
+    cvxc_dimset_t dims;
+    cvxc_index_t index;
     
-    cvx_dimset_alloc(&dims, 4, (int[]){6, 0}, (int[]){4, 0});
-    cvx_index_init(&index, &dims, CVX_INDEX_NORMAL);
+    cvxc_dimset_alloc(&dims, 4, (int[]){6, 0}, (int[]){4, 0});
+    cvxc_index_init(&index, &dims, CVXC_INDEX_NORMAL);
 
-    printf("sum(L) = %ld\n", cvx_dimset_sum(&dims, L));
-    printf("sum(Q) = %ld\n", cvx_dimset_sum(&dims, Q));
-    printf("sum(S) = %ld\n", cvx_dimset_sum_squared(&dims, S));
+    printf("sum(L) = %ld\n", cvxc_dimset_sum(&dims, L));
+    printf("sum(Q) = %ld\n", cvxc_dimset_sum(&dims, Q));
+    printf("sum(S) = %ld\n", cvxc_dimset_sum_squared(&dims, S));
 
-    printf("offset(L) = %ld\n", cvx_index_count(&index, CVXDIM_LINEAR) ? index.indl[0] : 0);
-    for (int k = 0; k < cvx_index_count(&index, CVXDIM_SOCP); k++) {
+    printf("offset(L) = %ld\n", cvxc_index_count(&index, CVXDIM_LINEAR) ? index.indl[0] : 0);
+    for (int k = 0; k < cvxc_index_count(&index, CVXDIM_SOCP); k++) {
         printf("offset(Q) = %ld\n", index.indq[k]);
     }
-    for (int k = 0; k < cvx_index_count(&index, CVXDIM_SDP); k++) {
+    for (int k = 0; k < cvxc_index_count(&index, CVXDIM_SDP); k++) {
         printf("offset(S) = %ld\n", index.inds[k]);
     }
 
-    cvx_index_release(&index);
-    cvx_dimset_release(&dims);
+    cvxc_index_release(&index);
+    cvxc_dimset_release(&dims);
 }
 
 void test_index()
 {
-    cvx_dimset_t dims;
-    cvx_index_t index;
-    cvx_matrix_t x;
+    cvxc_dimset_t dims;
+    cvxc_index_t index;
+    cvxc_matrix_t x;
     
-    cvx_dimset_alloc(&dims, 4, (int[]){6, 0}, (int[]){4, 0});
-    cvx_index_create(&x, &index, &dims, CVX_INDEX_NORMAL);
+    cvxc_dimset_alloc(&dims, 4, (int[]){6, 0}, (int[]){4, 0});
+    cvxc_index_create(&x, &index, &dims, CVXC_INDEX_NORMAL);
 
-    printf("sum(L) = %ld\n", cvx_dimset_sum(&dims, L));
-    printf("sum(Q) = %ld\n", cvx_dimset_sum(&dims, Q));
-    printf("sum(S) = %ld\n", cvx_dimset_sum_squared(&dims, S));
+    printf("sum(L) = %ld\n", cvxc_dimset_sum(&dims, L));
+    printf("sum(Q) = %ld\n", cvxc_dimset_sum(&dims, Q));
+    printf("sum(S) = %ld\n", cvxc_dimset_sum_squared(&dims, S));
 
-    printf("offset(L) = %ld\n", cvx_index_count(&index, CVXDIM_LINEAR) ? index.indl[0] : 0);
-    for (int k = 0; k < cvx_index_count(&index, CVXDIM_SOCP); k++) {
+    printf("offset(L) = %ld\n", cvxc_index_count(&index, CVXDIM_LINEAR) ? index.indl[0] : 0);
+    for (int k = 0; k < cvxc_index_count(&index, CVXDIM_SOCP); k++) {
         printf("offset(Q) = %ld\n", index.indq[k]);
     }
-    for (int k = 0; k < cvx_index_count(&index, CVXDIM_SDP); k++) {
+    for (int k = 0; k < cvxc_index_count(&index, CVXDIM_SDP); k++) {
         printf("offset(S) = %ld\n", index.inds[k]);
     }
     printf("size(x) = (%d, %d)\n", x.rows, x.cols);
     
-    cvx_index_release(&index);
-    cvx_dimset_release(&dims);
+    cvxc_index_release(&index);
+    cvxc_dimset_release(&dims);
 }
 
 int main(int argc, char **argv)

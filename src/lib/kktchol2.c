@@ -5,46 +5,46 @@
 
 // forward declarations
 static
-int chol2_init(cvx_kktsolver_t *S,
-             cvx_conelp_problem_t *cp,
+int chol2_init(cvxc_kktsolver_t *S,
+             cvxc_conelp_problem_t *cp,
              int n,
              int m,
-             const cvx_dimset_t *dims);
+             const cvxc_dimset_t *dims);
 
 static
-int chol2_factor(cvx_kktsolver_t *S,
-               cvx_scaling_t *W,
-               cvx_matrix_t *H,
-               cvx_matrix_t *Df);
+int chol2_factor(cvxc_kktsolver_t *S,
+               cvxc_scaling_t *W,
+               cvxc_matrix_t *H,
+               cvxc_matrix_t *Df);
 static
-int chol2_solve(cvx_kktsolver_t *S,
-              cvx_matrix_t *x,
-              cvx_matrix_t *y,
-              cvx_matgrp_t *z_g);
+int chol2_solve(cvxc_kktsolver_t *S,
+              cvxc_matrix_t *x,
+              cvxc_matrix_t *y,
+              cvxc_matgrp_t *z_g);
 
 static
-cvx_size_t chol2_bytes(int n, int m, const cvx_dimset_t *dims);
+cvxc_size_t chol2_bytes(int n, int m, const cvxc_dimset_t *dims);
 
 static
-cvx_size_t chol2_make(cvx_kktsolver_t *kkt,
-                    cvx_conelp_problem_t *cp,
+cvxc_size_t chol2_make(cvxc_kktsolver_t *kkt,
+                    cvxc_conelp_problem_t *cp,
                     int n,
                     int m,
-                    const cvx_dimset_t *dims,
+                    const cvxc_dimset_t *dims,
                     void *mem,
-                    cvx_size_t nbytes);
+                    cvxc_size_t nbytes);
 
 static
-cvx_kktsolver_t *chol2_new(cvx_conelp_problem_t *cp,
+cvxc_kktsolver_t *chol2_new(cvxc_conelp_problem_t *cp,
                          int n,
                          int m,
-                         const cvx_dimset_t *dims);
+                         const cvxc_dimset_t *dims);
 
 static
-void chol2_free(cvx_kktsolver_t *S);
+void chol2_free(cvxc_kktsolver_t *S);
 
 // function table
-static cvx_kktfuncs_t chol2_functions = {
+static cvxc_kktfuncs_t chol2_functions = {
     .new    = chol2_new,
     .factor = chol2_factor,
     .solve  = chol2_solve,
@@ -56,7 +56,7 @@ static cvx_kktfuncs_t chol2_functions = {
 
 
 static
-int chol2_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matrix_t *Df)
+int chol2_factor(cvxc_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_matrix_t *Df)
 {
 }
 
@@ -72,55 +72,55 @@ int chol2_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matr
 // the solution ux, uy, W*uz.
 
 static
-int chol2_solve(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_t *z_g)
+int chol2_solve(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g)
 {
     return 0;
 }
 
 
 static
-int chol2_init(cvx_kktsolver_t *S, cvx_conelp_problem_t *cp, int n, int m, const cvx_dimset_t *dims)
+int chol2_init(cvxc_kktsolver_t *S, cvxc_conelp_problem_t *cp, int n, int m, const cvxc_dimset_t *dims)
 {
     return 0;
 }
 
 
 static
-cvx_size_t chol2_bytes(int n, int m, const cvx_dimset_t *dims)
+cvxc_size_t chol2_bytes(int n, int m, const cvxc_dimset_t *dims)
 {
     return 0;
 }
 
 static
-cvx_size_t chol2_make(cvx_kktsolver_t *kkt,
-                     cvx_conelp_problem_t *cp,
+cvxc_size_t chol2_make(cvxc_kktsolver_t *kkt,
+                     cvxc_conelp_problem_t *cp,
                      int n,
                      int m,
-                     const cvx_dimset_t *dims,
+                     const cvxc_dimset_t *dims,
                      void *mem,
-                     cvx_size_t nbytes)
+                     cvxc_size_t nbytes)
 {
     return 0;
 }
 
 static
-cvx_kktsolver_t *chol2_new(cvx_conelp_problem_t *cp,
+cvxc_kktsolver_t *chol2_new(cvxc_conelp_problem_t *cp,
                           int n,
                           int m,
-                          const cvx_dimset_t *dims)
+                          const cvxc_dimset_t *dims)
 {
-    return (cvx_kktsolver_t *)0;
+    return (cvxc_kktsolver_t *)0;
 }
 
 static
-void chol2_free(cvx_kktsolver_t *kkt)
+void chol2_free(cvxc_kktsolver_t *kkt)
 {
     if (!kkt)
         return;
     
 }
 
-cvx_kktfuncs_t *cvx_chol2_load()
+cvxc_kktfuncs_t *cvxc_chol2_load()
 {
     return &chol2_functions;
 }

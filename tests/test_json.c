@@ -104,7 +104,7 @@ void file_stream_close(armas_iostream_t *ios)
         fclose(fp);
 }
 
-void print_dims(const cvx_dimset_t *d)
+void print_dims(const cvxc_dimset_t *d)
 {
     printf("NL: %d\n", d->mnl);
     printf(" L: %d\n", d->ldim);
@@ -126,7 +126,7 @@ void print_dims(const cvx_dimset_t *d)
 
 int test_dims(int n)
 {
-    cvx_dimset_t dims, *dims2 = (cvx_dimset_t *)0;
+    cvxc_dimset_t dims, *dims2 = (cvxc_dimset_t *)0;
     iobuf_t iob;
     armas_iostream_t ios;
     char buf[512];
@@ -135,25 +135,25 @@ int test_dims(int n)
     iob_stream_init(&ios, &iob);
     switch (n) {
     case 0:
-        cvx_dimset_alloc(&dims, 5, (int *)0, (int*)0);
+        cvxc_dimset_alloc(&dims, 5, (int *)0, (int*)0);
         break;
     case 1:
-        cvx_dimset_alloc(&dims, 5, (int[]){4, 6, 3, 0}, (int*)0);
+        cvxc_dimset_alloc(&dims, 5, (int[]){4, 6, 3, 0}, (int*)0);
         break;
     case 2:
-        cvx_dimset_alloc(&dims, 5, (int*)0, (int[]){6, 6, 0});
+        cvxc_dimset_alloc(&dims, 5, (int*)0, (int[]){6, 6, 0});
         break;
     default:
-        cvx_dimset_alloc(&dims, 5, (int[]){4, 6, 3, 0}, (int[]){6, 6, 0});
+        cvxc_dimset_alloc(&dims, 5, (int[]){4, 6, 3, 0}, (int[]){6, 6, 0});
         break;
     }
 
     print_dims(&dims);
-    cvx_json_dimset_write(&ios, &dims);
+    cvxc_json_dimset_write(&ios, &dims);
 
     printf("JSON: %s\n", buf);
     iob.cp = iob.data;
-    cvx_json_dimset_read(&dims2, &ios);
+    cvxc_json_dimset_read(&dims2, &ios);
     print_dims(dims2);
 
     return 0;
@@ -164,19 +164,19 @@ int test_opts(int n)
     iobuf_t iob;
     armas_iostream_t ios;
     char buf[512];
-    cvx_solopts_t *opts2, opts = (cvx_solopts_t){
+    cvxc_solopts_t *opts2, opts = (cvxc_solopts_t){
         .abstol = 1e-8, .reltol = 1e-9, .feastol = 1e-7, .max_iter = 100
     };
 
     iob_init(&iob, buf, sizeof(buf));
     iob_stream_init(&ios, &iob);
 
-    opts2 = (cvx_solopts_t *)0;
+    opts2 = (cvxc_solopts_t *)0;
     
-    cvx_json_write_options(&ios, &opts, (char *)0);
+    cvxc_json_write_options(&ios, &opts, (char *)0);
     printf("JSON: %s\n", buf);
     iob.cp = iob.data;
-    cvx_json_read_options(&opts2, &ios);
+    cvxc_json_read_options(&opts2, &ios);
     if (opts2) {
         printf("abstol: %e, reltol: %e, feastol: %e, maxiter: %d, kkt:%d\n",
                opts2->abstol, opts2->reltol, opts2->feastol,
@@ -194,17 +194,17 @@ int test_parms()
     armas_iostream_t ios;
     char buf[512];
 
-    cvx_matrix_t c, G, h, A, b;
-    cvx_dimset_t dims;
-    cvx_params_t *pars;
+    cvxc_matrix_t c, G, h, A, b;
+    cvxc_dimset_t dims;
+    cvxc_params_t *pars;
 
-    cvx_float_t gdata[] = {
+    cvxc_float_t gdata[] = {
         2.0, 1.0, -1.0, 0.0,
         1.0, 2.0, 0.0, -1.0
     };
-    cvx_float_t cdata[] = {-4.0, -5.0};
-    cvx_float_t hdata[] = {3.0, 3.0, 0.0, 0.0};
-    cvx_solopts_t opts = (cvx_solopts_t){
+    cvxc_float_t cdata[] = {-4.0, -5.0};
+    cvxc_float_t hdata[] = {3.0, 3.0, 0.0, 0.0};
+    cvxc_solopts_t opts = (cvxc_solopts_t){
         .abstol = 1e-6,
         .reltol = 1e-7,
         .feastol = 1e-8,
@@ -224,16 +224,16 @@ int test_parms()
     cvxm_map_data(&G, 4, 2, gdata);
     cvxm_map_data(&h, 4, 1, hdata);
     // equality constraints: Ax = b  (empty matrices if missing)
-    cvxm_map_data(&A, 0, 2, (cvx_float_t *)0);
-    cvxm_map_data(&b, 0, 1, (cvx_float_t *)0);
+    cvxm_map_data(&A, 0, 2, (cvxc_float_t *)0);
+    cvxm_map_data(&b, 0, 1, (cvxc_float_t *)0);
 
-    cvx_dimset_alloc(&dims, 4, (int *)0, (int *)0);
+    cvxc_dimset_alloc(&dims, 4, (int *)0, (int *)0);
 
-    cvx_json_write_params(&ios, &opts, &dims, &c, &G, &h, &A, &b);
+    cvxc_json_write_params(&ios, &opts, &dims, &c, &G, &h, &A, &b);
     printf("JSON: %s\n", buf);
     iob.cp = iob.data;
     memset(&pars, 0, sizeof(pars));
-    cvx_json_read_params(&pars, &ios);
+    cvxc_json_read_params(&pars, &ios);
     if (pars) {
         print_dims(pars->dims);
         printf("c\n"); cvxm_printf(stdout, "%9.2e", pars->c);

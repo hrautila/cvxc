@@ -4,18 +4,17 @@
 #include <stdio.h>
 #include "cvxc.h"
 
-
 /*
  * Compute x^T * J * y, where J = [1, 0; 0, -I]
  *
  *   (x0 X1^T) (1  0) (y0)  = (x0 -X1^T) (y0)  = x0*y0 - X1^T*Y1
  *             (0 -I) (Y1)               (Y1)
  */
-cvx_float_t cvx_jdot(cvx_matrix_t *x, cvx_matrix_t *y)
+cvxc_float_t cvxc_jdot(cvxc_matrix_t *x, cvxc_matrix_t *y)
 {
-    cvx_float_t a, x0, y0;
-    cvx_matrix_t x1, y1;
-    cvx_size_t nr, nc;
+    cvxc_float_t a, x0, y0;
+    cvxc_matrix_t x1, y1;
+    cvxc_size_t nr, nc;
 
     cvxm_size(&nr, &nc, x);
 
@@ -38,11 +37,11 @@ cvx_float_t cvx_jdot(cvx_matrix_t *x, cvx_matrix_t *y)
  *
  *   sqrt( x0*x0 - |X1|*|X1| ) = sqrt(x0 - |X1|)*sqrt(x0 + |X1|)
  */
-cvx_float_t cvx_jnrm2(cvx_matrix_t *x)
+cvxc_float_t cvxc_jnrm2(cvxc_matrix_t *x)
 {
-    cvx_float_t a, x0;
-    cvx_matrix_t x1;
-    cvx_size_t nr, nc;
+    cvxc_float_t a, x0;
+    cvxc_matrix_t x1;
+    cvxc_size_t nr, nc;
 
     cvxm_size(&nr, &nc, x);
     cvxm_view_map(&x1, x, 1, 0, nr-1, 1);
@@ -56,26 +55,26 @@ cvx_float_t cvx_jnrm2(cvx_matrix_t *x)
  * Compute inner product of two vectors in S; S part is assumed to be in lower
  * storage format.
  */
-cvx_float_t cvx_sdot(cvx_matgrp_t *x_g, cvx_matgrp_t *y_g)
+cvxc_float_t cvxc_sdot(cvxc_matgrp_t *x_g, cvxc_matgrp_t *y_g)
 {
-    cvx_size_t ind;
-    cvx_matrix_t x0, y0, xs, ys, *x = x_g->mat, *y = y_g->mat;
-    cvx_float_t sdot = 0.0;
+    cvxc_size_t ind;
+    cvxc_matrix_t x0, y0, xs, ys, *x = x_g->mat, *y = y_g->mat;
+    cvxc_float_t sdot = 0.0;
     int k;
-    cvx_size_t j;
+    cvxc_size_t j;
 
-    ind = cvx_index_length(x_g->index, CVXDIM_NLTARGET) +
-        cvx_index_length(x_g->index, CVXDIM_NONLINEAR) +
-        cvx_index_length(x_g->index, CVXDIM_LINEAR) +
-        cvx_index_length(x_g->index, CVXDIM_SOCP);
+    ind = cvxc_index_length(x_g->index, CVXDIM_NLTARGET) +
+        cvxc_index_length(x_g->index, CVXDIM_NONLINEAR) +
+        cvxc_index_length(x_g->index, CVXDIM_LINEAR) +
+        cvxc_index_length(x_g->index, CVXDIM_SOCP);
 
     cvxm_view_map(&x0, x, 0, 0, ind, 1);
     cvxm_view_map(&y0, y, 0, 0, ind, 1);
     sdot += cvxm_dot(&x0, &y0);
 
-    for (k = 0; k < cvx_mgrp_count(x_g, CVXDIM_SDP); k++) {
-        cvx_size_t m = cvx_mgrp_elem(&xs, x_g, CVXDIM_SDP, k);
-        cvx_mgrp_elem(&ys, y_g, CVXDIM_SDP, k);
+    for (k = 0; k < cvxc_mgrp_count(x_g, CVXDIM_SDP); k++) {
+        cvxc_size_t m = cvxc_mgrp_elem(&xs, x_g, CVXDIM_SDP, k);
+        cvxc_mgrp_elem(&ys, y_g, CVXDIM_SDP, k);
 
         cvxm_view_diag(&x0, &xs, 0);
         cvxm_view_diag(&y0, &ys, 0);
@@ -94,47 +93,47 @@ cvx_float_t cvx_sdot(cvx_matgrp_t *x_g, cvx_matgrp_t *y_g)
 /*
  * Compute the norm of vector in S
  */
-cvx_float_t cvx_snrm2(cvx_matgrp_t *x_g)
+cvxc_float_t cvxc_snrm2(cvxc_matgrp_t *x_g)
 {
-    return sqrt(cvx_sdot(x_g, x_g));
+    return sqrt(cvxc_sdot(x_g, x_g));
 }
 
 /*
  * Compute inner product of two vectors in subset of S; SDP part is assumed to be in lower
  * storage format.
  */
-cvx_float_t cvx_sdot_elem(cvx_matgrp_t *x_g, cvx_matgrp_t *y_g, cvx_dim_enum name)
+cvxc_float_t cvxc_sdot_elem(cvxc_matgrp_t *x_g, cvxc_matgrp_t *y_g, cvxc_dim_enum name)
 {
-    cvx_matrix_t x0, y0, xs, ys;
-    cvx_float_t sdot = 0.0;
+    cvxc_matrix_t x0, y0, xs, ys;
+    cvxc_float_t sdot = 0.0;
     int k;
-    cvx_size_t j;
+    cvxc_size_t j;
 
     switch (name) {
     case CVXDIM_NLTARGET:
     case CVXDIM_CONVEX:
         break;
     case CVXDIM_NONLINEAR:
-        cvx_mgrp_elem(&xs, x_g, CVXDIM_NONLINEAR, 0);
-        cvx_mgrp_elem(&ys, y_g, CVXDIM_NONLINEAR, 0);
+        cvxc_mgrp_elem(&xs, x_g, CVXDIM_NONLINEAR, 0);
+        cvxc_mgrp_elem(&ys, y_g, CVXDIM_NONLINEAR, 0);
         sdot += cvxm_dot(&xs, &ys);
         break;
     case CVXDIM_LINEAR:
-        cvx_mgrp_elem(&xs, x_g, CVXDIM_LINEAR, 0);
-        cvx_mgrp_elem(&ys, y_g, CVXDIM_LINEAR, 0);
+        cvxc_mgrp_elem(&xs, x_g, CVXDIM_LINEAR, 0);
+        cvxc_mgrp_elem(&ys, y_g, CVXDIM_LINEAR, 0);
         sdot += cvxm_dot(&xs, &ys);
         break;
     case CVXDIM_SOCP:
-        for (k = 0; k < cvx_mgrp_count(x_g, CVXDIM_SOCP); k++) {
-            cvx_mgrp_elem(&xs, x_g, CVXDIM_SOCP, k);
-            cvx_mgrp_elem(&ys, y_g, CVXDIM_SOCP, k);
+        for (k = 0; k < cvxc_mgrp_count(x_g, CVXDIM_SOCP); k++) {
+            cvxc_mgrp_elem(&xs, x_g, CVXDIM_SOCP, k);
+            cvxc_mgrp_elem(&ys, y_g, CVXDIM_SOCP, k);
             sdot += cvxm_dot(&xs, &ys);
         }
         break;
     case CVXDIM_SDP:
-        for (k = 0; k < cvx_mgrp_count(x_g, CVXDIM_SDP); k++) {
-            cvx_size_t m = cvx_mgrp_elem(&xs, x_g, CVXDIM_SDP, k);
-            cvx_mgrp_elem(&ys, y_g, CVXDIM_SDP, k);
+        for (k = 0; k < cvxc_mgrp_count(x_g, CVXDIM_SDP); k++) {
+            cvxc_size_t m = cvxc_mgrp_elem(&xs, x_g, CVXDIM_SDP, k);
+            cvxc_mgrp_elem(&ys, y_g, CVXDIM_SDP, k);
 
             cvxm_view_diag(&x0, &xs, 0);
             cvxm_view_diag(&y0, &ys, 0);
@@ -149,25 +148,25 @@ cvx_float_t cvx_sdot_elem(cvx_matgrp_t *x_g, cvx_matgrp_t *y_g, cvx_dim_enum nam
         }
         break;
     case CVXDIM_CONELP:
-        sdot += cvx_sdot_elem(x_g, y_g, CVXDIM_LINEAR);
-        sdot += cvx_sdot_elem(x_g, y_g, CVXDIM_SOCP);
-        sdot += cvx_sdot_elem(x_g, y_g, CVXDIM_SDP);
+        sdot += cvxc_sdot_elem(x_g, y_g, CVXDIM_LINEAR);
+        sdot += cvxc_sdot_elem(x_g, y_g, CVXDIM_SOCP);
+        sdot += cvxc_sdot_elem(x_g, y_g, CVXDIM_SDP);
         break;
     case CVXDIM_CONVEXPROG:
-        sdot += cvx_sdot_elem(x_g, y_g, CVXDIM_NLTARGET);
+        sdot += cvxc_sdot_elem(x_g, y_g, CVXDIM_NLTARGET);
     case CVXDIM_CONVEXLP:
-        sdot += cvx_sdot_elem(x_g, y_g, CVXDIM_NONLINEAR);
-        sdot += cvx_sdot_elem(x_g, y_g, CVXDIM_LINEAR);
-        sdot += cvx_sdot_elem(x_g, y_g, CVXDIM_SOCP);
-        sdot += cvx_sdot_elem(x_g, y_g, CVXDIM_SDP);
+        sdot += cvxc_sdot_elem(x_g, y_g, CVXDIM_NONLINEAR);
+        sdot += cvxc_sdot_elem(x_g, y_g, CVXDIM_LINEAR);
+        sdot += cvxc_sdot_elem(x_g, y_g, CVXDIM_SOCP);
+        sdot += cvxc_sdot_elem(x_g, y_g, CVXDIM_SDP);
         break;
     }
     return sdot;
 }
 
-cvx_float_t cvx_snrm2_elem(cvx_matgrp_t *x_g, cvx_dim_enum name)
+cvxc_float_t cvxc_snrm2_elem(cvxc_matgrp_t *x_g, cvxc_dim_enum name)
 {
-    return sqrt(cvx_sdot_elem(x_g, x_g, name));
+    return sqrt(cvxc_sdot_elem(x_g, x_g, name));
 }
 
 

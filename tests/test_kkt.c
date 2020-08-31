@@ -13,19 +13,19 @@ char *solution_name[] = {
     "Singular"
 };
 
-cvx_float_t W_d[] = {
+cvxc_float_t W_d[] = {
     7.330014e+00,
     5.394851e+00
 };
-cvx_float_t W_di[] = {
+cvxc_float_t W_di[] = {
     1.364254e-01,
     1.853619e-01
 };
-cvx_float_t W_beta[] = {
+cvxc_float_t W_beta[] = {
     1.073844e+01,
     6.125768e+00
 };
-cvx_float_t W_v[] = {
+cvxc_float_t W_v[] = {
     1.198764e+00,
     2.946933e-01,
     4.979940e-02,
@@ -36,7 +36,7 @@ cvx_float_t W_v[] = {
     1.046440e-02,
     -1.134278e-02
 };
-cvx_float_t W_r[] = {
+cvxc_float_t W_r[] = {
     2.919851e+00,
     -3.036526e+00,
     -1.083566e+00, 
@@ -49,7 +49,7 @@ cvx_float_t W_r[] = {
     -1.344990e-02,
     2.402415e+00
 };
-cvx_float_t W_rti[] = {
+cvxc_float_t W_rti[] = {
     // 1st
     1.722480e-01,
     -1.482364e-01,
@@ -65,14 +65,14 @@ cvx_float_t W_rti[] = {
 };
 
 // initial set
-cvx_float_t K_x[] = {
+cvxc_float_t K_x[] = {
     6.000000e+00,
     4.000000e+00,
     5.000000e+00
 };
-cvx_float_t K_y[] = {
+cvxc_float_t K_y[] = {
 };
-cvx_float_t K_z[] = {
+cvxc_float_t K_z[] = {
     -3.000000e+00,
     5.000000e+00,
     1.200000e+01,
@@ -94,14 +94,14 @@ cvx_float_t K_z[] = {
     1.000000e+01
 };
 // result set
-cvx_float_t R_x[] = {
+cvxc_float_t R_x[] = {
     2.183512e-01,
     1.632292e-01,
     3.860374e-01
 };
-cvx_float_t R_y[] = {
+cvxc_float_t R_y[] = {
 };
-cvx_float_t R_z[] = {
+cvxc_float_t R_z[] = {
     8.374605e-01,
     -5.829787e-01,
     3.218721e-01,
@@ -124,7 +124,7 @@ cvx_float_t R_z[] = {
 };
 
 // one linear [2,1], two socp of size [4,1], one sdp of size [3,3]
-cvx_float_t gdata[] = {
+cvxc_float_t gdata[] = {
     // 1st 
     16., 7., /**/ 24., -8., 8., -1., /**/ 0., -1., 0., 0.,/**/ 7., -5., 1., -5., 1., -7., 1., -7., -4.,
     // 2nd 
@@ -132,50 +132,50 @@ cvx_float_t gdata[] = {
     // 3rd
     5., 0., /**/-15., 12., -6., 17., /**/ 0., 0., 0., -1.,/**/ 9.,  6., -6., 6., -7., -7., -6., -7., -11.
 };
-cvx_float_t cdata[] = {-6., -4., -5.};
-cvx_float_t hdata[] = {
+cvxc_float_t cdata[] = {-6., -4., -5.};
+cvxc_float_t hdata[] = {
     -3., 5.,/**/ 12., -2., -14., -13.,/**/ 10., 0., 0., 0.,/**/ 68., -30., -19., -30., 99., 23., -19., 23., 10.
 };
 
-void make_scaling(cvx_scaling_t *W, cvx_dimset_t *dims)
+void make_scaling(cvxc_scaling_t *W, cvxc_dimset_t *dims)
 {
-    cvx_matrix_t s, m;
-    cvx_scaling_init(W, dims);
+    cvxc_matrix_t s, m;
+    cvxc_scaling_init(W, dims);
 
     cvxm_map_data(&s, 2, 1, W_d);
-    cvx_scaling_elem(&m, W, CVXWS_D, 0);
+    cvxc_scaling_elem(&m, W, CVXWS_D, 0);
     cvxm_copy(&m, &s, 0);
 
     cvxm_map_data(&s, 2, 1, W_di);
-    cvx_scaling_elem(&m, W, CVXWS_DI, 0);
+    cvxc_scaling_elem(&m, W, CVXWS_DI, 0);
     cvxm_copy(&m, &s, 0);
 
     cvxm_map_data(&s, 2, 1, W_beta);
-    cvx_scaling_elem(&m, W, CVXWS_BETA, 0);
+    cvxc_scaling_elem(&m, W, CVXWS_BETA, 0);
     cvxm_copy(&m, &s, 0);
 
     cvxm_map_data(&s, 4, 1, &W_v[0]);
-    cvx_scaling_elem(&m, W, CVXWS_V, 0);
+    cvxc_scaling_elem(&m, W, CVXWS_V, 0);
     cvxm_copy(&m, &s, 0);
 
     cvxm_map_data(&s, 4, 1, &W_v[4]);
-    cvx_scaling_elem(&m, W, CVXWS_V, 1);
+    cvxc_scaling_elem(&m, W, CVXWS_V, 1);
     cvxm_copy(&m, &s, 0);
 
     cvxm_map_data(&s, 3, 3, W_r);
-    cvx_scaling_elem(&m, W, CVXWS_R, 0);
+    cvxc_scaling_elem(&m, W, CVXWS_R, 0);
     cvxm_copy(&m, &s, 0);
 
     cvxm_map_data(&s, 3, 3, W_rti);
-    cvx_scaling_elem(&m, W, CVXWS_RTI, 0);
+    cvxc_scaling_elem(&m, W, CVXWS_RTI, 0);
     cvxm_copy(&m, &s, 0);
 
-    //cvx_scaling_printf(stdout, "%13.6e", W, "result");
+    //cvxc_scaling_printf(stdout, "%13.6e", W, "result");
 }
 
-void make_data(cvx_matrix_t *x, cvx_matrix_t *y, cvx_matrix_t *z)
+void make_data(cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matrix_t *z)
 {
-    cvx_matrix_t m;
+    cvxc_matrix_t m;
     cvxm_map_data(&m, 3, 1, K_x);
     cvxm_copy(x, &m, 0);
     
@@ -186,9 +186,9 @@ void make_data(cvx_matrix_t *x, cvx_matrix_t *y, cvx_matrix_t *z)
     cvxm_copy(z, &m, 0);
 }
 
-void compare_data(cvx_matrix_t *x, cvx_matrix_t *y, cvx_matrix_t *z)
+void compare_data(cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matrix_t *z)
 {
-    cvx_matrix_t m;
+    cvxc_matrix_t m;
     cvxm_map_data(&m, 3, 1, R_x);
     cvxm_axpy(x, -1.0, &m);
     
@@ -199,15 +199,15 @@ void compare_data(cvx_matrix_t *x, cvx_matrix_t *y, cvx_matrix_t *z)
     cvxm_axpy(z, -1.0, &m);
 }
 
-extern cvx_kktfuncs_t *cvx_ldl2load();
+extern cvxc_kktfuncs_t *cvxc_ldl2load();
 
 int main(int argc, char **argv)
 {
-    cvx_matrix_t c, G, h, A, b;
-    cvx_matrix_t x, y, z, m;
-    cvx_matgrp_t z_g;
-    cvx_dimset_t dims;
-    cvx_problem_t cp;
+    cvxc_matrix_t c, G, h, A, b;
+    cvxc_matrix_t x, y, z, m;
+    cvxc_matgrp_t z_g;
+    cvxc_dimset_t dims;
+    cvxc_problem_t cp;
     char *solver = "ldl";
     int opt;
 
@@ -228,9 +228,9 @@ int main(int argc, char **argv)
     cvxm_map_data(&h, 19, 1, hdata);
 
     // equality constraints: Ax = b  (empty matrices if missing)
-    cvxm_map_data(&A, 0, 3, (cvx_float_t *)0);
-    cvxm_map_data(&b, 0, 1, (cvx_float_t *)0);
-    cvx_dimset_alloc(&dims, 2, (int[]){4, 4, 0}, (int[]){3, 0});
+    cvxm_map_data(&A, 0, 3, (cvxc_float_t *)0);
+    cvxm_map_data(&b, 0, 1, (cvxc_float_t *)0);
+    cvxc_dimset_alloc(&dims, 2, (int[]){4, 4, 0}, (int[]){3, 0});
     
     make_scaling(&cp.W, &dims);
     cp.A = &A;
@@ -239,7 +239,7 @@ int main(int argc, char **argv)
     cp.h = &h;
     cp.c = &c;
     cp.dims = &dims;
-    cvx_index_init(&cp.index_full, &dims, CVX_INDEX_NORMAL);
+    cvxc_index_init(&cp.index_full, &dims, CVXC_INDEX_NORMAL);
     __mblk_init(&cp.work, 100);
 
     cvxm_init(&x, 3, 1);
@@ -247,27 +247,27 @@ int main(int argc, char **argv)
     cvxm_init(&z, 19, 1);
 
     make_data(&x, &y, &z);
-    cvx_mgrp_init(&z_g, &z, &cp.index_full);
-    cvx_mgrp_init(&cp.z_g, &z, &cp.index_full);
+    cvxc_mgrp_init(&z_g, &z, &cp.index_full);
+    cvxc_mgrp_init(&cp.z_g, &z, &cp.index_full);
     
 
-    cvx_kktfuncs_t *kkt;
+    cvxc_kktfuncs_t *kkt;
     printf("KKT solver: %s\n", solver);
     if (strcmp(solver, "ldl2") == 0) {
-        kkt = cvx_ldl2load();
+        kkt = cvxc_ldl2load();
     } else {
-        kkt = cvx_ldlload((void *)0);
+        kkt = cvxc_ldlload((void *)0);
     }
     
-    cvx_kktsolver_t *S = kkt->new(&cp, 3, 0, &dims);
+    cvxc_kktsolver_t *S = kkt->new(&cp, 3, 0, &dims);
     kkt->factor(S, &cp.W, __cvxnil, __cvxnil);
 
     kkt->solve(S, &x, &y, &z_g);
-    cvx_mgrp_elem(&m, &z_g, CVXDIM_SDP, 0);
-    cvxm_make_trm(&m, CVX_LOWER);
+    cvxc_mgrp_elem(&m, &z_g, CVXDIM_SDP, 0);
+    cvxm_make_trm(&m, CVXC_LOWER);
 
-    cvx_mat_printf(stdout, "%13.6e", &x, "x");
-    cvx_mat_printf(stdout, "%13.6e", &z, "z");
+    cvxc_mat_printf(stdout, "%13.6e", &x, "x");
+    cvxc_mat_printf(stdout, "%13.6e", &z, "z");
     
     compare_data(&x, &y, &z);
     printf("||x||_2: %e\n", cvxm_nrm2(&x));

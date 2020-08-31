@@ -14,7 +14,7 @@ char *solution_name[] = {
 };
 
 // one linear [2,1], one sdp of size [3,3]
-cvx_float_t gdata[] = {
+cvxc_float_t gdata[] = {
     // 1st
     16., 7., /**/ 7., -5., 1., -5., 1., -7., 1., -7., -4.,
     // 2nd
@@ -22,11 +22,11 @@ cvx_float_t gdata[] = {
     // 3rd
     5., 0., /**/ 9.,  6., -6., 6., -7., -7., -6., -7., -11.
 };
-cvx_float_t cdata[] = {-6., -4., -5.};
-cvx_float_t hdata[] = {
+cvxc_float_t cdata[] = {-6., -4., -5.};
+cvxc_float_t hdata[] = {
     -3., 5.,/**/ 68., -30., -19., -30., 99., 23., -19., 23., 10.};
 
-void print_solution(cvx_solution_t *sol)
+void print_solution(cvxc_solution_t *sol)
 {
     printf("status      : %2d [%s]\n", sol->status, solution_name[sol->status]);
     printf("primal obj  : %13.6e\n", sol->primal_objective);
@@ -40,22 +40,22 @@ void print_solution(cvx_solution_t *sol)
     printf("gap         : %13.6e\n", sol->gap);
     printf("relative gap: %13.6e\n", sol->relative_gap);
     printf("iterations  : %d\n", sol->iterations);
-    if (sol->status != CVX_STAT_OPTIMAL) 
+    if (sol->status != CVXC_STAT_OPTIMAL) 
         return;
-    cvx_mat_printf(stdout, "%13.6e", sol->x, "x");
-    cvx_mat_printf(stdout, "%13.6e", sol->s, "s");
-    cvx_mat_printf(stdout, "%13.6e", sol->y, "y");
-    cvx_mat_printf(stdout, "%13.6e", sol->z, "z");
+    cvxc_mat_printf(stdout, "%13.6e", sol->x, "x");
+    cvxc_mat_printf(stdout, "%13.6e", sol->s, "s");
+    cvxc_mat_printf(stdout, "%13.6e", sol->y, "y");
+    cvxc_mat_printf(stdout, "%13.6e", sol->z, "z");
 }
 
 int main(int argc, char **argv)
 {
-    cvx_matrix_t c, G, h, A, b;
-    cvx_problem_t cp;
-    cvx_dimset_t dims;
+    cvxc_matrix_t c, G, h, A, b;
+    cvxc_problem_t cp;
+    cvxc_dimset_t dims;
     int opt;
 
-    cvx_solopts_t opts = (cvx_solopts_t){
+    cvxc_solopts_t opts = (cvxc_solopts_t){
         .abstol = 0.0,
         .reltol = 0.0,
         .feastol = 0.0,
@@ -81,16 +81,16 @@ int main(int argc, char **argv)
     cvxm_map_data(&G, 11, 3, gdata);
     cvxm_map_data(&h, 11, 1, hdata);
     // equality constraints: Ax = b  (empty matrices if missing)
-    cvxm_map_data(&A, 0, 3, (cvx_float_t *)0);
-    cvxm_map_data(&b, 0, 1, (cvx_float_t *)0);
+    cvxm_map_data(&A, 0, 3, (cvxc_float_t *)0);
+    cvxm_map_data(&b, 0, 1, (cvxc_float_t *)0);
 
-    cvx_dimset_alloc(&dims, 2, (cvx_size_t *)0, (cvx_size_t[]){3, 0});
+    cvxc_dimset_alloc(&dims, 2, (cvxc_size_t *)0, (cvxc_size_t[]){3, 0});
 
-    cvx_conelp_setup(&cp, &c, &G, &h, &A, &b, &dims, (cvx_kktsolver_t *)0);
+    cvxc_conelp_setup(&cp, &c, &G, &h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
     //cp.solver->debug = 2;
 
-    cvx_conelp_compute_start(&cp);
-    if (cvx_conelp_solve(&cp, &opts) == 0)
+    cvxc_conelp_compute_start(&cp);
+    if (cvxc_conelp_solve(&cp, &opts) == 0)
         print_solution(&cp.solution);
 }
 

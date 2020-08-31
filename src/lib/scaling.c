@@ -2,7 +2,6 @@
 // Copyright: Harri Rautila, 2018 <harri.rautila@gmail.com>
 
 #include "cvxc.h"
-#include "cvxm.h"
 
 /**
  * @brief Compute memory size of scaling matrix W for spesified dimension set.
@@ -12,28 +11,28 @@
  * @param[in] dims
  *     Dimension set
  */
-cvx_size_t cvx_scaling_bytes(cvx_size_t *isize, const cvx_dimset_t *dims)
+cvxc_size_t cvxc_scaling_bytes(cvxc_size_t *isize, const cvxc_dimset_t *dims)
 {
     // SOCP space; for V matrices
-    cvx_size_t vspace = cvx_dimset_sum(dims, CVXDIM_SOCP);
+    cvxc_size_t vspace = cvxc_dimset_sum(dims, CVXDIM_SOCP);
 
     // SDP space; for R and RTI matrices
-    cvx_size_t rspace = cvx_dimset_sum_squared(dims, CVXDIM_SDP);
+    cvxc_size_t rspace = cvxc_dimset_sum_squared(dims, CVXDIM_SDP);
 
     // calculate index space length in bytes and align to 64bits;
     // (3 is for linear, non-linear and non-linear target spaces.)
     // SDP saved as tuple (offset, size)
-    cvx_size_t itotal = (3 + dims->qlen + 1 + 4*dims->slen)*sizeof(cvx_size_t);
+    cvxc_size_t itotal = (3 + dims->qlen + 1 + 4*dims->slen)*sizeof(cvxc_size_t);
     itotal += (itotal & 0x7) != 0 ? 8 - (itotal & 0x7) : 0;
 
     // matrix data space length
-    cvx_size_t ntotal =
+    cvxc_size_t ntotal =
         2 * dims->iscpt +       // Non-linear target function
         2 * dims->mnl +         // Non-linear DNL and DNLI vectors
         2 * dims->ldim +        // Linear D and DI vectors
         dims->qlen + vspace +   // SOCP BETAs and V vectors
         2 * rspace;             // SDP R and RTI matrices
-    ntotal *= sizeof(cvx_float_t);
+    ntotal *= sizeof(cvxc_float_t);
 
     // if non-null pointer return 
     if (isize)
@@ -56,10 +55,10 @@ cvx_size_t cvx_scaling_bytes(cvx_size_t *isize, const cvx_dimset_t *dims)
  * @return
  *   Number of bytes used from memory.
  */
-cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *mem, size_t nbytes)
+cvxc_size_t cvxc_scaling_make(cvxc_scaling_t *W, const cvxc_dimset_t *dims, void *mem, size_t nbytes)
 {
-    cvx_size_t ntotal, itotal;
-    ntotal = cvx_scaling_bytes(&itotal, dims);
+    cvxc_size_t ntotal, itotal;
+    ntotal = cvxc_scaling_bytes(&itotal, dims);
 
     if (nbytes < ntotal) {
         return 0;
@@ -69,8 +68,8 @@ cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *me
     W->__bytes = (unsigned char *)0;
     unsigned char *buf = (unsigned char *)mem;
     W->nbytes = ntotal;
-    W->indexes = (cvx_size_t *)buf;
-    W->data    = (cvx_float_t *)&buf[itotal];
+    W->indexes = (cvxc_size_t *)buf;
+    W->data    = (cvxc_float_t *)&buf[itotal];
 
     // initialized pointers and indexes.
     if (dims->qlen > 0 || dims->slen > 0) {
@@ -84,18 +83,18 @@ cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *me
             W->indrti = &W->indexes[(dims->qlen == 0 ? 0 : dims->qlen+1) + 2*dims->slen];
         }
     } else {
-        W->indexes = W->indv = W->indr = W->indrti = (cvx_size_t *)0;
+        W->indexes = W->indv = W->indr = W->indrti = (cvxc_size_t *)0;
         W->vcount = W->rcount = 0;
     }
 
     // setup indexes
-    cvx_size_t offset = 0;
+    cvxc_size_t offset = 0;
     W->dnltsz = dims->iscpt ? 1 : 0;
-    W->dnlt = W->dnlti = (cvx_float_t *)0;
+    W->dnlt = W->dnlti = (cvxc_float_t *)0;
     W->dnlsz = dims->mnl;
-    W->dnl = W->dnli = (cvx_float_t *)0;
+    W->dnl = W->dnli = (cvxc_float_t *)0;
     W->dsz = dims->ldim;
-    W->d = W->di = (cvx_float_t *)0;
+    W->d = W->di = (cvxc_float_t *)0;
 
     // Arrange NLTARGET, NONLINEAR and LINEAR spaces to continous
     // memory blocks for direct and inverse cases.
@@ -139,7 +138,7 @@ cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *me
         W->beta = &W->data[offset];
         offset += dims->qlen;
         // Sizes of and offsets to V vector data space
-        for (cvx_size_t k = 0; k < dims->qlen; k++) {
+        for (cvxc_size_t k = 0; k < dims->qlen; k++) {
             W->indv[k] = offset;
             offset += dims->qdims[k];
         }
@@ -148,12 +147,12 @@ cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *me
     }
     if (dims->slen > 0) {
         // Save sizes of and offsets to R/RTI matrices data space
-        for (cvx_size_t k = 0; k < 2*dims->slen; k += 2) {
+        for (cvxc_size_t k = 0; k < 2*dims->slen; k += 2) {
             W->indr[k] = offset;
             W->indr[k+1] = dims->sdims[k];
             offset += dims->sdims[k] * dims->sdims[k];
         }
-        for (cvx_size_t k = 0; k < 2*dims->slen; k += 2) {
+        for (cvxc_size_t k = 0; k < 2*dims->slen; k += 2) {
             W->indrti[k] = offset;
             W->indrti[k+1] = dims->sdims[k];
             offset += dims->sdims[k] * dims->sdims[k];
@@ -173,15 +172,15 @@ cvx_size_t cvx_scaling_make(cvx_scaling_t *W, const cvx_dimset_t *dims, void *me
  * @return
  *    Pointer to scaling matrix or null if memory allocation failed.
  */
-cvx_scaling_t *cvx_scaling_init(cvx_scaling_t *W, const cvx_dimset_t *dims)
+cvxc_scaling_t *cvxc_scaling_init(cvxc_scaling_t *W, const cvxc_dimset_t *dims)
 {
-    cvx_size_t ntotal, itotal;
-    ntotal = cvx_scaling_bytes(&itotal, dims);
+    cvxc_size_t ntotal, itotal;
+    ntotal = cvxc_scaling_bytes(&itotal, dims);
 
     unsigned char *buf = calloc(ntotal, sizeof(char));
     if (!buf)
-        return (cvx_scaling_t *)0;
-    cvx_scaling_make(W, dims, buf, ntotal);
+        return (cvxc_scaling_t *)0;
+    cvxc_scaling_make(W, dims, buf, ntotal);
     // set __bytes to indicate that memory is owned by this scaling matrix
     W->__bytes = buf;
     return W;
@@ -193,15 +192,15 @@ cvx_scaling_t *cvx_scaling_init(cvx_scaling_t *W, const cvx_dimset_t *dims)
  * @return
  *    Pointer to
  */
-cvx_scaling_t *cvx_scaling_new(const cvx_dimset_t *dims)
+cvxc_scaling_t *cvxc_scaling_new(const cvxc_dimset_t *dims)
 {
-    cvx_scaling_t *W = (cvx_scaling_t *)malloc(sizeof(cvx_scaling_t));
+    cvxc_scaling_t *W = (cvxc_scaling_t *)malloc(sizeof(cvxc_scaling_t));
     if (!W)
         return W;
 
-    if (!cvx_scaling_init(W, dims)) {
+    if (!cvxc_scaling_init(W, dims)) {
         free(W);
-        W = (cvx_scaling_t *)0;
+        W = (cvxc_scaling_t *)0;
     }
     return W;
 }
@@ -209,7 +208,7 @@ cvx_scaling_t *cvx_scaling_new(const cvx_dimset_t *dims)
 /**
  * @brief Release resources reserved for scaling matrix and clear indexing.
  */
-void cvx_scaling_release(cvx_scaling_t *W)
+void cvxc_scaling_release(cvxc_scaling_t *W)
 {
     if (!W)
         return;
@@ -218,19 +217,19 @@ void cvx_scaling_release(cvx_scaling_t *W)
         W->__bytes = (unsigned char *)0;
     }
     W->nbytes = 0;
-    W->data = W->dnl = W->dnli = W->d = W->di = W->beta = (cvx_float_t *)0;
+    W->data = W->dnl = W->dnli = W->d = W->di = W->beta = (cvxc_float_t *)0;
     W->dnlsz = W->dsz = W->vcount = W->rcount = 0;
-    W->indexes = W->indv = W->indr = W->indrti = (cvx_size_t *)0;
+    W->indexes = W->indv = W->indr = W->indrti = (cvxc_size_t *)0;
 }
 
-void cvx_scaling_free(cvx_scaling_t *W)
+void cvxc_scaling_free(cvxc_scaling_t *W)
 {
-    cvx_scaling_release(W);
+    cvxc_scaling_release(W);
     if (W)
         free(W);
 }
 
-int cvx_scaling_copy(cvx_scaling_t *W, const cvx_scaling_t *Ws)
+int cvxc_scaling_copy(cvxc_scaling_t *W, const cvxc_scaling_t *Ws)
 {
     if (W->nbytes != Ws->nbytes)
         return -1;
@@ -245,12 +244,12 @@ int cvx_scaling_copy(cvx_scaling_t *W, const cvx_scaling_t *Ws)
 }
 
 // \brief Get scaling element NAME at index ind; returns size of element
-cvx_size_t cvx_scaling_elem(cvx_matrix_t *A, const cvx_scaling_t *W, cvx_mset_enum name, int ind)
+cvxc_size_t cvxc_scaling_elem(cvxc_matrix_t *A, const cvxc_scaling_t *W, cvxc_mset_enum name, int ind)
 {
     if (!W || !A)
         return 0;
 
-    cvxm_map_data(A, 0, 0, (cvx_float_t *)0);
+    cvxm_map_data(A, 0, 0, (cvxc_float_t *)0);
 
     switch (name) {
     case CVXWS_DNLT:
@@ -290,19 +289,19 @@ cvx_size_t cvx_scaling_elem(cvx_matrix_t *A, const cvx_scaling_t *W, cvx_mset_en
         }
     case CVXWS_V:
         if (ind < W->vcount) {
-            cvx_size_t n = W->indv[ind+1] - W->indv[ind];
+            cvxc_size_t n = W->indv[ind+1] - W->indv[ind];
             cvxm_map_data(A, n, 1, &W->data[W->indv[ind]]);
             return n;
         }
     case CVXWS_R:
         if (ind < W->rcount) {
-            cvx_size_t n = W->indr[2*ind+1];
+            cvxc_size_t n = W->indr[2*ind+1];
             cvxm_map_data(A, n, n, &W->data[W->indr[2*ind]]);
             return n;
         }
     case CVXWS_RTI:
         if (ind < W->rcount) {
-            cvx_size_t n = W->indrti[2*ind+1];
+            cvxc_size_t n = W->indrti[2*ind+1];
             cvxm_map_data(A, n, n, &W->data[W->indrti[2*ind]]);
             return n;
         }
@@ -316,30 +315,30 @@ cvx_size_t cvx_scaling_elem(cvx_matrix_t *A, const cvx_scaling_t *W, cvx_mset_en
  * d, di to ones, beta_j = 1, v_j = e_1, r_k, rti_k = diag(1)
  *
  */
-void cvx_scaling_initial_value(cvx_scaling_t *W)
+void cvxc_scaling_initial_value(cvxc_scaling_t *W)
 {
-    cvx_matrix_t x;
+    cvxc_matrix_t x;
     // D = ones
-    cvx_scaling_elem(&x, W, CVXWS_D, 0);
+    cvxc_scaling_elem(&x, W, CVXWS_D, 0);
     cvxm_mkconst(&x, 1.0);
     // DI = ones
-    cvx_scaling_elem(&x, W, CVXWS_DI, 0);
+    cvxc_scaling_elem(&x, W, CVXWS_DI, 0);
     cvxm_mkconst(&x, 1.0);
     if (W->vcount > 0) {
         // BETA = ones
-        cvx_scaling_elem(&x, W, CVXWS_BETA, 0);
+        cvxc_scaling_elem(&x, W, CVXWS_BETA, 0);
         cvxm_mkconst(&x, 1.0);
         // V is unit vector
         for (int k = 0; k < W->vcount; k++) {
-            cvx_scaling_elem(&x, W, CVXWS_V, k);
+            cvxc_scaling_elem(&x, W, CVXWS_V, k);
             cvxm_mkident(&x);
         }
     }
     // R & RTI are identity
     for (int k = 0; k < W->rcount; k++) {
-        cvx_scaling_elem(&x, W, CVXWS_R, k);
+        cvxc_scaling_elem(&x, W, CVXWS_R, k);
         cvxm_mkident(&x);
-        cvx_scaling_elem(&x, W, CVXWS_RTI, k);
+        cvxc_scaling_elem(&x, W, CVXWS_RTI, k);
         cvxm_mkident(&x);
     }
 }

@@ -1,8 +1,7 @@
 
 // Copyright: Harri Rautila, 2018 <harri.rautila@gmail.com>
 
-#include "cvcx.h"
-#include "cvxm.h"
+#include "cvxc.h"
 
 /*
    Index layout:
@@ -31,17 +30,17 @@
  * @return
  *    New index set or null;
  */
-cvx_index_t *cvx_index_new(const cvx_dimset_t *dims, int kind)
+cvxc_index_t *cvxc_index_new(const cvxc_dimset_t *dims, int kind)
 {
-    cvx_index_t *ind = (cvx_index_t *)malloc(sizeof(cvx_index_t));
+    cvxc_index_t *ind = (cvxc_index_t *)malloc(sizeof(cvxc_index_t));
     if (ind)
-        return cvx_index_init(ind, dims, kind);
+        return cvxc_index_init(ind, dims, kind);
     return ind;
 }
 
-cvx_size_t cvx_index_bytes(const cvx_dimset_t *dims, int kind)
+cvxc_size_t cvxc_index_bytes(const cvxc_dimset_t *dims, int kind)
 {
-    cvx_size_t n = 0;
+    cvxc_size_t n = 0;
     if (!dims)
         return n;
 
@@ -55,7 +54,7 @@ cvx_size_t cvx_index_bytes(const cvx_dimset_t *dims, int kind)
     } else {
         n = dims->slen + 1;
     }
-    n *= sizeof(cvx_size_t);
+    n *= sizeof(cvxc_size_t);
     // align to 64bits
     n += (n & 0x7) != 0 ? 8 - (n & 0x7) : 0;
     return n;
@@ -64,27 +63,27 @@ cvx_size_t cvx_index_bytes(const cvx_dimset_t *dims, int kind)
 /**
  * @brief Overlay index structure to provided memory block.
  */
-cvx_size_t cvx_index_make(cvx_index_t *ind,
-                          const cvx_dimset_t *dims,
+cvxc_size_t cvxc_index_make(cvxc_index_t *ind,
+                          const cvxc_dimset_t *dims,
                           int kind,
                           void *buf,
-                          cvx_size_t nbytes)
+                          cvxc_size_t nbytes)
 {
     if (!ind || !dims)
         return 0;
 
-    cvx_size_t n = cvx_index_bytes(dims, kind);
+    cvxc_size_t n = cvxc_index_bytes(dims, kind);
     if (nbytes < n)
         return 0;
 
-    cvx_size_t k = 0;
-    cvx_size_t off = 0;
-    ind->indnlt = ind->indnl = ind->indl = ind->indq = ind->inds = (cvx_size_t *)0;
+    cvxc_size_t k = 0;
+    cvxc_size_t off = 0;
+    ind->indnlt = ind->indnl = ind->indl = ind->indq = ind->inds = (cvxc_size_t *)0;
     //ind->dims = dims;
     ind->type = kind;
-    ind->index = (cvx_size_t *)buf;
+    ind->index = (cvxc_size_t *)buf;
 
-    if (kind != CVX_INDEX_SIGS) {
+    if (kind != CVXC_INDEX_SIGS) {
         if (dims->iscpt > 0) {
             ind->indnlt = &ind->index[k];
             k++;
@@ -102,7 +101,7 @@ cvx_size_t cvx_index_make(cvx_index_t *ind,
             k++;
             off += dims->ldim;
         }
-        for (cvx_size_t j = 0; j < dims->qlen; j++) {
+        for (cvxc_size_t j = 0; j < dims->qlen; j++) {
             if (j == 0)
                 ind->indq = &ind->index[k];
             ind->index[k] = off;
@@ -112,14 +111,14 @@ cvx_size_t cvx_index_make(cvx_index_t *ind,
         ind->qlen = dims->qlen;
     }
 
-    for (cvx_size_t j = 0; j < dims->slen; j++) {
+    for (cvxc_size_t j = 0; j < dims->slen; j++) {
         if (j == 0)
             ind->inds = &ind->index[k];
         ind->index[k] = off;
         k++;
-        off += kind == CVX_INDEX_NORMAL ?
+        off += kind == CVXC_INDEX_NORMAL ?
             dims->sdims[j] * dims->sdims[j] :           // normal storage for S
-            ( kind == CVX_INDEX_PACKED ?
+            ( kind == CVXC_INDEX_PACKED ?
               dims->sdims[j] * (dims->sdims[j] + 1)/2 : // packed storage for S
               dims->sdims[j]);                          // diagonal storage for S (kind == 2|3)
     }
@@ -152,25 +151,25 @@ cvx_size_t cvx_index_make(cvx_index_t *ind,
  *  3  : only 'S' space diagonal storage indexing
  *
  */
-cvx_index_t *cvx_index_init(cvx_index_t *ind, const cvx_dimset_t *dims, int kind)
+cvxc_index_t *cvxc_index_init(cvxc_index_t *ind, const cvxc_dimset_t *dims, int kind)
 {
     if (! ind)
         return ind;
     if (! dims)
-        return (cvx_index_t *)0;
+        return (cvxc_index_t *)0;
 
-    cvx_size_t nb = cvx_index_bytes(dims, kind);
+    cvxc_size_t nb = cvxc_index_bytes(dims, kind);
     void *mem = calloc(nb, 1);
     if (!mem)
-        return (cvx_index_t *)0;
+        return (cvxc_index_t *)0;
 
-    cvx_index_make(ind, dims, kind, mem, nb);
+    cvxc_index_make(ind, dims, kind, mem, nb);
     ind->__bytes = mem;
     return ind;
 
 }
 
-void cvx_index_release(cvx_index_t *ind)
+void cvxc_index_release(cvxc_index_t *ind)
 {
     if (! ind)
         return;
@@ -178,11 +177,11 @@ void cvx_index_release(cvx_index_t *ind)
         free(ind->__bytes);
         ind->__bytes = (void *)0;
     }
-    ind->index = ind->indnlt = ind->indnl = ind->indl = ind->indq = ind->inds = (cvx_size_t *)0;
+    ind->index = ind->indnlt = ind->indnl = ind->indl = ind->indq = ind->inds = (cvxc_size_t *)0;
 }
 
-cvx_size_t cvx_index_count(const cvx_index_t *ind,
-                           cvx_dim_enum name)
+cvxc_size_t cvxc_index_count(const cvxc_index_t *ind,
+                           cvxc_dim_enum name)
 {
     switch (name) {
     case CVXDIM_SOCP:
@@ -201,7 +200,7 @@ cvx_size_t cvx_index_count(const cvx_index_t *ind,
     return 0;
 }
 
-cvx_size_t cvx_index_length(const cvx_index_t *ind, cvx_dim_enum name)
+cvxc_size_t cvxc_index_length(const cvxc_index_t *ind, cvxc_dim_enum name)
 {
     switch (name) {
     case CVXDIM_SOCP:
@@ -228,13 +227,13 @@ cvx_size_t cvx_index_length(const cvx_index_t *ind, cvx_dim_enum name)
  * @param      src
  *     Source index
  * @param      parts
- *     Flags from cvx_dim_enum set to indicate which part are included.
+ *     Flags from cvxc_dim_enum set to indicate which part are included.
  *
  */
-void cvx_subindex(cvx_index_t *ind, const cvx_index_t *src, int parts)
+void cvxc_subindex(cvxc_index_t *ind, const cvxc_index_t *src, int parts)
 {
     ind->__bytes = (void *)0;
-    ind->index = ind->indnlt = ind->indnl = ind->indl = ind->indq = ind->inds = (cvx_size_t *)0;
+    ind->index = ind->indnlt = ind->indnl = ind->indl = ind->indq = ind->inds = (cvxc_size_t *)0;
     if ((parts & CVXDIM_NLTARGET) != 0) {
         ind->indnlt = src->indnlt;
     }
@@ -275,19 +274,19 @@ void cvx_subindex(cvx_index_t *ind, const cvx_index_t *src, int parts)
  * If x is null then returns dimensionality of k'th element in the spesified 
  * dimension set.
  */
-cvx_size_t cvx_index_elem(cvx_matrix_t *x,
-                          const cvx_matrix_t *y,
-                          const cvx_index_t *ind,
-                          cvx_dim_enum name,
+cvxc_size_t cvxc_index_elem(cvxc_matrix_t *x,
+                          const cvxc_matrix_t *y,
+                          const cvxc_index_t *ind,
+                          cvxc_dim_enum name,
                           int k)
 {
-    cvx_size_t n = 0, m = 0;
+    cvxc_size_t n = 0, m = 0;
 
     if (!y || !ind)
         return 0;
 
     if (x)
-        cvxm_map_data(x, 0, 0, (cvx_float_t *)0);
+        cvxm_map_data(x, 0, 0, (cvxc_float_t *)0);
 
     switch (name) {
     case CVXDIM_CONVEX:
@@ -336,11 +335,11 @@ cvx_size_t cvx_index_elem(cvx_matrix_t *x,
         if (ind->inds) {
             //m = ind->dims->sdims[k];
             n = ind->inds[k+1] - ind->inds[k];
-            m = ind->type == CVX_INDEX_NORMAL ? (cvx_size_t)floor(sqrt(n)) : n;
+            m = ind->type == CVXC_INDEX_NORMAL ? (cvxc_size_t)floor(sqrt(n)) : n;
             // TODO: what if indexing is not standard storage??
             if (x) {
                 // standard vs. diagonal storage
-                n = ind->type == CVX_INDEX_NORMAL ? m : 1;
+                n = ind->type == CVXC_INDEX_NORMAL ? m : 1;
                 cvxm_map_data(x, m, n, cvxm_data(y, ind->inds[k]));
             }
         }
@@ -384,28 +383,28 @@ cvx_size_t cvx_index_elem(cvx_matrix_t *x,
 }
 
 
-void cvx_index_create(cvx_matrix_t *x, cvx_index_t *index, const cvx_dimset_t *dims, cvx_index_type kind)
+void cvxc_index_create(cvxc_matrix_t *x, cvxc_index_t *index, const cvxc_dimset_t *dims, cvxc_index_type kind)
 {
-    cvx_size_t cdim = cvx_dimset_sum(dims, CVXDIM_NONLINEAR) +
-        cvx_dimset_sum(dims, CVXDIM_LINEAR) +
-        cvx_dimset_sum(dims, CVXDIM_SOCP);
+    cvxc_size_t cdim = cvxc_dimset_sum(dims, CVXDIM_NONLINEAR) +
+        cvxc_dimset_sum(dims, CVXDIM_LINEAR) +
+        cvxc_dimset_sum(dims, CVXDIM_SOCP);
     switch (kind) {
-    case CVX_INDEX_PACKED:
-        cdim += cvx_dimset_sum_packed(dims, CVXDIM_SDP);
+    case CVXC_INDEX_PACKED:
+        cdim += cvxc_dimset_sum_packed(dims, CVXDIM_SDP);
         break;
-    case CVX_INDEX_DIAG:
-        cdim += cvx_dimset_sum(dims, CVXDIM_SDP);
+    case CVXC_INDEX_DIAG:
+        cdim += cvxc_dimset_sum(dims, CVXDIM_SDP);
         break;
-    case CVX_INDEX_SIGS:
-        cdim = cvx_dimset_sum(dims, CVXDIM_SDP);
+    case CVXC_INDEX_SIGS:
+        cdim = cvxc_dimset_sum(dims, CVXDIM_SDP);
         break;
-    case CVX_INDEX_NORMAL:
+    case CVXC_INDEX_NORMAL:
     default:
-        cdim += cvx_dimset_sum_squared(dims, CVXDIM_SDP);
+        cdim += cvxc_dimset_sum_squared(dims, CVXDIM_SDP);
         break;
     }
     cvxm_init(x, cdim, 1);
-    cvx_index_init(index, dims, kind);
+    cvxc_index_init(index, dims, kind);
 }
 
 

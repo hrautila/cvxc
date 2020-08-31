@@ -53,30 +53,30 @@
  */
 
 typedef struct floorplan {
-    cvx_matrix_t Amin;
+    cvxc_matrix_t Amin;
 } floorplan_t;
 
 
-int floorplan_init(cvx_convex_program_t *cp, void *data)
+int floorplan_init(cvxc_convex_program_t *cp, void *data)
 {
     return 0;
 }
 
-void floorplan_release(cvx_convex_program_t *cp)
+void floorplan_release(cvxc_convex_program_t *cp)
 {
 }
 
-int floorplan_F(cvx_matrix_t *f,
-                cvx_matrix_t *Df,
-                cvx_matrix_t *H,
-                const cvx_matrix_t *x,
-                const cvx_matrix_t *z,
+int floorplan_F(cvxc_matrix_t *f,
+                cvxc_matrix_t *Df,
+                cvxc_matrix_t *H,
+                const cvxc_matrix_t *x,
+                const cvxc_matrix_t *z,
                 void *user)
 {
     floorplan_t *p = (floorplan_t *)user;
     
-    cvx_matrix_t x1, x2, Df1, Df2, H1;
-    cvx_float_t x1val, x2val, aval, xval, zval;
+    cvxc_matrix_t x1, x2, Df1, Df2, H1;
+    cvxc_float_t x1val, x2val, aval, xval, zval;
     
     if (!x && !z) {
         // F0; assume len(f) is 
@@ -113,15 +113,15 @@ int floorplan_F(cvx_matrix_t *f,
         // H_ii = 2*z_i * Amin_i / x_i^3
         cvxm_set(&H1, i, i, (2.0/xval)*(zval/xval)*(aval/xval));
     }
-    // cvx_mat_printf(stdout, "%6.3f", H, "F2:H");
+    // cvxc_mat_printf(stdout, "%6.3f", H, "F2:H");
     return 0;
  }
 
-void floorplan_constraints(cvx_matrix_t *c,
-                           cvx_matrix_t *G,
-                           cvx_matrix_t *h,
-                           cvx_float_t rho,
-                           cvx_float_t gamma)
+void floorplan_constraints(cvxc_matrix_t *c,
+                           cvxc_matrix_t *G,
+                           cvxc_matrix_t *h,
+                           cvxc_float_t rho,
+                           cvxc_float_t gamma)
 {
     // [W, H, x(5), y(5), w(5), h(5)]
     cvxm_set(c, 0, 0, 1.0);
@@ -242,14 +242,14 @@ void floorplan_constraints(cvx_matrix_t *c,
 
 int main(int argc, char **argv)
 {
-    cvx_matrix_t *c, *G, *h, A, b;
-    cvx_problem_t cpl;
-    cvx_dimset_t dims;
-    cvx_float_t rho, gamma;
+    cvxc_matrix_t *c, *G, *h, A, b;
+    cvxc_problem_t cpl;
+    cvxc_dimset_t dims;
+    cvxc_float_t rho, gamma;
     int opt;
     
-    cvx_float_t amin_data[] = {100.0, 100.0, 100.0, 100.0, 100.0};
-    cvx_solopts_t opts = (cvx_solopts_t){
+    cvxc_float_t amin_data[] = {100.0, 100.0, 100.0, 100.0, 100.0};
+    cvxc_solopts_t opts = (cvxc_solopts_t){
         .abstol = 0.0,
         .reltol = 0.0,
         .feastol = 0.0,
@@ -260,7 +260,7 @@ int main(int argc, char **argv)
         .show_progress = 1
     };
     floorplan_t Fplan;
-    cvx_convex_program_t F;
+    cvxc_convex_program_t F;
     
     
     while ((opt = getopt(argc, argv, "N:")) != -1) {
@@ -274,27 +274,27 @@ int main(int argc, char **argv)
     }
     
 
-    cvx_dimset_create(&dims, 5, 26, 0, 0);
+    cvxc_dimset_create(&dims, 5, 26, 0, 0);
 
     cvxm_map_data(&Fplan.Amin, 5, 1, amin_data);
-    cvx_convex_program_init(&F, floorplan_F, &Fplan);
+    cvxc_convex_program_init(&F, floorplan_F, &Fplan);
     
     rho = 1.0; gamma = 5.0;
     c = cvxm_new(22, 1);
     h = cvxm_new(26, 1);
     G = cvxm_new(26, 22);;
-    cvxm_map_data(&A, 0, 22, (cvx_float_t *)0);
-    cvxm_map_data(&b, 0, 1,  (cvx_float_t *)0);
+    cvxm_map_data(&A, 0, 22, (cvxc_float_t *)0);
+    cvxm_map_data(&b, 0, 1,  (cvxc_float_t *)0);
 
     floorplan_constraints(c, G, h, rho, gamma);
-    //cvx_mat_printf(stderr, "%9.2e", G, "G");
+    //cvxc_mat_printf(stderr, "%9.2e", G, "G");
 
     if (opts.max_iter == 0)
         return 0;
 
-    cvx_cpl_setup(&cpl, &F, c, G, h, &A, &b, &dims, (cvx_kktsolver_t *)0);
-    cvx_cpl_compute_start(&cpl);
-    cvx_cpl_solve(&cpl, &opts);
+    cvxc_cpl_setup(&cpl, &F, c, G, h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
+    cvxc_cpl_compute_start(&cpl);
+    cvxc_cpl_solve(&cpl, &opts);
     return 0;
 }
 

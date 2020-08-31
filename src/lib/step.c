@@ -21,43 +21,43 @@
  *  - For the 'S' blocks: e is the identity matrix.
  *
  */
-cvx_float_t cvx_max_step(cvx_matgrp_t *x_g,
-                         cvx_matgrp_t *sigma_g,
-                         cvx_memblk_t *wrk)
+cvxc_float_t cvxc_max_step(cvxc_matgrp_t *x_g,
+                         cvxc_matgrp_t *sigma_g,
+                         cvxc_memblk_t *wrk)
 {
-    cvx_float_t v, tmax = -1e18;
-    cvx_matrix_t u, u1;
-    cvx_index_t *index = x_g->index;
-    cvx_size_t m;
+    cvxc_float_t v, tmax = -1e18;
+    cvxc_matrix_t u, u1;
+    cvxc_index_t *index = x_g->index;
+    cvxc_size_t m;
     // static int svd = 0;
 
     if (index->indnlt) {
-        m = cvx_mgrp_elem(&u, x_g, CVXDIM_NLTARGET, 0);
-        for (cvx_size_t k = 0; k < m; k++) {
+        m = cvxc_mgrp_elem(&u, x_g, CVXDIM_NLTARGET, 0);
+        for (cvxc_size_t k = 0; k < m; k++) {
             if (tmax < -cvxm_get(&u, k, 0)) {
                 tmax = -cvxm_get(&u, k, 0);
             }
         }
     }
     if (index->indnl) {
-        m = cvx_mgrp_elem(&u, x_g, CVXDIM_NONLINEAR, 0);
-        for (cvx_size_t k = 0; k < m; k++) {
+        m = cvxc_mgrp_elem(&u, x_g, CVXDIM_NONLINEAR, 0);
+        for (cvxc_size_t k = 0; k < m; k++) {
             if (tmax < -cvxm_get(&u, k, 0)) {
                 tmax = -cvxm_get(&u, k, 0);
             }
         }
     }
     if (index->indl) {
-        m = cvx_mgrp_elem(&u, x_g, CVXDIM_LINEAR, 0);
-        for (cvx_size_t k = 0; k < m; k++) {
+        m = cvxc_mgrp_elem(&u, x_g, CVXDIM_LINEAR, 0);
+        for (cvxc_size_t k = 0; k < m; k++) {
             if (tmax < -cvxm_get(&u, k, 0)) {
                 tmax = -cvxm_get(&u, k, 0);
             }
         }
     }
     if (index->indq) {
-        for (int k = 0; k < cvx_mgrp_count(x_g, CVXDIM_SOCP); k++) {
-            m = cvx_mgrp_elem(&u, x_g, CVXDIM_SOCP, k);
+        for (int k = 0; k < cvxc_mgrp_count(x_g, CVXDIM_SOCP); k++) {
+            m = cvxc_mgrp_elem(&u, x_g, CVXDIM_SOCP, k);
             cvxm_view_map(&u1, &u, 1, 0, m-1, 1);
             v = cvxm_nrm2(&u1);
             v -= cvxm_get(&u, 0, 0);
@@ -67,22 +67,22 @@ cvx_float_t cvx_max_step(cvx_matgrp_t *x_g,
         }
     }
     if (index->inds) {
-        cvx_matrix_t Q, w, lk;
-        cvx_memblk_t mem;
-        for (int k = 0; k < cvx_mgrp_count(x_g, CVXDIM_SDP); k++) {
-            m = cvx_mgrp_elem(&u, x_g,  CVXDIM_SDP, k);
+        cvxc_matrix_t Q, w, lk;
+        cvxc_memblk_t mem;
+        for (int k = 0; k < cvxc_mgrp_count(x_g, CVXDIM_SDP); k++) {
+            m = cvxc_mgrp_elem(&u, x_g,  CVXDIM_SDP, k);
 #if 0
             if (svd > 3 && svd < 7) {
-                cvx_mat_printf(stderr, "%.12e", &u, "svd.u");
+                cvxc_mat_printf(stderr, "%.12e", &u, "svd.u");
             }
 #endif
             if (sigma_g) {
-                cvx_mgrp_elem(&lk, sigma_g, CVXDIM_SDP, k);
-                cvxm_evd_sym(&lk, &u, CVX_WANTV|CVX_LOWER|ARMAS_FORWARD, wrk);
+                cvxc_mgrp_elem(&lk, sigma_g, CVXDIM_SDP, k);
+                cvxm_evd_sym(&lk, &u, CVXC_WANTV|CVXC_LOWER|ARMAS_FORWARD, wrk);
                 v = - cvxm_get(&lk, 0, 0);
 #if 0
                 if (svd > 3 && svd < 7) {
-                    cvx_mat_printf(stderr, "%.12e", &lk, "svd.lk");
+                    cvxc_mat_printf(stderr, "%.12e", &lk, "svd.lk");
                 }
 #endif
             } else {
@@ -90,12 +90,12 @@ cvx_float_t cvx_max_step(cvx_matgrp_t *x_g,
                 cvxm_map_data(&w, m, 1, __mblk_offset(wrk, m*m));
                 __mblk_subblk(&mem, wrk, m*m +m);
                 cvxm_copy(&Q, &u, 0);
-                cvxm_evd_sym(&w, &Q, CVX_LOWER, &mem);
+                cvxm_evd_sym(&w, &Q, CVXC_LOWER, &mem);
 
                 v = - cvxm_get(&w, 0, 0);
 #if 0
                 if (svd > 3 && svd < 7) {
-                    cvx_mat_printf(stderr, "%.12e", &w, "svd.w");
+                    cvxc_mat_printf(stderr, "%.12e", &w, "svd.w");
                 }
 #endif
             }

@@ -5,46 +5,46 @@
 
 // forward declarations
 static
-int ldl2_init(cvx_kktsolver_t *S,
-             cvx_problem_t *cp,
+int ldl2_init(cvxc_kktsolver_t *S,
+             cvxc_problem_t *cp,
              int n,
              int m,
-             const cvx_dimset_t *dims);
+             const cvxc_dimset_t *dims);
 
 static
-int ldl2_factor(cvx_kktsolver_t *S,
-               cvx_scaling_t *W,
-               cvx_matrix_t *H,
-               cvx_matrix_t *Df);
+int ldl2_factor(cvxc_kktsolver_t *S,
+               cvxc_scaling_t *W,
+               cvxc_matrix_t *H,
+               cvxc_matrix_t *Df);
 static
-int ldl2_solve(cvx_kktsolver_t *S,
-              cvx_matrix_t *x,
-              cvx_matrix_t *y,
-              cvx_matgrp_t *z_g);
+int ldl2_solve(cvxc_kktsolver_t *S,
+              cvxc_matrix_t *x,
+              cvxc_matrix_t *y,
+              cvxc_matgrp_t *z_g);
 
 static
-cvx_size_t ldl2_bytes(int n, int m, const cvx_dimset_t *dims);
+cvxc_size_t ldl2_bytes(int n, int m, const cvxc_dimset_t *dims);
 
 static
-cvx_size_t ldl2_make(cvx_kktsolver_t *kkt,
-                    cvx_problem_t *cp,
+cvxc_size_t ldl2_make(cvxc_kktsolver_t *kkt,
+                    cvxc_problem_t *cp,
                     int n,
                     int m,
-                    const cvx_dimset_t *dims,
+                    const cvxc_dimset_t *dims,
                     void *mem,
-                    cvx_size_t nbytes);
+                    cvxc_size_t nbytes);
 
 static
-cvx_kktsolver_t *ldl2_new(cvx_problem_t *cp,
+cvxc_kktsolver_t *ldl2_new(cvxc_problem_t *cp,
                          int n,
                          int m,
-                         const cvx_dimset_t *dims);
+                         const cvxc_dimset_t *dims);
 
 static
-void ldl2_free(cvx_kktsolver_t *S);
+void ldl2_free(cvxc_kktsolver_t *S);
 
 // function table
-static cvx_kktfuncs_t ldl2functions = {
+static cvxc_kktfuncs_t ldl2functions = {
     .new    = ldl2_new,
     .factor = ldl2_factor,
     .solve  = ldl2_solve,
@@ -75,14 +75,14 @@ static cvx_kktfuncs_t ldl2functions = {
 */
 
 static
-int ldl2_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matrix_t *Df)
+int ldl2_factor(cvxc_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_matrix_t *Df)
 {
-    cvx_ldlsolver_t *ldl = (cvx_ldlsolver_t *)S;
-    cvx_problem_t *cp = ldl->cp;
-    cvx_size_t rG, cG;
-    cvx_matrix_t Kt, Dfk, Gk, g0, g1;
-    cvx_matgrp_t g_g;
-    int mnl = cvx_dimset_sum(ldl->dims, CVXDIM_NONLINEAR);
+    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)S;
+    cvxc_problem_t *cp = ldl->cp;
+    cvxc_size_t rG, cG;
+    cvxc_matrix_t Kt, Dfk, Gk, g0, g1;
+    cvxc_matgrp_t g_g;
+    int mnl = cvxc_dimset_sum(ldl->dims, CVXDIM_NONLINEAR);
     int err;
 
     cvxm_size(&rG, &cG, cp->G);
@@ -115,23 +115,23 @@ int ldl2_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matri
         cvxm_copy(&g1, &Gk, 0);
 
         // TODO: works only w/o non-linear part (z_g.index ??)
-        cvx_mgrp_init(&g_g, &g1, cp->index_g);
-        cvx_scale(&g_g, W, CVX_INV|CVX_TRANS, &cp->work);
-        cvx_scale(&g_g, W, CVX_INV, &cp->work);
+        cvxc_mgrp_init(&g_g, &g1, cp->index_g);
+        cvxc_scale(&g_g, W, CVXC_INV|CVXC_TRANS, &cp->work);
+        cvxc_scale(&g_g, W, CVXC_INV, &cp->work);
 
         if (Df && mnl > 0) {
-            cvxm_mvmult(1.0, &Kt, 1.0, Df, &g0, CVX_TRANS);
+            cvxm_mvmult(1.0, &Kt, 1.0, Df, &g0, CVXC_TRANS);
         }
         // last n-k columns of G
         cvxm_view_map(&Gk, ldl->G, 0, k, rG, cG-k);
         // Kt = Kt + G^T*g
-        cvx_sgemv(1.0, &Kt, 1.0, &Gk, &g_g, CVX_TRANS);
+        cvxc_sgemv(1.0, &Kt, 1.0, &Gk, &g_g, CVXC_TRANS);
     }
 
     if (ldl->p > 0) {
-        err = cvxm_ldlfactor(&ldl->K, ldl->ipiv, CVX_LOWER, &ldl->work);
+        err = cvxm_ldlfactor(&ldl->K, ldl->ipiv, CVXC_LOWER, &ldl->work);
     } else {
-        err = cvxm_cholfactor(&ldl->K, CVX_LOWER);
+        err = cvxm_cholfactor(&ldl->K, CVXC_LOWER);
     }
     return err;
 }
@@ -151,14 +151,14 @@ int ldl2_factor(cvx_kktsolver_t *S, cvx_scaling_t *W, cvx_matrix_t *H, cvx_matri
 
  */
 static
-int ldl2_solve(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_t *z_g)
+int ldl2_solve(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g)
 {
-    cvx_ldlsolver_t *ldl = (cvx_ldlsolver_t *)S;
-    cvx_problem_t *cp = ldl->cp;
-    cvx_matrix_t u0, u1;
-    cvx_matgrp_t g_g, x_g;
-    cvx_float_t beta = 0.0;
-    int mnl = cvx_dimset_sum(ldl->dims, CVXDIM_NONLINEAR);
+    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)S;
+    cvxc_problem_t *cp = ldl->cp;
+    cvxc_matrix_t u0, u1;
+    cvxc_matgrp_t g_g, x_g;
+    cvxc_float_t beta = 0.0;
+    int mnl = cvxc_dimset_sum(ldl->dims, CVXDIM_NONLINEAR);
     int err = 0;
 
     cvxm_view_map(&u0, &ldl->u, 0,      0, ldl->n, 1);
@@ -166,22 +166,22 @@ int ldl2_solve(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_
 
     // TODO: z_g.index ?? in non-linear case
     cvxm_copy(&ldl->g, z_g->mat, 0);
-    cvx_mgrp_init(&g_g, &ldl->g, z_g->index);
+    cvxc_mgrp_init(&g_g, &ldl->g, z_g->index);
 
-    cvx_scale(&g_g, ldl->W, CVX_INV|CVX_TRANS, &cp->work);
-    cvx_scale(&g_g, ldl->W, CVX_INV, &cp->work);
+    cvxc_scale(&g_g, ldl->W, CVXC_INV|CVXC_TRANS, &cp->work);
+    cvxc_scale(&g_g, ldl->W, CVXC_INV, &cp->work);
     if (mnl > 0) {
         // TODO: non-linear
         beta = 1.0;
     }
-    cvx_sgemv(beta, &ldl->u, 1.0, ldl->G, &g_g, CVX_TRANS);
+    cvxc_sgemv(beta, &ldl->u, 1.0, ldl->G, &g_g, CVXC_TRANS);
     cvxm_axpy(&u0, 1.0, x);
     cvxm_copy(&u1, y, 0);
 
     if (ldl->p > 0) {
-        err = cvxm_ldlsolve(&ldl->u, &ldl->K, ldl->ipiv, CVX_LOWER, &ldl->work);
+        err = cvxm_ldlsolve(&ldl->u, &ldl->K, ldl->ipiv, CVXC_LOWER, &ldl->work);
     } else {
-        err = cvxm_cholsolve(&ldl->u, &ldl->K, CVX_LOWER);
+        err = cvxm_cholsolve(&ldl->u, &ldl->K, CVXC_LOWER);
     }
 
     cvxm_copy(x, &u0, 0);
@@ -189,19 +189,19 @@ int ldl2_solve(cvx_kktsolver_t *S, cvx_matrix_t *x, cvx_matrix_t *y, cvx_matgrp_
 
     if (mnl > 0) {
     }
-    cvx_mgrp_init(&x_g, x, (cvx_index_t *)0);
+    cvxc_mgrp_init(&x_g, x, (cvxc_index_t *)0);
     // z = G*x - z
-    cvx_sgemv(-1.0, z_g->mat, 1.0, cp->G, &x_g, 0);
-    cvx_scale(z_g, ldl->W, CVX_TRANS|CVX_INV, &cp->work);
+    cvxc_sgemv(-1.0, z_g->mat, 1.0, cp->G, &x_g, 0);
+    cvxc_scale(z_g, ldl->W, CVXC_TRANS|CVXC_INV, &cp->work);
 
     return err;
 }
 
 
 static
-int ldl2_init(cvx_kktsolver_t *S, cvx_problem_t *cp, int n, int m, const cvx_dimset_t *dims)
+int ldl2_init(cvxc_kktsolver_t *S, cvxc_problem_t *cp, int n, int m, const cvxc_dimset_t *dims)
 {
-    cvx_ldlsolver_t *ldl = (cvx_ldlsolver_t *)S;
+    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)S;
     size_t grows, gcols;
 
 
@@ -233,48 +233,48 @@ int ldl2_init(cvx_kktsolver_t *S, cvx_problem_t *cp, int n, int m, const cvx_dim
 
 
 static
-cvx_size_t ldl2_bytes(int n, int m, const cvx_dimset_t *dims)
+cvxc_size_t ldl2_bytes(int n, int m, const cvxc_dimset_t *dims)
 {
-    cvx_size_t sz = n + m + cvx_dimset_sum_packed(dims, CVXDIM_CONELP);
-    cvx_size_t need = sz*sz + 2*sz;  // dense matrix + 2 vectors;
-    cvx_size_t ipvlen = sz;
+    cvxc_size_t sz = n + m + cvxc_dimset_sum_packed(dims, CVXDIM_CONELP);
+    cvxc_size_t need = sz*sz + 2*sz;  // dense matrix + 2 vectors;
+    cvxc_size_t ipvlen = sz;
     ipvlen *= sizeof(int);
     ipvlen += __aligned128(ipvlen);
-    need   *= sizeof(cvx_float_t);
+    need   *= sizeof(cvxc_float_t);
     need   += __aligned128(need);
     return need + ipvlen;
 }
 
 static
-cvx_size_t ldl2_make(cvx_kktsolver_t *kkt,
-                     cvx_problem_t *cp,
+cvxc_size_t ldl2_make(cvxc_kktsolver_t *kkt,
+                     cvxc_problem_t *cp,
                      int n,
                      int m,
-                     const cvx_dimset_t *dims,
+                     const cvxc_dimset_t *dims,
                      void *mem,
-                     cvx_size_t nbytes)
+                     cvxc_size_t nbytes)
 {
     return 0;
 }
 
 static
-cvx_kktsolver_t *ldl2_new(cvx_problem_t *cp,
+cvxc_kktsolver_t *ldl2_new(cvxc_problem_t *cp,
                           int n,
                           int m,
-                          const cvx_dimset_t *dims)
+                          const cvxc_dimset_t *dims)
 {
-    cvx_ldlsolver_t *ldl = (cvx_ldlsolver_t *)calloc(sizeof(cvx_ldlsolver_t), 1);
-    ldl2_init((cvx_kktsolver_t *)ldl, cp, n, m, dims);
-    return  (cvx_kktsolver_t *)ldl;
+    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)calloc(sizeof(cvxc_ldlsolver_t), 1);
+    ldl2_init((cvxc_kktsolver_t *)ldl, cp, n, m, dims);
+    return  (cvxc_kktsolver_t *)ldl;
 }
 
 static
-void ldl2_free(cvx_kktsolver_t *kkt)
+void ldl2_free(cvxc_kktsolver_t *kkt)
 {
     if (!kkt)
         return;
 
-    cvx_ldlsolver_t *ldl = (cvx_ldlsolver_t *)kkt;
+    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)kkt;
     cvxm_release(&ldl->K);
     cvxm_release(&ldl->u);
     cvxm_release(&ldl->g);
@@ -284,7 +284,7 @@ void ldl2_free(cvx_kktsolver_t *kkt)
     free(kkt);
 }
 
-cvx_kktfuncs_t *cvx_ldl2load()
+cvxc_kktfuncs_t *cvxc_ldl2load()
 {
     return &ldl2functions;
 }
