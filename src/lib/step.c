@@ -29,7 +29,6 @@ cvxc_float_t cvxc_max_step(cvxc_matgrp_t *x_g,
     cvxc_matrix_t u, u1;
     cvxc_index_t *index = x_g->index;
     cvxc_size_t m;
-    // static int svd = 0;
 
     if (index->indnlt) {
         m = cvxc_mgrp_elem(&u, x_g, CVXDIM_NLTARGET, 0);
@@ -71,20 +70,10 @@ cvxc_float_t cvxc_max_step(cvxc_matgrp_t *x_g,
         cvxc_memblk_t mem;
         for (int k = 0; k < cvxc_mgrp_count(x_g, CVXDIM_SDP); k++) {
             m = cvxc_mgrp_elem(&u, x_g,  CVXDIM_SDP, k);
-#if 0
-            if (svd > 3 && svd < 7) {
-                cvxc_mat_printf(stderr, "%.12e", &u, "svd.u");
-            }
-#endif
             if (sigma_g) {
                 cvxc_mgrp_elem(&lk, sigma_g, CVXDIM_SDP, k);
                 cvxm_evd_sym(&lk, &u, CVXC_WANTV|CVXC_LOWER|ARMAS_FORWARD, wrk);
                 v = - cvxm_get(&lk, 0, 0);
-#if 0
-                if (svd > 3 && svd < 7) {
-                    cvxc_mat_printf(stderr, "%.12e", &lk, "svd.lk");
-                }
-#endif
             } else {
                 cvxm_map_data(&Q, m, m, __mblk_offset(wrk, 0));
                 cvxm_map_data(&w, m, 1, __mblk_offset(wrk, m*m));
@@ -93,21 +82,10 @@ cvxc_float_t cvxc_max_step(cvxc_matgrp_t *x_g,
                 cvxm_evd_sym(&w, &Q, CVXC_LOWER, &mem);
 
                 v = - cvxm_get(&w, 0, 0);
-#if 0
-                if (svd > 3 && svd < 7) {
-                    cvxc_mat_printf(stderr, "%.12e", &w, "svd.w");
-                }
-#endif
             }
             if (tmax < v)
                 tmax = v;
         }
-        //svd++;
     }
     return tmax;
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

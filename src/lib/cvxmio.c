@@ -21,7 +21,7 @@ int cvxm_read_sbuffer(cvxc_matrix_t *m, const char *s)
     const char *sp = s;
     char *endp;
     cvxc_size_t nrows, ncols, nelems;
-    
+
     while (*sp && *sp != '{')
         sp++;
     if (*sp == '\0')
@@ -40,13 +40,13 @@ int cvxm_read_sbuffer(cvxc_matrix_t *m, const char *s)
 
     nelems = nrows*ncols;
     cvxm_init(m, nrows, ncols);
-    
+
     if (nelems == 0)
         return 0;
-    
+
     while (*sp && isspace(*sp) && *sp != '[')
         sp++;
-    
+
     if (*sp == '\0')
         return -1;
     sp++;
@@ -55,7 +55,7 @@ int cvxm_read_sbuffer(cvxc_matrix_t *m, const char *s)
     cvxc_float_t eval, *ep;
     int k = 0;
     ep = cvxm_data(m, 0);
-    
+
     while (nelems > 0) {
         //printf("sp: %s\n", sp);
         errno = 0;
@@ -128,7 +128,7 @@ int get_tok(char *buf, size_t blen, FILE *fp)
             }
             else {
                 buf[i] = c;
-            }                
+            }
             c = fgetc(fp);
             i++;
         }
@@ -170,10 +170,10 @@ int get_tok(char *buf, size_t blen, FILE *fp)
             }
             buf[i] = c;
             c = fgetc(fp);
-        } 
+        }
     done:
         buf[i] = '\0';
-        return dot_seen || exp_seen ? T_FLOAT : T_INT;   
+        return dot_seen || exp_seen ? T_FLOAT : T_INT;
     }
     // should not come here at all
     return T_ERROR;
@@ -184,13 +184,13 @@ int cvxm_read_file(cvxc_matrix_t *m, FILE *fp)
     int tok;
     double val;
     char buf[64], *endp;
-    
+
     cvxc_size_t nrows, ncols;
-    
+
     tok = get_tok(buf, sizeof(buf), fp);
     if (tok != '{')
         return -1;
-    
+
     tok = get_tok(buf, sizeof(buf), fp);
     if (tok != T_INT)
         return -1;
@@ -242,9 +242,9 @@ int cvxm_write_file(FILE *fp, const cvxc_matrix_t *m)
     for (int j = 0; j < m->data.cols; j++) {
         for (int i = 0; i < m->data.rows; i++) {
             if ((j == 0 && i > 0) || j > 0) {
-                fputc(',', fp);             
+                fputc(',', fp);
                 n++;
-            } 
+            }
             n += fprintf(fp, "%.9e", cvxm_get((cvxc_matrix_t *)m, i, j));
         }
     }
@@ -259,18 +259,12 @@ int cvxm_json_write_file(FILE *fp, const cvxc_matrix_t *m)
     for (int j = 0; j < m->data.cols; j++) {
         for (int i = 0; i < m->data.rows; i++) {
             if ((j == 0 && i > 0) || j > 0) {
-                fputc(',', fp);             
+                fputc(',', fp);
                 n++;
-            } 
+            }
             n += fprintf(fp, "%.9e", cvxm_get((cvxc_matrix_t *)m, i, j));
         }
     }
     n += fprintf(fp, "]}\n");
     return n;
 }
-
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

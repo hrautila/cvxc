@@ -58,13 +58,13 @@ int cvxc_json_matrix_read(cvxc_matrix_t **A, cvxc_stream_t *ios)
         m->bits = 0;
         *A = m;
     }
-    armas_d_dense_t *amat = &(*A)->data;
-    return armas_d_json_read(&amat, ios);
+    armas_dense_t *amat = &(*A)->data;
+    return armas_json_read(&amat, ios);
 }
 
 int cvxc_json_matrix_write(cvxc_stream_t *ios, const cvxc_matrix_t *A)
 {
-    return armas_d_json_write(ios, &A->data, 0);
+    return armas_json_write(ios, &A->data, 0);
 }
 
 enum cvxc_json_states {
