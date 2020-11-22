@@ -39,11 +39,11 @@ cvxc_float_t W_v[] = {
 cvxc_float_t W_r[] = {
     2.919851e+00,
     -3.036526e+00,
-    -1.083566e+00, 
+    -1.083566e+00,
     // 2nd column
-    -2.263271e+00, 
+    -2.263271e+00,
     -2.680673e+00,
-    1.738179e-01, 
+    1.738179e-01,
     // 3rd column
     5.926005e-01,
     -1.344990e-02,
@@ -53,11 +53,11 @@ cvxc_float_t W_rti[] = {
     // 1st
     1.722480e-01,
     -1.482364e-01,
-    -4.331807e-02, 
-    // 2nd 
-    -1.955742e-01, 
+    -4.331807e-02,
+    // 2nd
+    -1.955742e-01,
     -2.048651e-01,
-    4.709509e-02, 
+    4.709509e-02,
     // 3rd
     9.183940e-02,
     -5.203710e-02,
@@ -125,9 +125,9 @@ cvxc_float_t R_z[] = {
 
 // one linear [2,1], two socp of size [4,1], one sdp of size [3,3]
 cvxc_float_t gdata[] = {
-    // 1st 
+    // 1st
     16., 7., /**/ 24., -8., 8., -1., /**/ 0., -1., 0., 0.,/**/ 7., -5., 1., -5., 1., -7., 1., -7., -4.,
-    // 2nd 
+    // 2nd
     -14., 2.,/**/ 7., -13., -18., 3.,/**/ 0., 0., -1., 0.,/**/ 3., 13., -6., 13., 12., -10., -6., -10., -28.,
     // 3rd
     5., 0., /**/-15., 12., -6., 17., /**/ 0., 0., 0., -1.,/**/ 9.,  6., -6., 6., -7., -7., -6., -7., -11.
@@ -178,7 +178,7 @@ void make_data(cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matrix_t *z)
     cvxc_matrix_t m;
     cvxm_map_data(&m, 3, 1, K_x);
     cvxm_copy(x, &m, 0);
-    
+
     cvxm_map_data(&m, 0, 1, K_y);
     cvxm_copy(y, &m, 0);
 
@@ -191,7 +191,7 @@ void compare_data(cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matrix_t *z)
     cvxc_matrix_t m;
     cvxm_map_data(&m, 3, 1, R_x);
     cvxm_axpy(x, -1.0, &m);
-    
+
     cvxm_map_data(&m, 0, 1, R_y);
     cvxm_axpy(y, -1.0, &m);
 
@@ -221,7 +221,7 @@ int main(int argc, char **argv)
             break;
         }
     }
-    // 
+    //
     cvxm_map_data(&c, 3, 1, cdata);
     // inequality constraints; G*x <= h
     cvxm_map_data(&G, 19, 3, gdata);
@@ -231,7 +231,7 @@ int main(int argc, char **argv)
     cvxm_map_data(&A, 0, 3, (cvxc_float_t *)0);
     cvxm_map_data(&b, 0, 1, (cvxc_float_t *)0);
     cvxc_dimset_alloc(&dims, 2, (int[]){4, 4, 0}, (int[]){3, 0});
-    
+
     make_scaling(&cp.W, &dims);
     cp.A = &A;
     cp.b = &b;
@@ -249,7 +249,6 @@ int main(int argc, char **argv)
     make_data(&x, &y, &z);
     cvxc_mgrp_init(&z_g, &z, &cp.index_full);
     cvxc_mgrp_init(&cp.z_g, &z, &cp.index_full);
-    
 
     cvxc_kktfuncs_t *kkt;
     printf("KKT solver: %s\n", solver);
@@ -258,7 +257,7 @@ int main(int argc, char **argv)
     } else {
         kkt = cvxc_ldlload((void *)0);
     }
-    
+
     cvxc_kktsolver_t *S = kkt->new(&cp, 3, 0, &dims);
     kkt->factor(S, &cp.W, __cvxnil, __cvxnil);
 
@@ -268,14 +267,9 @@ int main(int argc, char **argv)
 
     cvxc_mat_printf(stdout, "%13.6e", &x, "x");
     cvxc_mat_printf(stdout, "%13.6e", &z, "z");
-    
+
     compare_data(&x, &y, &z);
     printf("||x||_2: %e\n", cvxm_nrm2(&x));
     printf("||y||_2: %e\n", cvxm_nrm2(&y));
     printf("||z||_2: %e\n", cvxm_nrm2(&z));
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

@@ -82,10 +82,10 @@ int test_pack(int N, int verbose)
     // one 5x5 symmetric matrix
     cvxc_dimset_alloc(&dims, 0, (int *)0, (int[]){5, 0});
     cvxc_index_init(&index, &dims, CVXC_INDEX_NORMAL);
-    
+
     cvxm_map_data(&x, 5, 5, data);
     cvxm_make_trm(&x, CVXC_LOWER);
-    cvxm_init(&y,  5, 5); 
+    cvxm_init(&y,  5, 5);
     cvxm_init(&xc, 5*3, 1);   // packed size is N*(N+1)/2
 
     //printf("x\n"); cvxm_printf(stdout, "%6.2f", &x);
@@ -99,7 +99,7 @@ int test_pack(int N, int verbose)
     cvxc_unpack(&y, &xc, &index);
     //printf("y\n"); cvxm_printf(stdout, "%6.2f", &y);
 
-    // compute ||y -x||; map matrices to vectors; substract 
+    // compute ||y -x||; map matrices to vectors; substract
     cvxm_map_data(&x0, 25, 1, cvxm_data(&x, 0));
     cvxm_map_data(&y0, 25, 1, cvxm_data(&y, 0));
     cvxm_axpy(&y0, -1.0, &x0);
@@ -127,14 +127,9 @@ void test_read()
 int main(int argc, char **argv)
 {
     int verbose = 1;
-    
+
     test_jdot(7, verbose);
     test_jnrm2(7, verbose);
     test_read();
     test_pack(7, verbose);
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:
