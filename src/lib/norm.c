@@ -168,9 +168,3 @@ cvxc_float_t cvxc_snrm2_elem(cvxc_matgrp_t *x_g, cvxc_dim_enum name)
 {
     return sqrt(cvxc_sdot_elem(x_g, x_g, name));
 }
-
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

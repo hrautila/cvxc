@@ -1083,10 +1083,10 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
             return cvxc_conelp_ready(cp, stats, iter, CVXC_STAT_UNKNOWN);
 
         }
-        else  if (stats->pres <= feastol &&
-                    stats->dres <= feastol &&
-                    (stats->gap <= abstol ||
-                     (!isnan(stats->relgap) && stats->relgap < reltol))) {
+        else if (stats->pres <= feastol &&
+                 stats->dres <= feastol &&
+                 (stats->gap <= abstol ||
+                  (!isnan(stats->relgap) && stats->relgap < reltol))) {
 
             return cvxc_conelp_ready(cp, stats, iter, CVXC_STAT_OPTIMAL);
         }
@@ -1415,8 +1415,3 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
     // we never reach here; TODO: fail if we do
     return 0;
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

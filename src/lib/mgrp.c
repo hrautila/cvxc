@@ -269,8 +269,3 @@ void cvxc_mgrp_initial_value(cvxc_matgrp_t *x_g, int flags)
         }
     }
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

@@ -197,8 +197,3 @@ void cvxc_mat_test_nan(const char *name, const cvxc_matrix_t *A)
     }
 
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

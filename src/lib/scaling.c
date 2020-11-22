@@ -342,8 +342,3 @@ void cvxc_scaling_initial_value(cvxc_scaling_t *W)
         cvxm_mkident(&x);
     }
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

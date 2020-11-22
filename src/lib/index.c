@@ -406,9 +406,3 @@ void cvxc_index_create(cvxc_matrix_t *x, cvxc_index_t *index, const cvxc_dimset_
     cvxm_init(x, cdim, 1);
     cvxc_index_init(index, dims, kind);
 }
-
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

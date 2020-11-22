@@ -968,8 +968,3 @@ int cvxc_scale2(cvxc_matgrp_t *x_g,
     }
     return 0;
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

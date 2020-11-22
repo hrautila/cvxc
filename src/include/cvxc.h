@@ -978,10 +978,3 @@ cvxc_gp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts);
 
 
 #endif // __CVXC_CONVEX_H
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:
-
-

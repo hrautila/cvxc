@@ -446,9 +446,3 @@ int cvxc_ssqr(cvxc_matgrp_t *x_g,
     cvxm_mult_diag(&xk, 1.0, &yk, 0);
     return 0;
 }
-
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

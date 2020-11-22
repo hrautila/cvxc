@@ -287,9 +287,3 @@ cvxc_kktfuncs_t *cvxc_ldlload(void *ptr)
 {
     return &ldlfunctions;
 }
-
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

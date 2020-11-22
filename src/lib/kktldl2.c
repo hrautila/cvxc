@@ -288,8 +288,3 @@ cvxc_kktfuncs_t *cvxc_ldl2load()
 {
     return &ldl2functions;
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

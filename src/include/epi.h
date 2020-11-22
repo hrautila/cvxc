@@ -47,11 +47,4 @@ void cvxc_epi_copy(cvxc_epi_t *y, const cvxc_epi_t *x)
     y->val = x->val;
 }
 
-
-
 #endif // __CVXC_EPI_H
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

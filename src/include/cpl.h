@@ -81,8 +81,3 @@ extern cvxc_size_t cvxc_cpl_setup(cvxc_problem_t *prob,
 
 
 #endif // __CVXC_CPL_H
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

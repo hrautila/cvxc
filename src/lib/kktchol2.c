@@ -117,15 +117,9 @@ void chol2_free(cvxc_kktsolver_t *kkt)
 {
     if (!kkt)
         return;
-    
 }
 
 cvxc_kktfuncs_t *cvxc_chol2_load()
 {
     return &chol2_functions;
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

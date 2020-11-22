@@ -252,9 +252,3 @@ cvxc_size_t cvxc_dimset_sum_packed(const cvxc_dimset_t *dims, cvxc_dim_enum name
     }
     return sum;
 }
-
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:

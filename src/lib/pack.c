@@ -154,9 +154,3 @@ void cvxc_pack2(cvxc_matrix_t *x, const cvxc_index_t *index, cvxc_memblk_t *work
         iu += n*n;
     }
 }
-
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:
