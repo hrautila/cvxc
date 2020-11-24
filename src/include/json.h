@@ -1,3 +1,10 @@
+/*
+ * Copyright by libcvxc authors. See AUTHORS file in this archive.
+ *
+ * This file is part of libcvxc library. It is free software,
+ * distributed under the terms of GNU Lesser General Public License Version 3, or
+ * any later version. See the COPYING file included in this archive.
+ */
 
 
 #ifndef __CONVEX_JSON_H
