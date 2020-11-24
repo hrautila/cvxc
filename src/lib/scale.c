@@ -64,7 +64,7 @@ int cvxc_scale(cvxc_matgrp_t *x_g,
 
     int inverse = (flags & CVXC_INV) != 0;
 
-    __mblk_clear(work);
+    cvxc_mblk_clear(work);
 
     ncols = 1;
     cvxm_size(&nrows, &ncols, x);
@@ -117,7 +117,7 @@ int cvxc_scale(cvxc_matgrp_t *x_g,
     //
     if (W->vcount > 0 && cvxc_mgrp_count(x_g, CVXDIM_SOCP) > 0) {
         cvxc_float_t bk;
-        cvxm_map_data(&w, ncols, 1, __mblk_offset(work, 0));
+        cvxm_map_data(&w, ncols, 1, cvxc_mblk_offset(work, 0));
         cvxc_scaling_elem(&beta, W, CVXWS_BETA, 0);
         for (k = 0; k < W->vcount; k++) {
             m = cvxc_scaling_elem(&v, W, CVXWS_V, k);
@@ -164,7 +164,7 @@ int cvxc_scale(cvxc_matgrp_t *x_g,
         for (k = 0; k < W->rcount; k++) {
             m = cvxc_scaling_elem(&r, W, (inverse ? CVXWS_RTI : CVXWS_R), k);
             // workspace Ak = mat(xk)
-            cvxm_map_data(&Ak, m, m, __mblk_offset(work, 0));
+            cvxm_map_data(&Ak, m, m, cvxc_mblk_offset(work, 0));
             // each column of x is matrix in lower triangular storage format
             for (j = 0; j < ncols; j++) {
                 cvxm_map_data(&xk, m, m, cvxm_data(x, ind+j*nrows));
@@ -269,7 +269,7 @@ int cvxc_scale_vector(cvxc_matgrp_t *x_g,
         for (int k = 0; k < W->rcount; k++) {
             m = cvxc_scaling_elem(&r, W, (inverse ? CVXWS_RTI : CVXWS_R), k); 
             // workspace Ak = mat(xk)
-            cvxm_map_data(&Ak, m, m, __mblk_offset(work, 0));
+            cvxm_map_data(&Ak, m, m, cvxc_mblk_offset(work, 0));
             // x is matrix in lower triangular storage format
             cvxc_mgrp_elem(&xk, x_g, CVXDIM_SDP, k);
             // scale diagonal by 0.5
@@ -493,12 +493,12 @@ int cvxc_compute_scaling(cvxc_scaling_t *W,
             m = cvxc_scaling_elem(&r, W, CVXWS_R, k);
             cvxc_scaling_elem(&rti, W, CVXWS_RTI, k);
 
-            __mblk_clear(work);
+            cvxc_mblk_clear(work);
             // space for intermediate matrices
-            cvxm_map_data(&wrk, m, m, __mblk_offset(work, 0));
-            cvxm_map_data(&Ls,  m, m, __mblk_offset(work, m*m));
-            cvxm_map_data(&Lz,  m, m, __mblk_offset(work, 2*m*m));
-            __mblk_subblk(&Tmp, work, 3*m*m);
+            cvxm_map_data(&wrk, m, m, cvxc_mblk_offset(work, 0));
+            cvxm_map_data(&Ls,  m, m, cvxc_mblk_offset(work, m*m));
+            cvxm_map_data(&Lz,  m, m, cvxc_mblk_offset(work, 2*m*m));
+            cvxc_mblk_subblk(&Tmp, work, 3*m*m);
             //
             cvxc_mgrp_elem(&sk, s_g, CVXDIM_SDP, k);
             cvxc_mgrp_elem(&zk, z_g, CVXDIM_SDP, k);
@@ -800,9 +800,9 @@ int cvxc_update_scaling(cvxc_scaling_t *W,
             cvxc_mgrp_elem(&Lz, z_g, CVXDIM_SDP, k);
             cvxc_mgrp_elem(&lk, lmbda_g, CVXDIM_SDP, k);
             // workspaces
-            __mblk_clear(work);
-            cvxm_map_data(&wrk, m, m, __mblk_offset(work, 0));
-            __mblk_subblk(&Tmp, work, m*m);
+            cvxc_mblk_clear(work);
+            cvxm_map_data(&wrk, m, m, cvxc_mblk_offset(work, 0));
+            cvxc_mblk_subblk(&Tmp, work, m*m);
             // t = r*sk = r*Ls
             cvxm_mult(0.0, &wrk, 1.0, &r, &Ls, 0);
             cvxm_copy(&r, &wrk, CVXC_ALL);
@@ -950,7 +950,7 @@ int cvxc_scale2(cvxc_matgrp_t *x_g,
         for (int k = 0; k < cvxc_mgrp_count(x_g, CVXDIM_SDP); k++) {
             m = cvxc_mgrp_elem(&xk, x_g, CVXDIM_SDP, k);
             cvxc_mgrp_elem(&lk, lmbda_g, CVXDIM_SDP, k);
-            cvxm_map_data(&lc, m, 1, __mblk_offset(work, 0));
+            cvxm_map_data(&lc, m, 1, cvxc_mblk_offset(work, 0));
             for (cvxc_size_t i = 0; i < m; i++) {
                 lx = SQRT(cvxm_get(&lk, i, 0));
                 for (cvxc_size_t j = 0; j < m; j++) {   // changed:

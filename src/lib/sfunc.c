@@ -254,7 +254,7 @@ int cvxc_sinv(cvxc_matgrp_t *x_g,
         m = cvxc_mgrp_elem(&xk, x_g, CVXDIM_SDP, k);
         cvxc_mgrp_elem(&yk, y_g, CVXDIM_SDP, k);
         for (cvxc_size_t i = 0; i < m; i++) {
-            cvxm_map_data(&u, m-i, 1, __mblk_offset(work, 0));
+            cvxm_map_data(&u, m-i, 1, cvxc_mblk_offset(work, 0));
             // column of x
             cvxm_view_map(&xc, &xk, i, i, m-i, 1);
             cvxm_view_map(&yc, &yk, i, 0, m-i, 1);
@@ -352,7 +352,7 @@ int cvxc_sprod(cvxc_matgrp_t *x_g,
         if (flags & CVXC_DIAG) {
             cvxc_matrix_t u, xc, yc;
             for (cvxc_size_t i = 0; i < m; i++) {
-                cvxm_map_data(&u, m-i, 1, __mblk_offset(work, 0));
+                cvxm_map_data(&u, m-i, 1, cvxc_mblk_offset(work, 0));
                 // column of x
                 cvxm_view_map(&xc, &xk, i, i, m-i, 1);
                 cvxm_view_map(&yc, &yk, i, 0, m-i, 1);
@@ -363,7 +363,7 @@ int cvxc_sprod(cvxc_matgrp_t *x_g,
                 cvxm_mult_diag(&xc, 0.5, &u, CVXC_LEFT);
             }
         } else {
-            cvxm_map_data(&A, m, m, __mblk_offset(work, 0));
+            cvxm_map_data(&A, m, m, cvxc_mblk_offset(work, 0));
             cvxm_copy(&A, &xk, CVXC_LOWER);
             cvxm_mksymm(&A, m);
             cvxm_mksymm(&yk, m);

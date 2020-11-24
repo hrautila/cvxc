@@ -217,7 +217,7 @@ int ldl_init(cvxc_kktsolver_t *S,
     armas_d_bkfactor_w(&ldl->K, &P, CVXC_LOWER, &wb, (armas_conf_t *)0);
 #endif
     cvxc_size_t wbytes = cvxm_ldlwork(&ldl->K);
-    __mblk_init(&ldl->work, 4*wbytes);
+    cvxc_mblk_init(&ldl->work, 4*wbytes);
 
     ldl->dims = dims;
     ldl->A = cp->A;
@@ -275,7 +275,7 @@ void ldl_free(cvxc_kktsolver_t *kkt)
     cvxm_release(&ldl->K);
     cvxm_release(&ldl->u);
     cvxm_release(&ldl->g);
-    __mblk_release(&ldl->work);
+    cvxc_mblk_release(&ldl->work);
     if (ldl->ipiv)
         free(ldl->ipiv);
     free(kkt);

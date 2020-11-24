@@ -464,9 +464,9 @@ cvxc_size_t cvxc_conelp_make(cvxc_problem_t *cp,
     __INIT(used, cvxc_scaling_make(&cp->W, dims, &bytes[offset], nbytes));
 
     // workspace for SDP contraints handling
-    __mblk_empty(&cp->work);
+    cvxc_mblk_empty(&cp->work);
     if (maxsdp > 0) {
-        __INIT(used, __mblk_make(&cp->work, __WORKBYTES(maxsdp), &bytes[offset], nbytes));
+        __INIT(used, cvxc_mblk_make(&cp->work, __WORKBYTES(maxsdp), &bytes[offset], nbytes));
     }
 
     // setup matrix group variables
@@ -734,9 +734,9 @@ int cvxc_conelp_compute_start(cvxc_problem_t *cp)
         return -1;
     }
 
-    stats->resx0 = __maxvec(2, (cvxc_float_t []){1.0, cvxm_nrm2(cp->c)});
-    stats->resy0 = __maxvec(2, (cvxc_float_t []){1.0, cvxm_nrm2(cp->b)});
-    stats->resz0 = __maxvec(2, (cvxc_float_t []){1.0, cvxc_snrm2(&cpi->h_g)});
+    stats->resx0 = MAXF(1.0, cvxm_nrm2(cp->c));
+    stats->resy0 = MAXF(1.0, cvxm_nrm2(cp->b));
+    stats->resz0 = MAXF(1.0, cvxc_snrm2(&cpi->h_g));
 
     //printf("initial: resz0=%.4f, resy0=%.4f, resz0=%.4f\n", stats->resx0, stats->resy0, stats->resz0);
     cpi->nrms = cvxc_snrm2(&cpi->s_g);
@@ -779,7 +779,7 @@ int cvxc_conelp_ready(cvxc_problem_t *cp, cvxc_stats_t *stats, int iter, int sta
         cvxm_axpy(&cpi->rz, 1.0, cp->h);
         stats->resz = cvxc_snrm2(&cpi->rz_g);
 
-        stats->pres = __MAX2(stats->resy/stats->resy0, stats->resz/stats->resz0);
+        stats->pres = MAXF(stats->resy/stats->resy0, stats->resz/stats->resz0);
         stats->dres = stats->resx/stats->resx0;
         stats->cx = cvxm_dot(cp->c, &cpi->x);
         stats->by = cvxm_dot(cp->b, &cpi->y);
@@ -940,8 +940,8 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
             return cvxc_conelp_ready(cp, stats, -1, CVXC_STAT_OPTIMAL);
         }
 
-        max_nrms = __MAX2(1.0, cpi->nrms);
-        max_nrmz = __MAX2(1.0, cpi->nrmz);
+        max_nrms = MAXF(1.0, cpi->nrms);
+        max_nrmz = MAXF(1.0, cpi->nrmz);
         if (cpi->ts >= - 1e-8 * max_nrms) {
             cvxc_mgrp_update_sz(&cpi->s_g, 1.0+cpi->ts, 0);
         }
@@ -952,13 +952,13 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         //cvxc_mat_printf(stdout, "%e", &cpi->s, "s:");
         //cvxc_mat_printf(stdout, "%e", &cpi->z, "z:");
     } else if (primalstart && ! dualstart) {
-        max_nrms = __MAX2(1.0, cpi->nrms);
+        max_nrms = MAXF(1.0, cpi->nrms);
         if (cpi->ts >= - 1e-8 * max_nrms) {
             cvxc_mgrp_update_sz(&cpi->s_g, 1.0+cpi->ts, 0);
         }
 
     } else if (dualstart && ! primalstart) {
-        max_nrmz = __MAX2(1.0, cpi->nrmz);
+        max_nrmz = MAXF(1.0, cpi->nrmz);
         if (cpi->tz >= -1e-8 * max_nrmz) {
             cvxc_mgrp_update_sz(&cpi->z_g, 1.0+cpi->tz, 0);
         }
@@ -1056,7 +1056,7 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         //printf("pres: max(%e/%e, %e/%e)\n", stats->resy, stats->resy0, stats->resz, stats->resz0);
         //printf("dres: %e/%e\n", stats->resx, stats->resx0);
 
-        stats->pres = __MAX2((stats->resy/stats->resy0), (stats->resz/stats->resz0));
+        stats->pres = MAXF((stats->resy/stats->resy0), (stats->resz/stats->resz0));
         stats->dres = stats->resx / stats->resx0;
         stats->pinfres = __NaN();
         if (stats->hz + stats->by < 0.0) {
@@ -1064,7 +1064,7 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         }
         stats->dinfres = __NaN();
         if (stats->cx < 0.0) {
-            stats->dinfres = __MAX2((stats->hresy/stats->resy0),  (stats->hresz/stats->resz0)) / (-stats->cx);
+            stats->dinfres = MAXF((stats->hresy/stats->resy0),  (stats->hresz/stats->resz0)) / (-stats->cx);
         }
         //printf("pinfres.0 %e, dinfres: %e\n", stats->pinfres, stats->dinfres);
         if (opts->show_progress > 0) {
@@ -1247,9 +1247,9 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
             }
 
             // Maximum step to boundary.
-            // 
-            // If i is 1, also compute eigenvalue decomposition of the 's' 
-            // blocks in ds, dz.  The eigenvectors Qs, Qz are stored in 
+            //
+            // If i is 1, also compute eigenvalue decomposition of the 's'
+            // blocks in ds, dz.  The eigenvectors Qs, Qz are stored in
             // ds_k, dz_k.  The eigenvalues are stored in sigs, sigz.
 
             cvxc_scale2(&cpi->ds_g, &cpi->lmbda_g, 0, &cp->work);
@@ -1268,16 +1268,16 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
 
             tt = -cpi->dtau / cvxm_get(&cpi->lmbda, cp->cdim_diag, 0);
             tk = -cpi->dkappa / cvxm_get(&cpi->lmbda, cp->cdim_diag, 0);
-            cvxc_float_t t = __maxvec(5, (cvxc_float_t[]){0.0, cpi->ts, cpi->tz, tt, tk});
+            cvxc_float_t t = cvxc_maxvec(5, (cvxc_float_t[]){0.0, cpi->ts, cpi->tz, tt, tk});
             //printf("ts=%e, tz=%e, tt=%e, tk=%e, t=%e\n", cpi->ts, cpi->tz, tt, tk, t);
             //cvxc_mat_printf(stdout, "%e", &cpi->dz, "inloop maxstep dz");
             if (t == 0.0) {
                 step = 1.0;
             } else {
                 if (i == 0) {
-                    step = __minvec(2, (cvxc_float_t []){1.0, 1.0/t});
+                    step = MINF(1.0, 1.0/t);
                 } else {
-                    step = __minvec(2, (cvxc_float_t []){1.0, STEP/t});
+                    step = MINF(1.0, STEP/t);
                 }
             }
             if (i == 0) {

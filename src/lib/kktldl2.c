@@ -219,7 +219,7 @@ int ldl2_init(cvxc_kktsolver_t *S, cvxc_problem_t *cp, int n, int m, const cvxc_
 
     //int nelem = armas_d_bkfactor_work(&ldl->K, (armas_conf_t *)0);
     int nelem = cvxm_ldlwork(&ldl->K);
-    __mblk_init(&ldl->work, 4*nelem);
+    cvxc_mblk_init(&ldl->work, 4*nelem);
 
     ldl->cp = cp;
     ldl->dims = dims;
@@ -278,7 +278,7 @@ void ldl2_free(cvxc_kktsolver_t *kkt)
     cvxm_release(&ldl->K);
     cvxm_release(&ldl->u);
     cvxm_release(&ldl->g);
-    __mblk_release(&ldl->work);
+    cvxc_mblk_release(&ldl->work);
     if (ldl->ipiv)
         free(ldl->ipiv);
     free(kkt);

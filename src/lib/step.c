@@ -75,9 +75,9 @@ cvxc_float_t cvxc_max_step(cvxc_matgrp_t *x_g,
                 cvxm_evd_sym(&lk, &u, CVXC_WANTV|CVXC_LOWER|ARMAS_FORWARD, wrk);
                 v = - cvxm_get(&lk, 0, 0);
             } else {
-                cvxm_map_data(&Q, m, m, __mblk_offset(wrk, 0));
-                cvxm_map_data(&w, m, 1, __mblk_offset(wrk, m*m));
-                __mblk_subblk(&mem, wrk, m*m +m);
+                cvxm_map_data(&Q, m, m, cvxc_mblk_offset(wrk, 0));
+                cvxm_map_data(&w, m, 1, cvxc_mblk_offset(wrk, m*m));
+                cvxc_mblk_subblk(&mem, wrk, m*m +m);
                 cvxm_copy(&Q, &u, 0);
                 cvxm_evd_sym(&w, &Q, CVXC_LOWER, &mem);
 

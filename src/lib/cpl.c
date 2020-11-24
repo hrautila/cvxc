@@ -485,9 +485,9 @@ cvxc_size_t cvxc_cpl_make(cvxc_problem_t *cp,
     __INIT(used, cvxc_scaling_make(&cpi->W0, dims, &bytes[offset], nbytes));
 
     // workspace for SDP contraints handling
-    __mblk_empty(&cp->work);
+    cvxc_mblk_empty(&cp->work);
     if (maxsdp > 0) {
-        __INIT(used, __mblk_make(&cp->work, __WORKBYTES(maxsdp), &bytes[offset], nbytes));
+        __INIT(used, cvxc_mblk_make(&cp->work, __WORKBYTES(maxsdp), &bytes[offset], nbytes));
     }
 
     // setup matrix group variables
@@ -711,7 +711,7 @@ int cvxc_cpl_ready(cvxc_problem_t *cp,
         cvxm_axpy(&cpi->rz, 1.0, cp->h);
         cpi->resz = cvxc_snrm2(&cpi->rz_g);
 
-        cpi->pres = __MAX2(cpi->resy/cpi->resy0, cpi->resz/cpi->resz0);
+        cpi->pres = MAXF(cpi->resy/cpi->resy0, cpi->resz/cpi->resz0);
         cpi->dres = cpi->resx/cpi->resx0;
         cpi->cx = cvxm_dot(cp->c, &cpi->x);
         cpi->by = cvxm_dot(cp->b, &cpi->y);
@@ -887,7 +887,7 @@ int cvxc_cpl_linesearch(cvxc_problem_t *cp,
                 ((relaxed_iters > 0 && relaxed_iters < MAX_RELAXED_ITERS)
                  || newphi <= cpi->phi+ALPHA*cpi->step*cpi->dphi)) {
                 backtrack = 0;
-                cpi->sigma = __MIN2(newgap/cpi->gap, __POW((newgap/cpi->gap), EXPON));
+                cpi->sigma = MINF(newgap/cpi->gap, POW((newgap/cpi->gap), EXPON));
                 //printf("  break 1: sigma=%.7f [%.7f, %.7f]\n", cpi->sigma, newgap, cpi->gap);
                 cpi->eta   = 0.0;
             }
@@ -975,7 +975,7 @@ int cvxc_cpl_compute_start(cvxc_problem_t *cp)
 }
 
 /*
- * Notes: 
+ * Notes:
  * phase 1 implementation: CPL (convex program with linear objective)
  *   stardard matrix elements c, x, G, h, A, b, s, z
  *   convex programs CP with F0, F1, F2
@@ -1112,10 +1112,10 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
 
         cpi->dres = cpi->resx;
         if (iter == 0) {
-            cpi->resx0 = __MAX2(1.0, cpi->resx);
-            cpi->resznl0 = __MAX2(1.0, cpi->resznl);
-            cpi->pres0 = __MAX2(1.0, cpi->pres);
-            cpi->dres0 = __MAX2(1.0, cpi->dres);
+            cpi->resx0 = MAXF(1.0, cpi->resx);
+            cpi->resznl0 = MAXF(1.0, cpi->resznl);
+            cpi->pres0 = MAXF(1.0, cpi->pres);
+            cpi->dres0 = MAXF(1.0, cpi->dres);
             cpi->gap0  = cpi->gap;
             cpi->theta1 = 1.0/cpi->gap0;
             cpi->theta2 = 1.0/cpi->resx0;
@@ -1285,11 +1285,11 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
             cpi->tz = cvxc_max_step(&cpi->dz_g, &cpi->sigz_g, &cp->work);
             //printf( "ts    : %e\n", cpi->ts);
             //printf( "tz    : %e\n", cpi->tz);
-            cvxc_float_t t = __maxvec(3, (cvxc_float_t[]){0.0, cpi->ts, cpi->tz});
+            cvxc_float_t t = cvxc_maxvec(3, (cvxc_float_t[]){0.0, cpi->ts, cpi->tz});
             if (t == 0.0)
                 cpi->step = 1.0;
             else
-                cpi->step = __MIN2(1.0, STEP/t);
+                cpi->step = MINF(1.0, STEP/t);
             //printf( "step    : %e\n", cpi->step);
 
             // backtrack until newx is in domain of f

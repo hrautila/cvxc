@@ -131,7 +131,7 @@ void cvxc_pack2(cvxc_matrix_t *x, const cvxc_index_t *index, cvxc_memblk_t *work
         cvxc_index_length(index, CVXDIM_SOCP);
 
     cvxm_size(&nr, &nc, x);
-    cvxm_map_data(&row, nc, 1, __mblk_offset(work, 0));
+    cvxm_map_data(&row, nc, 1, cvxc_mblk_offset(work, 0));
 
     for (j = 0; j < cvxc_index_count(index, CVXDIM_SDP); j++) {
         // get row count for j'th element
