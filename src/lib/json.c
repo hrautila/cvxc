@@ -1,21 +1,11 @@
-
-// Copyright: Harri Rautila, 2018 <harri.rautila@gmail.com>
-
+/*
+ * Copyright by libcvxc authors. See AUTHORS file in this archive.
+ *
+ * This file is part of libcvxc library. It is free software,
+ * distributed under the terms of GNU Lesser General Public License Version 3, or
+ * any later version. See the COPYING file included in this archive.
+ */
 #include "json.h"
-#if 0
-#include "cvxc.h"
-
-#include <armas/armas.h>
-
-typedef armas_iostream_t cvxc_stream_t;
-
-enum json_tokens {
-    CVXC_JSON_STRING = ARMAS_JSON_STRING,
-    CVXC_JSON_INT = ARMAS_JSON_INT,
-    CVXC_JSON_NUMBER = ARMAS_JSON_NUMBER,
-    CVXC_JSON_NULL = ARMAS_JSON_NULL
-};
-#endif
 
 int cvxc_solver_number(const char *name)
 {
