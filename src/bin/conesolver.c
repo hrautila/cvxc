@@ -1,6 +1,10 @@
-
-// Copyright: Harri Rautila, 2016 <harri.rautila@gmail.com>
-
+/*
+ * Copyright by libcvxc authors. See AUTHORS file in this archive.
+ *
+ * This file is part of libcvxc library. It is free software,
+ * distributed under the terms of GNU Lesser General Public License Version 3, or
+ * any later version. See the COPYING file included in this archive.
+ */
 #include <getopt.h>
 #include <string.h>
 
@@ -180,8 +184,3 @@ int main(int argc, char **argv)
     cvxc_conelp_solve(&cp, &opts);
     print_solution(&cp.solution);
 }
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:
