@@ -17,14 +17,28 @@
 #define CVXC_ABI_REVISION  0
 #define CVXC_ABI_AGE  0
 
-#define SQRT sqrt
-#define __POW  pow
+#if ENABLE_FLOAT32
+/* float32 */
+#define SQRT   sqrtf
+#define POW    powf
+#define MAXF   fmaxf
+#define MINF   fminf
 
-#define SQRT2           1.41421356237309504880
-#define CVXC_MAXITER     100
+
+#else
+/* float64 */
+#define SQRT   sqrt
+#define POW    pow
+#define MAXF   fmax
+#define MINF   fmin
+
+#endif
+
+#define SQRT2            1.41421356237309504880
 #define CVXC_ABSTOL      1e-7
 #define CVXC_RELTOL      1e-6
 #define CVXC_FEASTOL     1e-7
+#define CVXC_MAXITER     100
 #define CVXC_STEP        0.99
 
 #define CVXC_STAT_OPTIMAL                0
@@ -55,7 +69,7 @@ cvxc_float_t __NaN()
 #ifdef NAN
     return NAN;
 #else
-    return sqrt(-1.0);
+    return SQRT(-1.0);
 #endif
 }
 
@@ -77,23 +91,21 @@ cvxc_size_t __aligned64(cvxc_size_t n)
 }
 
 static inline
-cvxc_float_t __maxvec(int n, const cvxc_float_t *vec)
+cvxc_float_t cvxc_maxvec(int n, const cvxc_float_t *vec)
 {
     cvxc_float_t r = vec[0];
     for (int k = 1; k < n; k++) {
-        if (vec[k] > r)
-            r = vec[k];
+        r = MAXF(vec[k], r);
     }
     return r;
 }
 
 static inline
-cvxc_float_t __minvec(int n, const cvxc_float_t *vec)
+cvxc_float_t cvxc_minvec(int n, const cvxc_float_t *vec)
 {
     cvxc_float_t r = vec[0];
     for (int k = 1; k < n; k++) {
-        if (vec[k] < r)
-            r = vec[k];
+        r = MINF(vec[k], r);
     }
     return r;
 }
@@ -167,7 +179,7 @@ typedef struct cvxc_memblk {
 } cvxc_memblk_t;
 
 static inline
-void __mblk_empty(cvxc_memblk_t *m)
+void cvxc_mblk_empty(cvxc_memblk_t *m)
 {
     if (m) {
         m->memory = (cvxc_float_t *)0;
@@ -175,7 +187,7 @@ void __mblk_empty(cvxc_memblk_t *m)
     }
 }
 static inline
-void __mblk_init(cvxc_memblk_t *m, cvxc_size_t n)
+void cvxc_mblk_init(cvxc_memblk_t *m, cvxc_size_t n)
 {
     m->memory = (cvxc_float_t *)0;
     m->mlen = 0;
@@ -188,7 +200,7 @@ void __mblk_init(cvxc_memblk_t *m, cvxc_size_t n)
 }
 
 static inline
-cvxc_size_t __mblk_make(cvxc_memblk_t *m, cvxc_size_t mlen, void *ptr, cvxc_size_t nbytes)
+cvxc_size_t cvxc_mblk_make(cvxc_memblk_t *m, cvxc_size_t mlen, void *ptr, cvxc_size_t nbytes)
 {
     if (!ptr || nbytes < mlen)
         return 0;
@@ -199,7 +211,7 @@ cvxc_size_t __mblk_make(cvxc_memblk_t *m, cvxc_size_t mlen, void *ptr, cvxc_size
 }
 
 static inline
-void __mblk_release(cvxc_memblk_t *m)
+void cvxc_mblk_release(cvxc_memblk_t *m)
 {
     if (m->__bytes)
         free(m->__bytes);
@@ -209,7 +221,7 @@ void __mblk_release(cvxc_memblk_t *m)
 }
 
 static inline
-cvxc_float_t *__mblk_offset(cvxc_memblk_t *m, cvxc_size_t off)
+cvxc_float_t *cvxc_mblk_offset(cvxc_memblk_t *m, cvxc_size_t off)
 {
     if (off >= m->mlen) {
         abort();
@@ -219,7 +231,7 @@ cvxc_float_t *__mblk_offset(cvxc_memblk_t *m, cvxc_size_t off)
 }
 
 static inline
-void __mblk_subblk(cvxc_memblk_t *d, cvxc_memblk_t *m, cvxc_size_t off)
+void cvxc_mblk_subblk(cvxc_memblk_t *d, cvxc_memblk_t *m, cvxc_size_t off)
 {
     if (off >= m->mlen) {
         d->memory = (cvxc_float_t *)0;
@@ -231,7 +243,7 @@ void __mblk_subblk(cvxc_memblk_t *d, cvxc_memblk_t *m, cvxc_size_t off)
 }
 
 static inline
-void __mblk_clear(cvxc_memblk_t *m)
+void cvxc_mblk_clear(cvxc_memblk_t *m)
 {
     if (m && m->mlen > 0)
         memset(m->memory, 0, m->mlen*sizeof(cvxc_float_t));
