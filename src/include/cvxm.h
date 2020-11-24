@@ -20,11 +20,21 @@
 #  endif
 #endif
 
-#include <armas/ddense.h>
+#if ENABLE_FLOAT32
 
+#include <armas/sdense.h>
+typedef uint32_t cvxc_size_t;
+typedef float cvxc_float_t;
+typedef int32_t cvxc_int_t;
+
+#else
+
+#include <armas/ddense.h>
 typedef uint64_t cvxc_size_t;
 typedef double cvxc_float_t;
 typedef int64_t cvxc_int_t;
+
+#endif /* ENABLE_FLOAT32 */
 
 //typedef armas_dense_t cvxc_matrix_t;
 typedef struct cvxc_matrix {
