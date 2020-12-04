@@ -56,6 +56,9 @@ typedef struct cvxc_memblk cvxc_memblk_t;
 #define NULLCONF (armas_conf_t *)0
 #define __cvxnil (cvxc_matrix_t *)0
 
+typedef armas_iostream_t cvxc_stream_t;
+
+
 typedef enum cvxc_flags {
     CVXC_ALL    = 0,
     CVXC_TRANS  = ARMAS_TRANS,
@@ -212,8 +215,8 @@ cvxc_matrix_t *cvxm_view_diag(cvxc_matrix_t *A, const cvxc_matrix_t *B, int nd)
 __CVXC_INLINE
 void cvxm_size(size_t *r, size_t *c, const cvxc_matrix_t *A)
 {
-    *r = A->data.rows;
-    *c = A->data.cols;
+    *r = A ? A->data.rows : 0;
+    *c = A ? A->data.cols : 0;
 }
 
 __CVXC_INLINE
@@ -442,6 +445,7 @@ int cvxm_update2_sym(cvxc_float_t beta, cvxc_matrix_t *C, cvxc_float_t alpha, co
 extern int cvxm_mmload(cvxc_matrix_t *A, FILE *fp);
 extern int cvxm_write_file(FILE *fp, const cvxc_matrix_t *m);
 extern int cvxm_json_write_file(FILE *fp, const cvxc_matrix_t *m);
+extern int cvxm_json_read_file(cvxc_matrix_t *m, FILE *fp);
 extern int cvxm_read_file(cvxc_matrix_t *m, FILE *fp);
 
 extern void cvxm_set_all(cvxc_matrix_t *A, cvxc_float_t val);
