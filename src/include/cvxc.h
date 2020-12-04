@@ -414,6 +414,55 @@ extern int
 cvxc_update_scaling(cvxc_scaling_t *W, cvxc_matgrp_t *s_g, cvxc_matgrp_t *z_g, cvxc_matgrp_t *l_g, cvxc_memblk_t *wrk);
 
 // ------------------------------------------------------------------------------------------
+
+typedef struct cvxc_solopts {
+    cvxc_float_t abstol;         ///< Absolute tolerance
+    cvxc_float_t reltol;         ///< Relative tolerance
+    cvxc_float_t feastol;        ///< Feasibility tolerance
+    int max_iter;               ///< Maximum iterations
+    int debug;                  ///< Debug
+    int refinement;             ///< Refinement count
+    int show_progress;          ///< Show progress of the iteration
+    int kkt_solver_name;        ///< KKT solver function
+} cvxc_solopts_t;
+
+typedef struct cvxc_params
+{
+    cvxc_dimset_t *dims;
+    cvxc_matrix_t *c;
+    cvxc_matrix_t *G;
+    cvxc_matrix_t *h;
+    cvxc_matrix_t *A;
+    cvxc_matrix_t *b;
+    struct cvxc_solopts *opts;
+} cvxc_params_t;
+
+struct cvxc_solution;
+
+extern int cvxc_json_matrix_read(cvxc_matrix_t **A, cvxc_stream_t *ios);
+extern int cvxc_json_matrix_write(cvxc_stream_t *ios, const cvxc_matrix_t *A);
+extern int cvxc_json_write_token(cvxc_stream_t *ios, int tok, const void *val, size_t len);
+extern int cvxc_json_write_simple_token(cvxc_stream_t *ios, int tok);
+extern int cvxc_json_read_token(char *iob, size_t len, cvxc_stream_t *ios);
+extern int cvxc_json_dimset_write(cvxc_stream_t *ios, const cvxc_dimset_t *dims);
+extern int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios);
+extern int cvxc_json_write_solution(cvxc_stream_t *ios, const struct cvxc_solution *sol);
+extern int cvxc_json_write_result(cvxc_stream_t *ios, const struct cvxc_solution *sol);
+extern int cvxc_json_read_params(cvxc_params_t **pars, cvxc_stream_t *ios);
+int cvxc_json_write_params(cvxc_stream_t *ios, const cvxc_solopts_t *opts, const cvxc_dimset_t *dims,
+                          const cvxc_matrix_t *c, const cvxc_matrix_t *G, const cvxc_matrix_t *h,
+                          const cvxc_matrix_t *A, const cvxc_matrix_t *b);
+extern int cvxc_json_read_options(cvxc_solopts_t **opts, cvxc_stream_t *ios);
+extern int cvxc_json_write_options(cvxc_stream_t *ios, const cvxc_solopts_t *opts, const char *kkt);
+
+extern void cvxc_file_stream(cvxc_stream_t *ios, FILE *fp);
+extern void cvxc_str_stream(cvxc_stream_t *ios, const char *s, int len);
+
+#define ONERR(exp) \
+    do { if ((exp) < 0) return -1; } while (0)
+
+
+// ------------------------------------------------------------------------------------------
 // solver things
 
 typedef int (*cvxc_convex_f0)(cvxc_matrix_t *x0, void *user);
@@ -586,17 +635,6 @@ typedef struct cvxc_solution {
     cvxc_float_t dual_residual_cert;
     int iterations;
 } cvxc_solution_t;
-
-typedef struct cvxc_solopts {
-    cvxc_float_t abstol;         ///< Absolute tolerance
-    cvxc_float_t reltol;         ///< Relative tolerance
-    cvxc_float_t feastol;        ///< Feasibility tolerance
-    int max_iter;               ///< Maximum iterations
-    int debug;                  ///< Debug
-    int refinement;             ///< Refinement count
-    int show_progress;          ///< Show progress of the iteration
-    int kkt_solver_name;        ///< KKT solver function
-} cvxc_solopts_t;
 
 typedef struct cvxc_stats {
     cvxc_float_t resx0;
