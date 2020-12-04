@@ -60,14 +60,11 @@ int cvxc_res(cvxc_problem_t *cp,
     cvxc_matgrp_t ux_g = (cvxc_matgrp_t){ .mat = ux, .index = (cvxc_index_t *)0 };
     int err = 0;
 
-    //printf("res:start utau=%e, ukappa=%e, vtau=%e, vkappa=%e, dg=%e\n", utau, ukappa, *vtau, *vkappa, dg);
     // vx = vx - A^T*uy - G^T*W^-1*uz - c*utau/dg
     cvxm_mult(1.0, vx, -1.0, cp->A, uy, CVXC_TRANSA);
     cvxm_copy(&cpi->wz3, uz, CVXC_ALL);
     cvxc_scale(&cpi->wz3_g, &cp->W, CVXC_INV, &cp->work);
-    //cvxc_mat_printf(stdout, "%e", &cp->wz3, "res_entry:wz3");
     cvxc_sgemv(1.0, vx, -1.0, cp->G, &cpi->wz3_g, CVXC_TRANS);
-    //cvxc_mat_printf(stdout, "%e", vx, "res_entry.2:vx");
     cvxm_axpy(vx, -utau/dg, cp->c);
 
     // vy = vy + A*ux - b*utau/dg
@@ -80,7 +77,6 @@ int cvxc_res(cvxc_problem_t *cp,
     cvxm_copy(&cpi->ws3, us, 0);
     cvxc_scale(&cpi->ws3_g, &cp->W, CVXC_TRANS, &cp->work);
     cvxm_axpy(vz, 1.0, &cpi->ws3);
-    //cvxc_mat_printf(stdout, "%e", vz, "res_entry:update(vz)");
 
     // vtau : vtau + c'*ux + b'uy + h'W^-1*uz + dg*ukappa
     tauplus  = dg*ukappa;
@@ -100,8 +96,6 @@ int cvxc_res(cvxc_problem_t *cp,
     vkplus = lscale * (utau + ukappa);
     *vkappa += vkplus;
 
-    //printf("res:end vtau=%e, vkappa=%e, tauplus=%e, lscale=%e, vkplus=%e\n", *vtau, *vkappa, tauplus, lscale, vkplus);
-
     return err;
 }
 
@@ -117,7 +111,7 @@ int cvxc_res(cvxc_problem_t *cp,
 //
 // On entry, x, y, z, tau, s, kappa contain bx, by, bz, btau, 
 // bkappa.  On exit, they contain ux, uy, uz, utau, ukappa.
-static 
+static
 int f6_no_ir(cvxc_problem_t *cp,
              cvxc_matrix_t *x,
              cvxc_matrix_t *y,
@@ -154,29 +148,18 @@ int f6_no_ir(cvxc_problem_t *cp,
     // [ A  0  0    ] [ uy        ] = [ -by                    ]
     // [ G  0 -W'*W ] [ W^{-1}*uz ]   [ -bz + W'*(lmbda o\ bs) ]
 
-    //printf("f6_no_ir:start tau=%e, kappa=%e\n", *tau, *kappa);
     cvxm_scale(y, -1.0, 0);
     // s = -lmbda o\ s = - lmbda o\ bs
-    //cvxc_mat_printf(stdout, "%e", &cp->lmbda, "f6_no_ir:lmbda");
     cvxc_sinv(s_g, &cpi->lmbda_g, &cp->work);
     cvxm_scale(s, -1.0, 0);
-    //cvxc_mat_printf(stdout, "%e", s, "f6_no_ir:s");
 
     // z = -(z + W'*s) = -bz + W'(lmbda o\ bs)
     cvxm_copy(&cpi->ws3, s, CVXC_ALL);
-    //cvxc_mat_printf(stdout, "%e", &cp->ws3, "f6_no_ir:ws3");
-    //cvxc_scaling_elem(&r, &cp->W, CVXWS_R, 0);
-    //cvxc_mat_printf(stdout, "%13.6e", &r, "f6_no_ir:r");
     cvxc_scale(&cpi->ws3_g, &cp->W, CVXC_TRANS, &cp->work);
-    //cvxc_mat_printf(stdout, "%e", &cp->ws3, "f6_no_ir:scaled(ws3)");
     cvxm_axpy(z, 1.0, &cpi->ws3);
     cvxm_scale(z, -1.0, 0);
-    //cvxc_mat_printf(stdout, "%e", z, "f6_no_ir:z");
 
-    //cvxc_mat_printf(stdout, "%e", x, "f6_no_ir:x");
     cvxc_kktsolve(cp->solver, x, y, z_g);
-    //cvxc_mat_printf(stdout, "%e", x, "f6_no_ir:solved(x)");
-    //cvxc_mat_printf(stdout, "%e", z, "f6_no_ir:solved(z)");
     // Combine with solution of
     //
     // [ 0   A'  G'    ] [ x1         ]          [ c ]
@@ -188,15 +171,10 @@ int f6_no_ir(cvxc_problem_t *cp,
     // -c'*x - b'*y - h'*W^{-1}*z + dg*tau = btau - bkappa/tau. '
     cvxc_float_t lkappa = - (*kappa) / cvxm_get(&cpi->lmbda, cp->cdim_diag, 0);
     cvxc_float_t ltau  = *tau + lkappa/cp->u.conelp.dgi;
-    //printf("f6_no_ir:tau.0=%e, kappa=%e\n", ltau, lkappa);
     ltau += cvxm_dot(cp->c, x);
-    //printf("f6_no_ir:tau.1=%e, kappa=%e\n", ltau, lkappa);
     ltau += cvxm_dot(cp->b, y);
-    //printf("f6_no_ir:tau.2=%e, kappa=%e\n", ltau, lkappa);
     ltau += cvxc_sdot(&cpi->th_g, z_g);  // TODO: check this
-    //printf("f6_no_ir:tau.3=%e, kappa=%e\n", ltau, lkappa);
     ltau = cp->u.conelp.dgi * ltau  / (1.0 + cvxc_sdot(&cpi->z1_g, &cpi->z1_g));
-    //printf("f6_no_ir:tau=%e, kappa=%e\n", ltau, lkappa);
 
     *tau = ltau;
     cvxm_axpy(x, ltau, &cpi->x1);
@@ -206,10 +184,6 @@ int f6_no_ir(cvxc_problem_t *cp,
     cvxm_axpy(s, -1.0, z);
     *kappa = lkappa - ltau;
 
-    //cvxc_mat_printf(stdout, "%e", x, "f6_no_ir(x)");
-    //cvxc_mat_printf(stdout, "%e", z, "f6_no_ir(z)");
-    //cvxc_mat_printf(stdout, "%e", s, "f6_no_ir(s)");
-    //printf("f6_no_ir:end tau=%e, kappa=%e\n", *tau, *kappa);
     return 0;
 }
 
@@ -232,8 +206,6 @@ int f6(cvxc_problem_t *cp,
 
     cvxc_conelp_internal_t *cpi = &cp->u.conelp;
 
-    //printf("**f6:start tau=%e, kappa=%e, refinement=%d\n", *tau, *kappa, refinement);
-
     if (refinement > 0 /*|| (flags | CVXC_DEBUG) != 0*/) {
         cvxm_copy(&cpi->wx, x, 0);
         cvxm_copy(&cpi->wy, y, 0);
@@ -255,15 +227,8 @@ int f6(cvxc_problem_t *cp,
                 &cpi->wx2, &cpi->wy2, &cpi->wz2_g, &wtau2,
                 &cpi->ws2_g, &wkappa2, &cp->W, cpi->dg, &cpi->lmbda_g);
 
-        //cvxc_mat_printf(stdout, "%e", &cp->wx2, "f6:wx2");
-        //cvxc_mat_printf(stdout, "%e", &cp->wy2, "f6:wy2");
-        //cvxc_mat_printf(stdout, "%e", &cp->wz2, "f6:wz2");
-        //cvxc_mat_printf(stdout, "%e", &cp->ws2, "f6:ws2");
         f6_no_ir(cp, &cpi->wx2, &cpi->wy2,
                  &cpi->wz2_g, &wtau2, &cpi->ws2_g, &wkappa2);
-
-        //cvxc_mat_printf(stdout, "%e", &cp->wz2, "f6_no_ir:wz2");
-        //cvxc_mat_printf(stdout, "%e", &cp->ws2, "f6_no_ir:ws2");
 
         cvxm_axpy(x, 1.0, &cpi->wx2);
         cvxm_axpy(y, 1.0, &cpi->wy2);
@@ -273,7 +238,6 @@ int f6(cvxc_problem_t *cp,
         *tau   += wtau2;
         *kappa += wkappa2;
     }
-    //printf("**f6:end tau=%e, kappa=%e, refinement=%d\n", *tau, *kappa, refinement);
     return err;
 }
 
@@ -680,30 +644,14 @@ int cvxc_conelp_compute_start(cvxc_problem_t *cp)
         cvxm_scale(&cpi->x, 0.0, 0);
         cvxm_copy(&cpi->dy, cp->b, 0);
         cvxm_copy(&cpi->s, cp->h, 0);
-        //cvxc_mat_printf(stdout, "%e", &cp->s, "initial s");
-
-        //cvxc_scaling_printf(stdout, "%13.6e", &cp->W, "kktsolve.W");
-        //cvxc_mat_printf(stdout, "%13.6e", cp->G, "kktsolve.G");
-        //cvxc_mat_printf(stdout, "%13.6e", cp->A, "kktsolve.A");
-        //cvxc_mat_printf(stdout, "%13.6e", &cpi->x, "kktsolve.x");
-        //cvxc_mat_printf(stdout, "%13.6e", &cpi->dy, "kktsolve.y");
-        //cvxc_mat_printf(stdout, "%13.6e", &cpi->s, "kktsolve.s");
-
         cvxc_kktsolve(cp->solver, &cpi->x, &cpi->dy, &cpi->s_g);
-
-        //cvxc_mat_printf(stdout, "%13.6e", &cpi->x, "result.x");
-        //cvxc_mat_printf(stdout, "%13.6e", &cpi->dy, "result.y");
-        //cvxc_mat_printf(stdout, "%13.6e", &cpi->s, "result.s");
         cvxm_scale(&cpi->s, -1.0, 0);
     } else {
         cvxm_copy(&cpi->x, cp->primal_x, 0);
         cvxm_copy(&cpi->s, cp->primal_s, 0);
     }
-    //cvxc_mat_printf(stdout, "%e", &cpi->s, "primal s");
-    //cvxc_mat_printf(stdout, "%e", &cpi->x, "primal x");
 
     cpi->ts = cvxc_max_step(&cpi->s_g, __nilgrp, &cp->work);
-    //fprintf(stdout, "initial ts=%f\n", cpi->ts);
 
     if (cpi->ts >= 0.0 && ! primalstart) {
         cp->error = CVXC_ERR_NEG_INITIAL_S;
@@ -713,7 +661,7 @@ int cvxc_conelp_compute_start(cvxc_problem_t *cp)
         // minimize   || z ||^2
         // subject to G'*z + A'*y + c = 0
         //
-        // by solving 
+        // by solving
         //
         //     [ 0   A'  G' ] [ dx ]   [ -c ]
         //     [ A   0   0  ] [ y  ] = [  0 ].
@@ -722,17 +670,13 @@ int cvxc_conelp_compute_start(cvxc_problem_t *cp)
         cvxm_copy(&cpi->dx, cp->c, 0);
         cvxm_scale(&cpi->dx, -1.0, 0);
         cvxm_scale(&cpi->z, 0.0, 0);
-        //cvxc_mat_printf(stdout, "%e", &cpi->z, "initial z");
         cvxc_kktsolve(cp->solver, &cpi->dx, &cpi->y, &cpi->z_g);
     } else {
         cvxm_copy(&cpi->y, cp->dual_y, 0);
         cvxm_copy(&cpi->z, cp->dual_z, 0);
     }
-    //cvxc_mat_printf(stdout, "%e", &cpi->z, "dual z");
-    //cvxc_mat_printf(stdout, "%e", &cpi->y, "dual y");
 
     cpi->tz = cvxc_max_step(&cpi->z_g,  __nilgrp, &cp->work);
-    //fprintf(stdout, "initial tz=%f\n", cpi->tz);
     if (cpi->tz >= 0.0 && ! dualstart) {
         cp->error = CVXC_ERR_NEG_INITIAL_Z;
         return -1;
@@ -742,11 +686,8 @@ int cvxc_conelp_compute_start(cvxc_problem_t *cp)
     stats->resy0 = MAXF(1.0, cvxm_nrm2(cp->b));
     stats->resz0 = MAXF(1.0, cvxc_snrm2(&cpi->h_g));
 
-    //printf("initial: resz0=%.4f, resy0=%.4f, resz0=%.4f\n", stats->resx0, stats->resy0, stats->resz0);
     cpi->nrms = cvxc_snrm2(&cpi->s_g);
     cpi->nrmz = cvxc_snrm2(&cpi->z_g);
-
-    //printf("initial nrms=%.5f, nrmz=%.5f\n", cpi->nrms, cpi->nrmz);
 
     stats->gap = stats->pcost = stats->dcost = stats->relgap = 0.0;
 
@@ -909,8 +850,8 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
     cvxc_float_t reltol = CVXC_RELTOL;
     cvxc_float_t feastol = CVXC_FEASTOL;
 
-    int maxiter = opts->max_iter > 0 ? opts->max_iter : CVXC_MAXITER;
-    int refinement = opts->refinement > 0 ? opts->refinement : 0;
+    int maxiter = opts && opts->max_iter > 0 ? opts->max_iter : CVXC_MAXITER;
+    int refinement = opts && opts->refinement > 0 ? opts->refinement : 0;
 
     if (cvxc_index_count(&cpi->index_full, CVXDIM_SOCP) > 0 ||
         cvxc_index_count(&cpi->index_full, CVXDIM_SDP) > 0)
@@ -953,8 +894,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         if (cpi->tz >= -1e-8 * max_nrmz) {
             cvxc_mgrp_update_sz(&cpi->z_g, 1.0+cpi->tz, 0);
         }
-        //cvxc_mat_printf(stdout, "%e", &cpi->s, "s:");
-        //cvxc_mat_printf(stdout, "%e", &cpi->z, "z:");
     } else if (primalstart && ! dualstart) {
         max_nrms = MAXF(1.0, cpi->nrms);
         if (cpi->ts >= - 1e-8 * max_nrms) {
@@ -978,7 +917,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
 
     stats->gap = cvxc_sdot(&cpi->s_g, &cpi->z_g);
 
-    //printf("preloop: resx0=%.4f, resy0=%.4f, resz0=%.4f\n", stats->resx0, stats->resy0, stats->resz0);
     // -----------------------------------------------------------------------------
 
     for (int iter = 0; iter <= maxiter; iter++) {
@@ -986,62 +924,44 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         // hrx = -A'*y - G'*z
         cvxm_scale(&cpi->hrx, 0.0, CVXC_ALL);
         cvxm_mvmult(0.0, &cpi->hrx, -1.0, cp->A, &cpi->y, CVXC_TRANS);
-        //if (iter == 0) cvxc_mat_printf(stdout, "%e", cpi->z_g.mat, "z.0");
         cvxc_sgemv(1.0, &cpi->hrx, -1.0, cp->G, &cpi->z_g, CVXC_TRANS);
-        //stats->hresx = cvxm_nrm2(&cpi->hrx);
         stats->hresx = SQRT(cvxm_dot(&cpi->hrx, &cpi->hrx));
-        //if (iter == 0) cvxc_mat_printf(stdout, "%e", &cpi->hrx, "hrx");
 
         // rx  = hrx - c*tau
         //     = -A'*y - G'*z - c*tau
         cvxm_copy(&cpi->rx, &cpi->hrx, 0);
         cvxm_axpy(&cpi->rx, -cpi->tau, cp->c);
         stats->resx = cvxm_nrm2(&cpi->rx) / cpi->tau;
-        //printf("resx : %e\n", stats->resx);
-        //cvxc_mat_printf(stdout, "%e", &cpi->rx, "rx");
 
         // hry = A*x
         cvxm_scale(&cpi->hry, 0.0, CVXC_ALL);
         cvxm_mvmult(0.0, &cpi->hry, 1.0, cp->A, &cpi->x, 0);
         stats->hresy = cvxm_nrm2(&cpi->hry);
-        //printf("hresy: %e\n", stats->hresy);
 
         // ry  = hry - b*tau
         //     = A*x - b*tau
         cvxm_copy(&cpi->ry, &cpi->hry, 0);
         cvxm_axpy(&cpi->ry, -cpi->tau, cp->b);
         stats->resy = cvxm_nrm2(&cpi->ry) / cpi->tau;
-        //printf("resy : %e\n", stats->resy);
 
         // hrz = s + G*x
         cvxm_scale(&cpi->hrz, 0.0, CVXC_ALL);
         cvxm_mvmult(0.0, &cpi->hrz, 1.0, cp->G, &cpi->x, 0);
         cvxm_axpy(&cpi->hrz, 1.0, &cpi->s);
         stats->hresz = cvxc_snrm2(&cpi->hrz_g);
-        //printf("hresz: %e\n", stats->hresz);
 
         //  rz = hrz = h*tau
         //     = s + G*x - h*tau
         cvxm_copy(&cpi->rz, &cpi->hrz, 0);
         cvxm_axpy(&cpi->rz, -cpi->tau, cp->h);
 
-        if (iter > 0) {
-            //cvxc_mat_printf(stdout, "%e", &cpi->hrz, "hrz (iter > 0)");
-            //cvxc_mat_printf(stdout, "%e", &cpi->rz, "rz (iter > 0)");
-        }
-
         stats->resz = cvxc_snrm2(&cpi->rz_g) / cpi->tau;
-        //printf("resz : %e [%e/%e]\n", stats->resz, tmp, cpi->tau);
 
         // rt = kappa + c'*x + b'*y + h'*z '
         stats->cx = cvxm_dot(cp->c, &cpi->x);
         stats->by = cvxm_dot(cp->b, &cpi->y);
         stats->hz = cvxc_sdot(&cpi->h_g, &cpi->z_g);
         stats->rt = cpi->kappa + stats->cx + stats->by + stats->hz;
-        //printf("rt   : %e\n", stats->rt);
-        //printf("cx   : %e\n", stats->cx);
-        //printf("by   : %e\n", stats->by);
-        //printf("hz   : %e\n", stats->hz);
 
         assert(isfinite(stats->cx));
         assert(isfinite(cpi->tau));
@@ -1057,9 +977,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
             stats->relgap = __NaN();
         }
 
-        //printf("pres: max(%e/%e, %e/%e)\n", stats->resy, stats->resy0, stats->resz, stats->resz0);
-        //printf("dres: %e/%e\n", stats->resx, stats->resx0);
-
         stats->pres = MAXF((stats->resy/stats->resy0), (stats->resz/stats->resz0));
         stats->dres = stats->resx / stats->resx0;
         stats->pinfres = __NaN();
@@ -1070,8 +987,8 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         if (stats->cx < 0.0) {
             stats->dinfres = MAXF((stats->hresy/stats->resy0),  (stats->hresz/stats->resz0)) / (-stats->cx);
         }
-        //printf("pinfres.0 %e, dinfres: %e\n", stats->pinfres, stats->dinfres);
-        if (opts->show_progress > 0) {
+
+        if (opts && opts->show_progress > 0) {
             if (iter == 0) {
                 fprintf(stderr, "%10s %12s %10s %8s %7s %5s\n",
                     "pcost", "dcost", "gap", "pres", "dres", "k/t");
@@ -1103,28 +1020,25 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
 
         // -----------------------------------------------------------------------
         // Compute initial scaling W:
-        // 
+        //
         //     W * z = W^{-T} * s = lambda
         //     dg * tau = 1/dg * kappa = lambdag.
         if (iter == 0) {
             cvxc_compute_scaling(&cp->W, &cpi->s_g, &cpi->z_g, &cpi->lmbda_g, &cp->work);
             //     dg = sqrt( kappa / tau )
             //     dgi = sqrt( tau / kappa )
-            //     lambda_g = sqrt( tau * kappa )  
-            // 
+            //     lambda_g = sqrt( tau * kappa )
+            //
             // lambda_g is stored in the last position of lmbda.
             cpi->dg  = SQRT(cpi->kappa / cpi->tau);
             cpi->dgi = SQRT(cpi->tau / cpi->kappa);
             cvxm_set(&cpi->lmbda, cp->cdim_diag, 0, SQRT(cpi->tau * cpi->kappa));
-            //cvxc_mat_printf(stdout, "%e", &cpi->lmbda, "lmbda");
-            //printf("dg: %e, dgi: %e\n", cpi->dg, cpi->dgi);
         }
 
         // lmdasq = lmda o lmbda
         cvxc_ssqr(&cpi->lmbdasq_g, &cpi->lmbda_g/*, 0*/);
         cvxc_float_t lambda_g0 = cvxm_get(&cpi->lmbda, cp->cdim_diag, 0);
         cvxm_set(&cpi->lmbdasq, cp->cdim_diag, 0, lambda_g0 * lambda_g0);
-        //cvxc_mat_printf(stdout, "%e", &cpi->lmbdasq, "lmbdasq");
 
         // Solve
         //
@@ -1139,26 +1053,7 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         cvxm_copy(&cpi->y1, cp->b, CVXC_ALL);
         cvxm_copy(&cpi->z1, cp->h, CVXC_ALL);
 
-#if 0
-        if (iter == 1) {
-            cvxc_scaling_printf(stdout, "%13.6e", &cp->W, "kktsolve.W");
-            cvxc_mat_printf(stdout, "%13.6e", cp->G, "kktsolve.G");
-            cvxc_mat_printf(stdout, "%13.6e", cp->A, "kktsolve.A");
-            cvxc_mat_printf(stdout, "%13.6e", &cpi->x1, "kktsolve.x");
-            cvxc_mat_printf(stdout, "%13.6e", &cpi->y1, "kktsolve.y");
-            cvxc_mat_printf(stdout, "%13.6e", &cpi->z1, "kktsolve.z");
-        }
-#endif
         int err = cvxc_kktsolve(cp->solver, &cpi->x1, &cpi->y1, &cpi->z1_g);
-#if 0
-        if (iter == 1) {
-            cvxc_mat_printf(stdout, "%13.6e", &cpi->x1, "kktsolve.x");
-            cvxc_mat_printf(stdout, "%13.6e", &cpi->y1, "kktsolve.y");
-            cvxc_mat_printf(stdout, "%13.6e", &cpi->z1, "kktsolve.z");
-        }
-#endif
-        //cvxc_mat_printf(stdout, "%e", &cpi->x1, "solved x");
-        //cvxc_mat_printf(stdout, "%e", &cpi->z1, "solved z");
 
         cvxm_scale(&cpi->x1, cpi->dgi, CVXC_ALL);
         cvxm_scale(&cpi->y1, cpi->dgi, CVXC_ALL);
@@ -1176,7 +1071,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
 
         cvxm_copy(&cpi->th, cp->h, CVXC_ALL);
         cvxc_scale(&cpi->th_g, &cp->W, CVXC_TRANS|CVXC_INV, &cp->work);
-        //cvxc_mat_printf(stdout, "%e", &cpi->th, "scaled th");
 
         cvxc_float_t nrm, mu, sigma, step, tt, tk;
 
@@ -1208,8 +1102,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
 
             cvxc_mgrp_copy_lambda(&cpi->ds_g, &cpi->lmbdasq_g);
             cpi->dkappa = cvxm_get(&cpi->lmbdasq, cp->cdim_diag, 0);
-            //cvxc_mat_printf(stdout, "%e", &cpi->ds, "ds");
-            //printf("dkappa=%e, mu=%e, sigma=%e, refinement=%d, i=%d\n", cpi->dkappa, mu, sigma, refinement, i);
 
             if (i == 1) {
                 // ws3 holds ds o dz ; wkappa3 holds dtau*dkappa 
@@ -1218,7 +1110,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
                 // update ds with -sigma*mu
                 cvxc_mgrp_update_sz(&cpi->ds_g, -sigma*mu, 0);
                 cpi->dkappa = cpi->dkappa + cpi->wkappa3 - sigma*mu;
-                //cvxc_mat_printf(stdout, "%e", &cpi->ds, "from saved ws3->ds (i=1)");
             }
             // (dx, dy, dz, dtau) = (1-sigma)*(rx, ry, rz, rt)
             cvxm_copy(&cpi->dx, &cpi->rx, CVXC_ALL);
@@ -1228,26 +1119,15 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
             cvxm_copy(&cpi->dz, &cpi->rz, CVXC_ALL);
             cvxm_scale(&cpi->dz, 1.0 - sigma, CVXC_ALL);
             cpi->dtau = (1.0 - sigma) * stats->rt;
-            if (i == 1) {
-                //cvxc_mat_printf(stdout, "%e", &cpi->rx, "rx (i=1)");
-                //cvxc_mat_printf(stdout, "%e", &cpi->dx, "dx (i=1)");
-                //cvxc_mat_printf(stdout, "%e", &cpi->rz, "rz (i=1)");
-                //cvxc_mat_printf(stdout, "%e", &cpi->dz, "dz (i=1)");
-                //cvxc_mat_printf(stdout, "%e", &cpi->ds, "ds (i=1)");
-            }
-            if (i == 0) {
-                //cvxc_mat_printf(stdout, "%e", &cpi->dx, "dx (i=0)");
-            }
+
             f6(cp, &cpi->dx, &cpi->dy,
                &cpi->dz_g, &cpi->dtau, &cpi->ds_g, &cpi->dkappa, refinement);
-            //cvxc_mat_printf(stdout, "%e", &cpi->dx, "f6(dx)");
-            //printf("f6: dtau=%e, dkappa=%e\n", cpi->dtau, cpi->dkappa);
+
             if (i == 0) {
                 // Save ds o dz and dkappa * dtau for Mehrotra correction
                 cvxm_copy(&cpi->ws3, &cpi->ds, CVXC_ALL);
                 cvxc_sprod(&cpi->ws3_g, &cpi->dz_g, 0, &cp->work);
                 cpi->wkappa3 = cpi->dtau * cpi->dkappa;
-                //cvxc_mat_printf(stdout, "%e", &cpi->ws3, "saved ds->ws3 (i=0)");
             }
 
             // Maximum step to boundary.
@@ -1258,9 +1138,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
 
             cvxc_scale2(&cpi->ds_g, &cpi->lmbda_g, 0, &cp->work);
             cvxc_scale2(&cpi->dz_g, &cpi->lmbda_g, 0, &cp->work);
-            //cvxc_mat_printf(stdout, "%e", &cpi->dz, "inloop scale2(dz)");
-            //cvxc_mat_printf(stdout, "%e", &cpi->ds, "inloop scale2(ds)");
-            //cvxc_mat_printf(stdout, "%e", &cpi->lmbda, "lmbda");
 
             if (i == 0) {
                 cpi->ts = cvxc_max_step(&cpi->ds_g, __nilgrp, &cp->work);
@@ -1273,8 +1150,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
             tt = -cpi->dtau / cvxm_get(&cpi->lmbda, cp->cdim_diag, 0);
             tk = -cpi->dkappa / cvxm_get(&cpi->lmbda, cp->cdim_diag, 0);
             cvxc_float_t t = cvxc_maxvec(5, (cvxc_float_t[]){0.0, cpi->ts, cpi->tz, tt, tk});
-            //printf("ts=%e, tz=%e, tt=%e, tk=%e, t=%e\n", cpi->ts, cpi->tz, tt, tk, t);
-            //cvxc_mat_printf(stdout, "%e", &cpi->dz, "inloop maxstep dz");
             if (t == 0.0) {
                 step = 1.0;
             } else {
@@ -1288,19 +1163,10 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
                 // sigma = (1 -step)^3
                 sigma = (1.0 - step) * (1.0 - step) * (1.0 - step);
             }
-            //printf("sigma=%e, step=%e\n", sigma, step);
-            //cvxc_mat_printf(stdout, "%e", &cpi->dz, "loop end dz");
-            //cvxc_mat_printf(stdout, "%e", &cpi->ds, "loop end ds");
         }
-        //printf("** tau = %e, kappa = %e\n", cpi->tau, cpi->kappa);
-        //printf("** step = %e, sigma = %e\n", step, sigma);
-        //cvxc_mat_printf(stdout, "%e", &cpi->dz, "after dz");
-        //cvxc_mat_printf(stdout, "%e", &cpi->ds, "after ds");
-
         // update x, y
         cvxm_axpy(&cpi->x, step, &cpi->dx);
         cvxm_axpy(&cpi->y, step, &cpi->dy);
-        //cvxc_mat_printf(stdout, "%e", &cpi->x, "update x");
 
         // Replace 'l' and 'q' blocks of ds and dz with the updated
         // variables in the current scaling.
@@ -1316,8 +1182,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         cvxc_mgrp_scale_sz(&cpi->dz_g, step, CVXDIM_LINEAR|CVXDIM_SOCP);
         cvxc_mgrp_update_sz(&cpi->dz_g, 1.0, CVXDIM_LINEAR|CVXDIM_SOCP);
 
-        //cvxc_mat_printf(stdout, "%e", &cpi->dz, "update dz");
-        //cvxc_mat_printf(stdout, "%e", &cpi->ds, "update ds");
         // ds := H(lambda)^{-1/2} * ds and dz := H(lambda)^{-1/2} * dz.
         //
         // This replaces the 'l' and 'q' components of ds and dz with the
@@ -1326,13 +1190,9 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         //
         // diag(lmbda_k)^{1/2} * Qs * diag(lmbda_k)^{1/2}
         // diag(lmbda_k)^{1/2} * Qz * diag(lmbda_k)^{1/2}
-        //cvxc_mat_printf(stdout, "%e", &cpi->dz, "pre-scale2 dz");
 
         cvxc_scale2(&cpi->ds_g, &cpi->lmbda_g, CVXC_INV, &cp->work);
         cvxc_scale2(&cpi->dz_g, &cpi->lmbda_g, CVXC_INV, &cp->work);
-
-        //cvxc_mat_printf(stdout, "%e", &cpi->dz, "scale2(dz)");
-        //cvxc_mat_printf(stdout, "%e", &cpi->ds, "scale2(ds)");
 
         // sigs := ( e + step*sigs ) ./ lambda for 's' blocks.
         // sigz := ( e + step*sigz ) ./ lambda for 's' blocks.
@@ -1340,8 +1200,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         cvxm_scale(&cpi->sigz, step, CVXC_ALL);
         cvxm_add(&cpi->sigs, 1.0, CVXC_ALL);
         cvxm_add(&cpi->sigz, 1.0, CVXC_ALL);
-        //cvxc_mat_printf(stdout, "%e", &cpi->sigs, "scaled sigs");
-        //cvxc_mat_printf(stdout, "%e", &cpi->sigz, "scaled sigz");
 
         for (int k = 0; k < cvxc_mgrp_count(&cpi->lmbda_g, CVXDIM_SDP); k++) {
             cvxc_mgrp_elem(&lk, &cpi->lmbda_g, CVXDIM_SDP, k);
@@ -1352,8 +1210,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
             cvxc_mgrp_elem(&sk, &cpi->sigz_g, CVXDIM_SDP, k);
             cvxm_solve_diag(&sk, 1.0, &lk, CVXC_RIGHT);
         }
-        //cvxc_mat_printf(stdout, "%e", &cpi->sigs, "scaled sigs");
-        //cvxc_mat_printf(stdout, "%e", &cpi->sigz, "scaled sigz");
 
         // TODO: missing somethings..!!!!
         // divide ds, dz by lmbda S blocks;; 
@@ -1374,14 +1230,7 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
                 cvxm_scale(&lk, a, 0);
             }
         }
-
-        //cvxc_mat_printf(stdout, "%e", &cpi->lmbda, "lambda");
-        //cvxc_mat_printf(stdout, "%e", &cpi->lmbda, "pre scaling lambda");
-        //cvxc_mat_printf(stdout, "%e", &cpi->ds, "pre scaling ds");
-        //cvxc_mat_printf(stdout, "%e", &cpi->dz, "pre scaling dz");
         cvxc_update_scaling(&cp->W, &cpi->lmbda_g, &cpi->ds_g, &cpi->dz_g, &cp->work);
-        //cvxc_scaling_printf(stdout, "%e", &cpi->W, "W");
-        //cvxc_mat_printf(stdout, "%e", &cpi->lmbda, "scaled lambda");
 
         // For kappa, tau block:
         //
@@ -1395,8 +1244,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         cvxc_float_t a = SQRT(1.0 - step*tk) * SQRT(1.0-step*tt);
         cvxc_float_t g = cvxm_get(&cpi->lmbda, cp->cdim_diag, 0);
         cvxm_set(&cpi->lmbda, cp->cdim_diag, 0, a*g);
-        //printf("dg=%e, dgi=%e\n", cpi->dg, cpi->dgi);
-        //cvxc_mat_printf(stdout, "%e", &cpi->lmbda, "updated lambda");
 
         // Unscale s, z, tau, kappa (unscaled variables are used only to
         // compute feasibility residuals).
@@ -1412,8 +1259,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         cvxm_map_data(&lk, cp->cdim_diag, 1, cvxm_data(&cpi->lmbda, 0));
         g = cvxm_nrm2(&lk) / cpi->tau;
         stats->gap = g*g;
-        //printf(" ** kappa=%e, tau=%e, gap=%e, sigma=%e\n", cpi->kappa, cpi->tau, stats->gap, sigma);
-
     }
 
     // we never reach here; TODO: fail if we do

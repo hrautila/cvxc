@@ -105,7 +105,6 @@ int ldl_factor(cvxc_kktsolver_t *S,
     cvxm_view_map(&Kt, &ldl->K, ldl->n, 0, ldl->p, ldl->n);
     cvxm_copy(&Kt, ldl->A, 0);
 
-    //cvxc_mat_printf(stdout, "%4.1f", Df, "Df");
     // copy scaled [Df; G].T to K ; column by column
     for (cvxc_size_t k = 0; k < ldl->n; k++) {
         // g is (mnl + G.Rows(), 1) matrix, Df is (mnl, n), G is (N, n)
@@ -132,12 +131,7 @@ int ldl_factor(cvxc_kktsolver_t *S,
     for (cvxc_size_t k = ldl->n + ldl->p; k < ldl->ldK; k++) {
         cvxm_set(&ldl->K, k, k, -1.0);
     }
-    //cvxc_mat_printf(stdout, "%4.1f", &ldl->K, "K");
-    //cvxc_mat_print_ifenv("LDLKKT_PREFACTOR_K", &ldl->K, "unfactored K");
     int err = cvxm_ldlfactor(&ldl->K, ldl->ipiv, CVXC_LOWER, &ldl->work);
-    //cvxc_mat_print_ifenv("LDLKKT_POSTFACTOR_K", &ldl->K, "factored K");
-    //cvxc_mat_test_nan("LDLKKT_POSTFACTOR_K", &ldl->K);
-
     return err;
 }
 
@@ -158,7 +152,6 @@ int ldl_solve(cvxc_kktsolver_t *S,
               cvxc_matrix_t *y,
               cvxc_matgrp_t *z_g)
 {
-    //cvxc_ldlsolver_t *ldl = &S->u.ldl;
     cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)S;
     cvxc_problem_t *cp = ldl->cp;
     cvxc_matrix_t u0;
@@ -213,13 +206,6 @@ int ldl_init(cvxc_kktsolver_t *S,
     cvxm_init(&ldl->g, ldl->ldK, 1);
 
     // compute size for workspace
-#if 0
-    armas_wbuf_t wb = ARMAS_WBNULL;
-    armas_pivot_t P;
-
-    armas_pivot_make(&P, ldl->ldK, ldl->ipiv);
-    armas_d_bkfactor_w(&ldl->K, &P, CVXC_LOWER, &wb, (armas_conf_t *)0);
-#endif
     cvxc_size_t wbytes = cvxm_ldlwork(&ldl->K);
     cvxc_mblk_init(&ldl->work, 4*wbytes);
 

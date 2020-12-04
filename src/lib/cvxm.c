@@ -324,14 +324,6 @@ cvxc_matrix_t *cvxm_new_unit_vector(cvxc_size_t n, cvxc_float_t val)
 // \brief print matrix to file stream
 void cvxm_printf(FILE *fp, const char *fmt, const cvxc_matrix_t *x)
 {
-#if 0
-    if (armas_isvector(x) && x->cols == 1) {
-        armas_dense_t row;
-        armas_col_as_row(&row, x);
-        armas_printf(fp, fmt, &row);
-        return;
-    }
-#endif
     armas_printf(fp, fmt, &x->data);
     if (cvxm_isepi(x)) {
         fprintf(fp, "/");
