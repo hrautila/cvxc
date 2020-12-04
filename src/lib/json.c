@@ -5,7 +5,24 @@
  * distributed under the terms of GNU Lesser General Public License Version 3, or
  * any later version. See the COPYING file included in this archive.
  */
-#include "json.h"
+#include "cvxc.h"
+
+enum json_tokens {
+    CVXC_JSON_STRING = ARMAS_JSON_STRING,
+    CVXC_JSON_INT = ARMAS_JSON_INT,
+    CVXC_JSON_NUMBER = ARMAS_JSON_NUMBER,
+    CVXC_JSON_NULL = ARMAS_JSON_NULL
+};
+
+void cvxc_file_stream(cvxc_stream_t *ios, FILE *fp)
+{
+    armas_ios_file(ios, fp);
+}
+
+void cvxc_str_stream(cvxc_stream_t *ios, const char *s, int len)
+{
+    armas_ios_string(ios, s, len);
+}
 
 int cvxc_solver_number(const char *name)
 {
@@ -48,6 +65,8 @@ int cvxc_json_matrix_read(cvxc_matrix_t **A, cvxc_stream_t *ios)
         m->bits = 0;
         *A = m;
     }
+    (*A)->t = 0.0;
+    (*A)->bits = 0;
     armas_dense_t *amat = &(*A)->data;
     return armas_json_read(&amat, ios);
 }
@@ -122,6 +141,10 @@ enum cvxc_json_flags {
 int cvxc_json_dimset_write(cvxc_stream_t *ios, const cvxc_dimset_t *dims)
 {
     int lval;
+    if (!dims) {
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_NULL, 0, 0));
+        return 0;
+    }
     //double lval;
     ONERR(cvxc_json_write_simple_token(ios, '{'));
     ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "nl", 2));
@@ -413,6 +436,10 @@ enum cvxc_param_bits {
 
 int cvxc_json_write_options(cvxc_stream_t *ios, const cvxc_solopts_t *opts, const char *kkt)
 {
+    if (!opts) {
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_NULL, 0, 0));
+        return 0;
+    }
     ONERR(cvxc_json_write_simple_token(ios, '{'));
     // "abstol": NUM
     ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "abstol", 6));
@@ -765,6 +792,64 @@ int cvxc_json_write_result(cvxc_stream_t *ios, const cvxc_solution_t *sol)
     // write result fields from solution
     ONERR(cvxc_json_write_simple_token(ios, '{'));
 
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "primal_objective", 16));
+    ONERR(cvxc_json_write_simple_token(ios, ':'));
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_NUMBER,
+                                &sol->primal_objective, sizeof(sol->primal_objective)));
+    ONERR(cvxc_json_write_simple_token(ios, ','));
+
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "dual_objective", 14));
+    ONERR(cvxc_json_write_simple_token(ios, ':'));
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_NUMBER,
+                                &sol->dual_objective, sizeof(sol->dual_objective)));
+    ONERR(cvxc_json_write_simple_token(ios, ','));
+
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "gap", 3));
+    ONERR(cvxc_json_write_simple_token(ios, ':'));
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_NUMBER, &sol->gap, sizeof(sol->gap)));
+    ONERR(cvxc_json_write_simple_token(ios, ','));
+
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "relative_gap", 12));
+    ONERR(cvxc_json_write_simple_token(ios, ':'));
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_NUMBER,
+                                &sol->relative_gap, sizeof(sol->relative_gap)));
+    ONERR(cvxc_json_write_simple_token(ios, ','));
+
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "primal_infeasibility", 19));
+    ONERR(cvxc_json_write_simple_token(ios, ':'));
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_NUMBER,
+                                &sol->primal_infeasibility, sizeof(sol->primal_infeasibility)));
+    ONERR(cvxc_json_write_simple_token(ios, ','));
+
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "dual_infeasibility", 17));
+    ONERR(cvxc_json_write_simple_token(ios, ':'));
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_NUMBER,
+                                &sol->dual_infeasibility, sizeof(sol->dual_infeasibility)));
+    ONERR(cvxc_json_write_simple_token(ios, ','));
+
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "primal_slack", 12));
+    ONERR(cvxc_json_write_simple_token(ios, ':'));
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_NUMBER,
+                                &sol->primal_slack, sizeof(sol->primal_slack)));
+    ONERR(cvxc_json_write_simple_token(ios, ','));
+
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "dual_slack", 10));
+    ONERR(cvxc_json_write_simple_token(ios, ':'));
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_NUMBER,
+                                &sol->dual_slack, sizeof(sol->dual_slack)));
+    ONERR(cvxc_json_write_simple_token(ios, ','));
+
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "primal_residual_cert", 20));
+    ONERR(cvxc_json_write_simple_token(ios, ':'));
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_NUMBER,
+                                &sol->primal_residual_cert, sizeof(sol->primal_residual_cert)));
+    ONERR(cvxc_json_write_simple_token(ios, ','));
+
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "dual_residual_cert", 18));
+    ONERR(cvxc_json_write_simple_token(ios, ':'));
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_NUMBER,
+                                &sol->dual_residual_cert, sizeof(sol->dual_residual_cert)));
+
     ONERR(cvxc_json_write_simple_token(ios, '}'));
     return 0;
 }
@@ -773,6 +858,10 @@ int cvxc_json_write_solution(cvxc_stream_t *ios, const cvxc_solution_t *sol)
 {
     int lval;
 
+    if (!sol) {
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_NULL, 0, 0));
+        return 0;
+    }
 
     ONERR(cvxc_json_write_simple_token(ios, '{'));
     // "status": INT
