@@ -19,6 +19,12 @@ cvxc_dimset_t *cvxc_dimset_alloc(cvxc_dimset_t *dims, cvxc_size_t linear, const 
     for (n = 0; sdp && sdp[n] > 0; n++);
     dims->slen = n;
 
+    dims->mnl = dims->iscpt = 0;
+    dims->ldim = linear;
+
+    if (dims->qlen == 0 && dims->slen == 0)
+        return dims;
+
     // allocate memory to hold both arrays
     dims->qdims = (cvxc_size_t *)calloc(dims->slen + dims->qlen, sizeof(cvxc_size_t));
     if (! dims->qdims) {
@@ -27,8 +33,6 @@ cvxc_dimset_t *cvxc_dimset_alloc(cvxc_dimset_t *dims, cvxc_size_t linear, const 
     }
     // SDP dimension after SOCP dimension
     dims->sdims = dims->slen > 0 ? &dims->qdims[dims->qlen] : (cvxc_size_t *)0;
-    dims->mnl = dims->iscpt = 0;
-    dims->ldim = linear;
     // copy SOCP dimensions
     for (n = 0; n < dims->qlen; dims->qdims[n] = socp[n], n++);
     // copy SDP dimensions
