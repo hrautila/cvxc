@@ -435,6 +435,8 @@ typedef struct cvxc_params
     cvxc_matrix_t *A;
     cvxc_matrix_t *b;
     struct cvxc_solopts *opts;
+    char *module;
+    char *args;
 } cvxc_params_t;
 
 struct cvxc_solution;
@@ -449,9 +451,11 @@ extern int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios);
 extern int cvxc_json_write_solution(cvxc_stream_t *ios, const struct cvxc_solution *sol);
 extern int cvxc_json_write_result(cvxc_stream_t *ios, const struct cvxc_solution *sol);
 extern int cvxc_json_read_params(cvxc_params_t **pars, cvxc_stream_t *ios);
-int cvxc_json_write_params(cvxc_stream_t *ios, const cvxc_solopts_t *opts, const cvxc_dimset_t *dims,
-                          const cvxc_matrix_t *c, const cvxc_matrix_t *G, const cvxc_matrix_t *h,
-                          const cvxc_matrix_t *A, const cvxc_matrix_t *b);
+extern int cvxc_json_write_params(cvxc_stream_t *ios, cvxc_params_t *pars);
+extern int cvxc_json_write_param_items(
+    cvxc_stream_t *ios, const cvxc_solopts_t *opts, const cvxc_dimset_t *dims,
+    const cvxc_matrix_t *c, const cvxc_matrix_t *G, const cvxc_matrix_t *h,
+    const cvxc_matrix_t *A, const cvxc_matrix_t *b, const char *mod, const char *args);
 extern int cvxc_json_read_options(cvxc_solopts_t **opts, cvxc_stream_t *ios);
 extern int cvxc_json_write_options(cvxc_stream_t *ios, const cvxc_solopts_t *opts, const char *kkt);
 
@@ -474,6 +478,8 @@ typedef struct cvxc_convex_program {
     cvxc_convex_f2 F;
     void *user;
 }  cvxc_convex_program_t;
+
+typedef int (*cvxc_cp_initfunc)(cvxc_convex_program_t *, void *);
 
 static inline
 void cvxc_convex_program_init(cvxc_convex_program_t *cp, cvxc_convex_f2 F, void *user)
