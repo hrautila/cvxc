@@ -28,11 +28,11 @@ int solver_read_matrix(cvxc_matrix_t **A, const char *path)
         perror(path);
         return -1;
     }
-    cvxc_file_stream(&ios, fp);
     if (json) {
+        cvxc_file_stream(&ios, fp);
         err = cvxc_json_matrix_read(A, &ios);
     } else {
-        err = 0; // cvxm_mmload(A, fp);
+        err = -1; // cvxm_mm_read_file(*A, fp);
     }
     fclose(fp);
     return err;
