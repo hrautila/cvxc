@@ -36,6 +36,16 @@ nobase_include_HEADERS = include/cvxc.h
 noinst_HEADERS = \
 	include/cpl.h \
 	include/cvxm.h \
-	include/epi.h \
-	include/json.h
+	include/epi.h
+
+LIBCVXC = libcvxc.la
+
+bin_PROGRAMS = cvxsolver
+cvxsolver_SOURCES = bin/solvermain.c bin/input.c bin/shared.c bin/solve.c
+cvxsolver_CFLAGS = -I$(srcdir)/bin
+cvxsolver_LDADD = -L$(HOME)/.local/lib -L$(top_builddir)/src/.libs -lcvxc -larmasd -ldl
+cvxsolver_LDFLAGS = -static
+
+
+
 
