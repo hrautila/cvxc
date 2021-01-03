@@ -442,7 +442,7 @@ int cvxm_update2_sym(cvxc_float_t beta, cvxc_matrix_t *C, cvxc_float_t alpha, co
 }
 
 
-extern int cvxm_mmload(cvxc_matrix_t *A, FILE *fp);
+extern int cvxm_mm_read_file(cvxc_matrix_t *A, FILE *fp);
 extern int cvxm_write_file(FILE *fp, const cvxc_matrix_t *m);
 extern int cvxm_json_write_file(FILE *fp, const cvxc_matrix_t *m);
 extern int cvxm_json_read_file(cvxc_matrix_t *m, FILE *fp);

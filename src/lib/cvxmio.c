@@ -258,17 +258,18 @@ int cvxm_write_file(FILE *fp, const cvxc_matrix_t *m)
 
 int cvxm_json_write_file(FILE *fp, const cvxc_matrix_t *m)
 {
-    int n = 0;
-    n += fprintf(fp, "{\"rows\":%d, \"cols\": %d, \"data\":[", m->data.rows, m->data.cols);
-    for (int j = 0; j < m->data.cols; j++) {
-        for (int i = 0; i < m->data.rows; i++) {
-            if ((j == 0 && i > 0) || j > 0) {
-                fputc(',', fp);
-                n++;
-            }
-            n += fprintf(fp, "%.9e", cvxm_get((cvxc_matrix_t *)m, i, j));
-        }
-    }
-    n += fprintf(fp, "]}\n");
-    return n;
+    return armas_json_dump(fp, &m->data, 0);
+}
+
+int cvxm_json_read_file(cvxc_matrix_t *m, FILE *fp)
+{
+    armas_dense_t *mptr = &m->data;
+    return armas_json_load(&mptr, fp);
+}
+
+int cvxm_mm_read_file(cvxc_matrix_t *m, FILE *fp)
+{
+    int flags = 0;
+    armas_dense_t *mptr = &m->data;
+    return armas_mmload(mptr, &flags, fp);
 }
