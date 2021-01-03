@@ -639,12 +639,10 @@ cvxc_size_t cvxc_cpl_setup(cvxc_problem_t *cp,
 }
 
 int cvxc_cpl_ready(cvxc_problem_t *cp,
-                  //cvxc_stats_t *stats,
                   int iter,
                   int stat)
 {
     cvxc_cpl_internal_t *cpi = &cp->u.cpl;
-    //cvxc_stats_t *stats = &prob->stats;
 
     if (stat == CVXC_STAT_OPTIMAL && iter == -1) {
         // constructed initial point is feasible and optimal
@@ -1046,25 +1044,21 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
 
         if (opts->show_progress > 0) {
             if (iter == 0) {
-                fprintf(stderr, "%10s %12s %10s %8s %7s\n",
+                fprintf(stderr, "%10s %11s %9s %8s %7s\n",
                     "pcost", "dcost", "gap", "pres", "dres");
             }
-            fprintf(stderr, "%2d: %11.4e %11.4e %4.0e %7.0e %7.0e\n",
+            fprintf(stderr, "%2d: %11.4e %11.4e %6.0e %7.0e %7.0e\n",
                     iter, cpi->pcost, cpi->dcost, cpi->gap, cpi->pres, cpi->dres);
         }
         // ---------------------------------------------------------------------
         // test for stopping criteria
 
-        if (iter == maxiter) {
-            return cvxc_cpl_ready(cp, /*stats,*/ iter, CVXC_STAT_UNKNOWN);
+        if (cpi->pres <= feastol &&
+            cpi->dres <= feastol &&
+            (cpi->gap <= abstol ||
+             (!isnan(cpi->relgap) && cpi->relgap < reltol))) {
 
-        }
-        else  if (cpi->pres <= feastol &&
-                    cpi->dres <= feastol &&
-                    (cpi->gap <= abstol ||
-                     (!isnan(cpi->relgap) && cpi->relgap < reltol))) {
-
-            return cvxc_cpl_ready(cp, /*stats,*/ iter, CVXC_STAT_OPTIMAL);
+            return cvxc_cpl_ready(cp, iter, CVXC_STAT_OPTIMAL);
         }
 
         // -----------------------------------------------------------------------
@@ -1157,13 +1151,12 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
             cvxc_mgrp_axpby_sz(0.0, &cpi->dz_g, -1.0+cpi->eta, &cpi->rz_g, CVXDIM_CONVEXPROG);
 
             // .. computation here
-            cvxc_mat_test_nan("pre solve ds", &cpi->ds);
             err = f4(cp, &cpi->dx, &cpi->dy, &cpi->dz_g, &cpi->ds_g, refinement);
             if (err < 0) {
                 // terminated ....
                 return cvxc_cpl_ready(cp, /*stats,*/ iter, CVXC_STAT_SINGULAR);
             }
-            cvxc_mat_test_nan("post solve ds", &cpi->ds);
+            // cvxc_mat_test_nan("post solve ds", &cpi->ds);
             // line search needs ds'*dz and unscaled steps
             cpi->dsdz = cvxc_sdot(&cpi->ds_g, &cpi->dz_g);
             cvxm_copy(&cpi->dz2, &cpi->dz, 0);
@@ -1172,12 +1165,9 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
             cvxc_scale(&cpi->ds2_g, &cp->W, CVXC_TRANS, &cp->work);
 
             // max step to boundary
-            cvxc_mat_test_nan("pre scale2 ds", &cpi->ds);
-            cvxc_mat_test_nan("pre scale2 dz", &cpi->dz);
             cvxc_scale2(&cpi->ds_g, &cpi->lmbda_g, 0, &cp->work);
             cvxc_scale2(&cpi->dz_g, &cpi->lmbda_g, 0, &cp->work);
-            cvxc_mat_test_nan("post scale2 ds", &cpi->ds);
-            cvxc_mat_test_nan("post scale2 dz", &cpi->dz);
+
             cpi->ts = cvxc_max_step(&cpi->ds_g, &cpi->sigs_g, &cp->work);
             cpi->tz = cvxc_max_step(&cpi->dz_g, &cpi->sigz_g, &cp->work);
             cvxc_float_t t = cvxc_maxvec(3, (cvxc_float_t[]){0.0, cpi->ts, cpi->tz});
@@ -1280,7 +1270,5 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
         cpi->gap = cvxm_dot(&cpi->lmbda, &cpi->lmbda);
     }
 
-    // we never reach here; TODO: fail if we do
-    return 0;
+    return cvxc_cpl_ready(cp, maxiter, CVXC_STAT_UNKNOWN);
 }
-
