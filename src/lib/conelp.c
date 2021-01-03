@@ -990,24 +990,20 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
 
         if (opts && opts->show_progress > 0) {
             if (iter == 0) {
-                fprintf(stderr, "%10s %12s %10s %8s %7s %5s\n",
+                fprintf(stderr, "%10s %12s %9s %8s %7s %5s\n",
                     "pcost", "dcost", "gap", "pres", "dres", "k/t");
             }
-            fprintf(stderr, "%2d: %11.4e %11.4e %4.0e %7.0e %7.0e %7.0e\n",
+            fprintf(stderr, "%2d: %11.4e %11.4e %6.0e %7.0e %7.0e %7.0e\n",
                     iter, stats->pcost, stats->dcost, stats->gap, stats->pres,
                     stats->dres, cpi->kappa/cpi->tau);
         }
         // ---------------------------------------------------------------------
         // test for stopping criteria
 
-        if (iter == maxiter) {
-            return cvxc_conelp_ready(cp, stats, iter, CVXC_STAT_UNKNOWN);
-
-        }
-        else if (stats->pres <= feastol &&
-                 stats->dres <= feastol &&
-                 (stats->gap <= abstol ||
-                  (!isnan(stats->relgap) && stats->relgap < reltol))) {
+        if (stats->pres <= feastol &&
+            stats->dres <= feastol &&
+            (stats->gap <= abstol ||
+             (!isnan(stats->relgap) && stats->relgap < reltol))) {
 
             return cvxc_conelp_ready(cp, stats, iter, CVXC_STAT_OPTIMAL);
         }
@@ -1261,6 +1257,5 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         stats->gap = g*g;
     }
 
-    // we never reach here; TODO: fail if we do
-    return 0;
+    return cvxc_conelp_ready(cp, stats, maxiter, CVXC_STAT_UNKNOWN);
 }
