@@ -42,8 +42,9 @@ LIBCVXC = libcvxc.la
 
 bin_PROGRAMS = cvxsolver
 cvxsolver_SOURCES = bin/solvermain.c bin/input.c bin/shared.c bin/solve.c
+cvxsolver_DEPENDENCIES = libcvxc.la
 cvxsolver_CFLAGS = -I$(srcdir)/bin
-cvxsolver_LDADD = -L$(HOME)/.local/lib -L$(top_builddir)/src/.libs -lcvxc -larmasd -ldl
+cvxsolver_LDADD =  -L$(top_builddir)/src/.libs -lcvxc -larmasd -ldl
 cvxsolver_LDFLAGS = -static
 
 
