@@ -24,6 +24,7 @@ struct solver_args {
     char *name_cp;
     char *args_cp;
     char *type;
+    char *output;
     cvxc_size_t L;
     cvxc_size_t nL;
     cvxc_size_t nQ;

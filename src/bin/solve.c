@@ -24,7 +24,7 @@ int solve_conelp(cvxc_params_t *params, cvxc_solopts_t *opts, struct solver_args
     cvxc_conelp_compute_start(&cp);
     cvxc_conelp_solve(&cp, params->opts ? params->opts : opts);
 
-    solver_write_solution("-", &cp.solution);
+    solver_write_solution(args->output, &cp.solution);
 
     return 0;
 }
@@ -69,7 +69,7 @@ int solve_cpl(cvxc_params_t *params, cvxc_solopts_t *opts, struct solver_args *a
     opts->max_iter = args->maxiter;
 
     cvxc_cpl_solve(&cpl, opts);
-    solver_write_solution("-", &cpl.solution);
+    solver_write_solution(args->output, &cpl.solution);
 
     dlclose(handle);
     return 0;
@@ -100,7 +100,7 @@ int solve_cp(cvxc_params_t *params, cvxc_solopts_t *opts, struct solver_args *ar
     }
     cvxc_cp_compute_start(&cp);
     cvxc_cp_solve(&cp, params->opts ? params->opts : opts);
-    solver_write_solution("-", &cp.solution);
+    solver_write_solution(args->output, &cp.solution);
 
     dlclose(handle);
     return 0;
