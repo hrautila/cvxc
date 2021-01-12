@@ -1,0 +1,37 @@
+FROM ubuntu as builder
+
+RUN apt-get update && apt-get upgrade -y
+RUN apt-get install -y git gcc make automake autoconf libtool
+
+WORKDIR /usr/local/src
+RUN git clone https://github.com/hrautila/armas
+RUN git clone https://github.com/hrautila/cvxc
+
+# Build libarmasd 
+WORKDIR /usr/local/src/armas
+RUN ./bootstrap.sh
+RUN mkdir build && cd build && \
+    ../configure --prefix=/usr/local --enable-notypenames --disable-accelerators --disable-ext-precision && \
+    make CFLAGS="-O3" && make install
+
+# Build libcvxc and solver
+WORKDIR /usr/local/src/cvxc
+RUN ./bootstrap.sh
+RUN mkdir build && cd build && \
+    CFLAGS=-I/usr/local/include LDFLAGS=-L/usr/local/lib ../configure --prefix=/usr/local && \
+    make CFLAGS="-O3" && make install
+
+FROM ubuntu
+
+WORKDIR /usr/local
+COPY --from=builder /usr/local/bin/* ./bin/
+COPY --from=builder /usr/local/lib/libarmas* ./lib/
+COPY --from=builder /usr/local/lib/libcvxc* ./lib/
+COPY --from=builder /usr/local/include/ ./include/
+
+RUN mkdir /var/lib/cvxc
+ENV CVXC_LIBRARY_PATH=/var/lib/cvxc
+
+WORKDIR /var/run
+
+ENTRYPOINT ["/usr/local/bin/cvxsolver"]
