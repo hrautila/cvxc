@@ -27,6 +27,7 @@ static struct option long_options[] = {
     {"program",    required_argument, 0, 'P'},
     {"convex",     required_argument, 0, 'F'},
     {"args",       required_argument, 0, 'a'},
+    {"output",     required_argument, 0, 'o'},
     {"mm-mask",    required_argument, 0, 'm'},
     {"max-iter",   required_argument, 0, 'i'},
     {"linear",     required_argument, 0, 'L'},
@@ -34,12 +35,40 @@ static struct option long_options[] = {
     {"sdp" ,       required_argument, 0, 'S'},
     {"json",       no_argument,       0, 'j'},
     {"verbose",    no_argument,       0, 'v'},
+    {"version",    no_argument,       0, 'V'},
     {"refinement", required_argument, 0, 'r'},
     {"type",       required_argument, 0, 'T'},
+    {"shell-template", no_argument,   0,   0},
     {0,            0,                 0, 0}
 };
 
-#define SHORT_OPTS "A:G:c:h:b:d:F:P:a:L:Q:S:m:i:T:jv"
+#define SHORT_OPTS "A:G:c:h:b:d:F:P:a:o:L:Q:S:m:i:T:jvV"
+
+
+static char *shell_template[] = {
+    "#!/bin/bash",
+    "",
+    "images=$(docker images | awk '$1 ~ /cvxc/ {printf \"%s:%s\\n\", $1, $2}')",
+    "",
+    "if [ \"$images\" = \"\" ]; then",
+    "    echo \"No cvxc images. Pull one!\" >&2",
+    "    exit 1",
+    "fi",
+    "",
+    "docker_image=$(echo \"$images\" | tr ' ' '\\n' | awk -F: '$2 ~ /latest/ {print $0}')",
+    "if [ \"$docker_image\" = \"\" ]; then",
+    "    docker_image=$(echo \"$images\" | tr ' ' '\\n' | head -1)",
+    "fi",
+    "",
+    "istty=\"-t\"",
+    "if [ ! -t 0 ]; then",
+    "    istty=",
+    "fi",
+    "",
+    "docker run --rm -i $istty --volume $PWD:/var/run $docker_image $*",
+    "",
+    0
+};
 
 cvxc_size_t *parse_intlist(cvxc_size_t *n, char *arg)
 {
@@ -78,6 +107,17 @@ int solver_is_convex(const char *type)
     return strncmp(type, "cpl", 3) == 0 || strncmp(type, "cp", 2) == 0;
 }
 
+int handle_long_only_option(const char *name, char *optarg, struct solver_args *args)
+{
+    if (strncmp(name, "shell-template", 14) == 0) {
+        for (int i = 0; shell_template[i]; i++) {
+            fprintf(stdout, "%s\n", shell_template[i]);
+        }
+        exit(0);
+    }
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     int opt;
@@ -91,6 +131,9 @@ int main(int argc, char **argv)
 
     while ((opt = getopt_long(argc, argv, SHORT_OPTS, long_options, &option_index)) != -1) {
         switch (opt) {
+        case 0:
+            handle_long_only_option(long_options[option_index].name, optarg, &args);
+            break;
         case 'A':
             if (optarg)
                 args.name_A = optarg;
@@ -127,6 +170,10 @@ int main(int argc, char **argv)
             if (optarg)
                 args.args_cp = optarg;
             break;
+        case 'o':
+            if (optarg)
+                args.output = optarg;
+            break;
         case 'T':
             if (optarg)
                 args.type = optarg;
@@ -154,6 +201,9 @@ int main(int argc, char **argv)
             break;
         case 'v':
             args.verbose++;
+            break;
+        case 'V':
+            // print version and exit
             break;
         default:
             fprintf(stderr, "unknown option: %c\n", opt);
