@@ -1007,10 +1007,13 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
 
             return cvxc_conelp_ready(cp, stats, iter, CVXC_STAT_OPTIMAL);
         }
-        else if (! isnan(stats->pinfres) && stats->pinfres <= feastol) {
+        // TODO: Compiling with -O0 generates incorrect test and iteration stops
+        // on first pass of the loop (stats->pinfres == NaN and stats->dinfres == NaN)
+        // WORKAROUND: Compile with at least -O1.
+        if  (!isnan(stats->pinfres) && stats->pinfres < feastol) {
             return cvxc_conelp_ready(cp, stats, iter, CVXC_STAT_PRIMAL_INFEASIBLE);
         }
-        else if (! isnan(stats->dinfres) && stats->dinfres <= feastol) {
+        if (!isnan(stats->dinfres) && stats->dinfres < feastol) {
             return cvxc_conelp_ready(cp, stats, iter, CVXC_STAT_DUAL_INFEASIBLE);
         }
 
