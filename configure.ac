@@ -2,8 +2,8 @@ dnl                                               -*- Autoconf -*-
 dnl Process this file with autoconf to produce a configure script.
 dnl
 AC_PREREQ([2.69])
-AC_INIT([CvxOpt in C], [m4_esyscmd(./package-version.sh)],
-   [harri.rautila@gmail.com], [libcvx], [])
+AC_INIT([CVXopt in C], [m4_esyscmd(./package-version.sh)],
+   [harri.rautila@gmail.com], [cvxc], [https://github.com/hrautila/cvxc])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([src/Makefile.am])
 AC_CONFIG_HEADERS([config.h])
