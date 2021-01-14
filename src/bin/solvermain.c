@@ -212,10 +212,6 @@ int main(int argc, char **argv)
     }
     int err;
 
-    if (!args.type) {
-        args.type = solver_type_from_name(argv[0]);
-    }
-
     if (solver_read_args(&args, &pptr, &opts) < 0)
         return -1;
 
