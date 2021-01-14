@@ -30,7 +30,7 @@ COPY --from=builder /usr/local/lib/libcvxc* ./lib/
 COPY --from=builder /usr/local/include/ ./include/
 
 RUN mkdir /var/lib/cvxc
-ENV CVXC_LIBRARY_PATH=/var/lib/cvxc
+ENV CVXC_LIBRARY_PATH=/var/run:/var/lib/cvxc
 
 WORKDIR /var/run
 
