@@ -116,7 +116,7 @@ void *solver_load_shared(const char *name)
 
     void *dlh = dlopen(filepath, RTLD_NOW);
     if (!dlh) {
-        perror(filepath);
+        fprintf(stderr, "error: %s - %s\n", name, dlerror());
     }
     free(filepath);
     return dlh;
