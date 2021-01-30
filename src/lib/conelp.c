@@ -756,7 +756,7 @@ int cvxc_conelp_ready(cvxc_problem_t *cp, cvxc_stats_t *stats, int iter, int sta
         cvxc_mksymm(&cpi->s_g);
         cvxc_mksymm(&cpi->z_g);
         cpi->ts = cvxc_max_step(&cpi->s_g, __nilgrp, &cp->work);
-        cpi->tz = cvxc_max_step(&cpi->s_g, __nilgrp, &cp->work);
+        cpi->tz = cvxc_max_step(&cpi->z_g, __nilgrp, &cp->work);
 
         cp->error = stat == CVXC_STAT_UNKNOWN ? CVXC_ERR_MAXITER : 0;
         cp->solution.x = &cpi->x;
