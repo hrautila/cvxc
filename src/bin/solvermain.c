@@ -212,11 +212,17 @@ int main(int argc, char **argv)
     }
     int err;
 
-    if (solver_read_args(&args, &pptr, &opts) < 0)
+    if (solver_read_args(&args, &pptr, &opts) < 0) {
+        fprintf(stderr, "error: failed to read data files\n");
         return -1;
+    }
 
-    if (!params.G || !params.h) {
-        fprintf(stderr, "error: matrices G, h must be defined\n");
+    if (!(params.G && params.h) && !(params.A && params.b)) {
+        fprintf(stderr, "error: matrices G, h or A,b must be defined\n");
+        return -1;
+    }
+    if ((!params.G && params.h) || (params.G && !params.h)) {
+        fprintf(stderr, "error: must have both  G and h\n");
         return -1;
     }
     if ((!params.A && params.b) || (params.A && !params.b)) {
@@ -228,6 +234,12 @@ int main(int argc, char **argv)
         cvxm_size(&rows, &cols, params.G);
         params.A = cvxm_new(0, cols);
         params.b = cvxm_new(0, 1);
+    }
+
+    if (!params.G && !params.h) {
+        cvxm_size(&rows, &cols, params.A);
+        params.G = cvxm_new(0, cols);
+        params.h = cvxm_new(0, 1);
     }
 
     if (params.module) {
@@ -242,7 +254,6 @@ int main(int argc, char **argv)
         /* This is CONELP problem. */
         err = solve_conelp(&params, &opts, &args);
     }
-    // solver_release_params(&params);
-
+    // TODO: release all allocated resources
     return err;
 }
