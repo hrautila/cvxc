@@ -239,7 +239,7 @@ int cvxc_scaling_copy(cvxc_scaling_t *W, const cvxc_scaling_t *Ws)
         return -1;
     if (W->__bytes && Ws->__bytes) {
         memcpy(W->__bytes, Ws->__bytes, W->nbytes);
-    } else {
+    } else if (Ws->indexes && W->indexes) {
         // memory block not owned by structure; layout is [indexes; data]
         // copy nbytes from the start of indexes.
         memcpy(W->indexes, Ws->indexes, W->nbytes);
