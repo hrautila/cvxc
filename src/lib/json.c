@@ -69,18 +69,35 @@ void cvxc_json_unget_simple_token(cvxc_stream_t *ios, int tok)
 
 int cvxc_json_matrix_read(cvxc_matrix_t **A, cvxc_stream_t *ios)
 {
-    if (! *A) {
-        cvxc_matrix_t *m = malloc(sizeof(cvxc_matrix_t));
+    armas_dense_t *amat;
+    cvxc_matrix_t *m = 0;
+    if (!*A) {
+        m = malloc(sizeof(cvxc_matrix_t));
         if (!m)
             return -1;
         m->t = 0.0;
         m->bits = 0;
-        *A = m;
+        amat = &m->data;
+    } else {
+        (*A)->t = 0.0;
+        (*A)->bits = 0;
+        amat = &(*A)->data;
     }
-    (*A)->t = 0.0;
-    (*A)->bits = 0;
-    armas_dense_t *amat = &(*A)->data;
-    return armas_json_read(&amat, ios);
+    if (armas_json_read(&amat, ios) < 0) {
+        if (!*A)
+            free(m);
+        return -1;
+    }
+    if (!*A) {
+        // If matrix is null then armas_json_read returns null pointer in matrix
+        // argument, release allocated matrix and return null.
+        if (!amat) {
+            free(m);
+        } else {
+            *A = m;
+        }
+    }
+    return 0;
 }
 
 int cvxc_json_matrix_write(cvxc_stream_t *ios, const cvxc_matrix_t *A)
@@ -536,16 +553,7 @@ int cvxc_json_read_options(cvxc_solopts_t **opts, cvxc_stream_t *ios)
 {
     int tok, ntok, state;
     char iob[IOBLEN];
-    cvxc_solopts_t *lopts;
-
-    if (*opts)
-        lopts = *opts;
-    else {
-        lopts = (cvxc_solopts_t *)malloc(sizeof(*lopts));
-        if (!lopts)
-            return -1;
-    }
-    memset(lopts, 0, sizeof(*lopts));
+    cvxc_solopts_t *lopts = 0;
 
     tok = cvxc_json_read_token(iob, sizeof(iob), ios);
     // first token ...
@@ -558,6 +566,15 @@ int cvxc_json_read_options(cvxc_solopts_t **opts, cvxc_stream_t *ios)
     default:
         return -1;
     }
+
+    if (*opts)
+        lopts = *opts;
+    else {
+        lopts = (cvxc_solopts_t *)malloc(sizeof(*lopts));
+        if (!lopts)
+            return -1;
+    }
+    memset(lopts, 0, sizeof(*lopts));
 
     state = JSON_STATE_KEY;
     for (ntok = 0; state != JSON_STATE_HAVE_ALL; ntok++) {
@@ -695,11 +712,13 @@ int cvxc_json_write_param_items(
     ONERR(cvxc_json_write_options(ios, opts, (char *)0));
 
     if (module) {
+        ONERR(cvxc_json_write_simple_token(ios, ','));
         ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "module", 6));
         ONERR(cvxc_json_write_simple_token(ios, ':'));
-        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, module, strlen(args)));
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, module, strlen(module)));
     }
     if (args) {
+        ONERR(cvxc_json_write_simple_token(ios, ','));
         ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "args", 4));
         ONERR(cvxc_json_write_simple_token(ios, ':'));
         ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, args, strlen(args)));
