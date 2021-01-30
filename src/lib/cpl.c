@@ -698,7 +698,7 @@ int cvxc_cpl_ready(cvxc_problem_t *cp,
         cvxc_mksymm(&cpi->s_g);
         cvxc_mksymm(&cpi->z_g);
         cpi->ts = cvxc_max_step(&cpi->s_g, __nilgrp, &cp->work);
-        cpi->tz = cvxc_max_step(&cpi->s_g, __nilgrp, &cp->work);
+        cpi->tz = cvxc_max_step(&cpi->z_g, __nilgrp, &cp->work);
 
         cp->error = stat == CVXC_STAT_UNKNOWN ? CVXC_ERR_MAXITER : 0;
         cp->solution.x = &cpi->x;
@@ -905,10 +905,7 @@ int cvxc_cpl_compute_start(cvxc_problem_t *cp)
     cvxm_copy(&cpi->dx0,  &cpi->x0, 0);
     cvxm_copy(&cpi->newx, &cpi->x0, 0);
     cvxm_copy(&cpi->newrx,&cpi->x0, 0);
-    cvxm_copy(&cpi->y,     cp->b,   0);
-    cvxm_copy(&cpi->dy,   &cpi->y,  0);
-    cvxm_copy(&cpi->ry,   &cpi->y,  0);
-    cvxm_copy(&cpi->newy, &cpi->y,  0);
+    cvxm_copy(&cpi->ry,    cp->b,   0);
     return 0;
 }
 
@@ -957,6 +954,8 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
     range += cvxc_index_length(&cpi->index_full, CVXDIM_NONLINEAR);
     range += cvxc_index_length(&cpi->index_full, CVXDIM_LINEAR);
     range += cvxc_index_length(&cpi->index_full, CVXDIM_SOCP);
+    if (range == 0)
+        range = 1;
 
     // make non-linear and linear mappings
     cvxc_mgrp_elem(&s_nl,  &cpi->s_g,  CVXDIM_NONLINEAR|CVXDIM_NLTARGET, 0);
@@ -1154,9 +1153,8 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
             err = f4(cp, &cpi->dx, &cpi->dy, &cpi->dz_g, &cpi->ds_g, refinement);
             if (err < 0) {
                 // terminated ....
-                return cvxc_cpl_ready(cp, /*stats,*/ iter, CVXC_STAT_SINGULAR);
+                return cvxc_cpl_ready(cp, iter, CVXC_STAT_SINGULAR);
             }
-            // cvxc_mat_test_nan("post solve ds", &cpi->ds);
             // line search needs ds'*dz and unscaled steps
             cpi->dsdz = cvxc_sdot(&cpi->ds_g, &cpi->dz_g);
             cvxm_copy(&cpi->dz2, &cpi->dz, 0);
@@ -1238,7 +1236,6 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
             cvxm_solve_diag(&sk, 1.0, &lk, CVXC_RIGHT);
         }
 
-        // TODO: missing somethings..!!!!
         // divide ds, dz by lmbda S blocks;;
         for (int k = 0; k < cvxc_mgrp_count(&cpi->ds_g, CVXDIM_SDP); k++) {
             cvxc_float_t a;

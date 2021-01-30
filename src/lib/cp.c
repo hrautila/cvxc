@@ -141,6 +141,7 @@ int cvxc_cp_setvars(cvxc_problem_t *cp,
     }
     cvxc_cp_solver_init(&cpi->cp_solver, cp, cp->solver);
     cp->solver = (cvxc_kktsolver_t *)&cpi->cp_solver;
+
     return 0;
 }
 
@@ -195,10 +196,7 @@ int cvxc_cp_compute_start(cvxc_problem_t *cp)
     cvxm_copy(&cpi->dx0,  &cpi->x0, 0);
     cvxm_copy(&cpi->newx, &cpi->x0, 0);
     cvxm_copy(&cpi->newrx,&cpi->x0, 0);
-    cvxm_copy(&cpi->y,     cp->b,   0);
-    cvxm_copy(&cpi->dy,   &cpi->y,  0);
-    cvxm_copy(&cpi->ry,   &cpi->y,  0);
-    cvxm_copy(&cpi->newy, &cpi->y,  0);
+    cvxm_copy(&cpi->ry,    cp->b,   0);
     return 0;
 }
 
