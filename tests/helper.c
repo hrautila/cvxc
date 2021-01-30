@@ -16,7 +16,7 @@ int print_solution(cvxc_solution_t *sol)
     printf("primal obj  : %13.6e\n", sol->primal_objective);
     printf("dual obj    : %13.6e\n", sol->dual_objective);
     printf("primal inf  : %13.6e\n", sol->primal_infeasibility);
-    printf("dual int    : %13.6e\n", sol->dual_infeasibility);
+    printf("dual inf    : %13.6e\n", sol->dual_infeasibility);
     printf("primal slack: %13.6e\n", sol->primal_slack);
     printf("dual slack  : %13.6e\n", sol->dual_slack);
     printf("primal cert : %13.6e\n", sol->primal_residual_cert);
