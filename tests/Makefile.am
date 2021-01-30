@@ -4,7 +4,7 @@ AM_CFLAGS = -O3 -march=native -Wall $(INCLUDE)
 
 LIBCVXC = $(top_builddir)/src/libcvxc.la
 
-check_PROGRAMS = test_lp test_conelp test_sdp test_socp test_cpl test_cp
+check_PROGRAMS = test_lp test_conelp test_sdp test_socp test_cpl test_cp test_cp2
 
 test_lp_SOURCES = test_lp.c helper.c
 test_lp_LDADD   = $(LIBCVXC) -larmasd
@@ -19,6 +19,9 @@ test_cpl_SOURCES = test_cpl.c helper.c
 test_cpl_LDADD   = $(LIBCVXC) -larmasd
 test_cp_SOURCES = test_cp.c helper.c
 test_cp_LDADD   = $(LIBCVXC) -larmasd
+
+test_cp2_SOURCES = test_cp2.c helper.c
+test_cp2_LDADD   = $(LIBCVXC) -larmasd
 
 
 TESTS = check_PROGRAMS
