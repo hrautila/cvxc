@@ -72,6 +72,32 @@ int cvxm_update2_sym(cvxc_float_t beta, cvxc_matrix_t *C, cvxc_float_t alpha, co
 
 #endif
 
+cvxc_float_t cvxm_min(const cvxc_matrix_t *x)
+{
+    const cvxc_float_t *vec =  x->data.elems;
+    int n = x->data.rows * x->data.cols;
+    int inc = x->data.rows == 1 ? x->data.step : 1;
+    cvxc_float_t min = FLOAT_BIG;
+
+    for (int i = 0; i < n; i++) {
+        min = FMIN(min, vec[i * inc]);
+    }
+    return min;
+}
+
+cvxc_float_t cvxm_max(const cvxc_matrix_t *x)
+{
+    const cvxc_float_t *vec =  x->data.elems;
+    int n = x->data.rows * x->data.cols;
+    int inc = x->data.rows == 1 ? x->data.step : 1;
+    cvxc_float_t max = -FLOAT_BIG;
+
+    for (int i = 0; i < n; i++) {
+        max = FMAX(max, vec[i * inc]);
+    }
+    return max;
+}
+
 //  \brief matrix-vector multiply; Y = beta*Y + alpha*A*X
 int cvxm_mvmult(cvxc_float_t beta, cvxc_matrix_t *Y, cvxc_float_t alpha, const cvxc_matrix_t *A,
                 const cvxc_matrix_t *X, int flags)
@@ -257,8 +283,6 @@ cvxc_matrix_t *cvxm_mkconst(cvxc_matrix_t *x, cvxc_float_t val)
 // \brief Make identity matrix or unit column vector 
 cvxc_matrix_t *cvxm_mkident(cvxc_matrix_t *x)
 {
-    // this does not work for non-continues submatrix or row vector
-    //memset(x->elems, 0, x->rows*x->cols*sizeof(x->elems[0]));
     cvxm_mkconst(x, 0.0);
     for (int k = 0; k < x->data.cols; k++) {
         x->data.elems[k + k*x->data.step] = 1.0;
@@ -274,6 +298,17 @@ void cvxm_set_all(cvxc_matrix_t *A, cvxc_float_t val)
     for (j = 0; j < n; j++) {
         for (i = 0; i < m; i++) {
             cvxm_set(A, i, j, val);
+        }
+    }
+}
+
+void cvxm_set_from(cvxc_matrix_t *A, cvxc_generator_t gen)
+{
+    cvxc_size_t n, m, i, j;
+    cvxm_size(&m, &n, A);
+    for (j = 0; j < n; j++) {
+        for (i = 0; i < m; i++) {
+            cvxm_set(A, i, j, gen());
         }
     }
 }

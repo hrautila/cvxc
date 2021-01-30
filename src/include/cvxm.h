@@ -9,6 +9,7 @@
 #ifndef __CVXC_CVXM_H
 #define __CVXC_CVXM_H 1
 
+#include <float.h>
 #include <stdio.h>
 #include <stddef.h>
 
@@ -32,12 +33,20 @@ typedef uint32_t cvxc_size_t;
 typedef float cvxc_float_t;
 typedef int32_t cvxc_int_t;
 
+#define FMIN fminf
+#define FMAX fmaxf
+#define FLOAT_BIG FLT_MAX
+
 #else
 
 #include <armas/ddense.h>
 typedef uint64_t cvxc_size_t;
 typedef double cvxc_float_t;
 typedef int64_t cvxc_int_t;
+
+#define FMIN fmin
+#define FMAX fmax
+#define FLOAT_BIG DBL_MAX
 
 #endif /* ENABLE_FLOAT32 */
 
@@ -50,6 +59,7 @@ typedef struct cvxc_matrix {
 
 
 typedef armas_operator_t cvxc_oper_t;
+typedef armas_generator_t cvxc_generator_t;
 
 typedef struct cvxc_memblk cvxc_memblk_t;
 
@@ -450,6 +460,9 @@ extern int cvxm_read_file(cvxc_matrix_t *m, FILE *fp);
 
 extern void cvxm_set_all(cvxc_matrix_t *A, cvxc_float_t val);
 extern void cvxm_unit_vector(cvxc_matrix_t *A);
+extern cvxc_float_t cvxm_min(const cvxc_matrix_t *x);
+extern cvxc_float_t cvxm_max(const cvxc_matrix_t *x);
+extern void cvxm_set_from(cvxc_matrix_t *A, cvxc_generator_t func);
 
 // other functions
 extern cvxc_matrix_t *cvxm_mkident(cvxc_matrix_t *x);
@@ -487,8 +500,3 @@ extern int cvxm_qrmult(cvxc_matrix_t *C, const cvxc_matrix_t *A, const cvxc_matr
 extern cvxc_size_t cvxm_svd_workspace(cvxc_size_t r, cvxc_size_t c);
 
 #endif // __CVXC_CVXM_H
-
-// Local Variables:
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// End:
