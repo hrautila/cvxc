@@ -498,7 +498,7 @@ static inline
 int F1(cvxc_convex_program_t *cp, cvxc_matrix_t *f, cvxc_matrix_t *Df, const cvxc_matrix_t *x)
 {
     int e = cp->F(f, Df, __cvxnil, x, __cvxnil, cp->user);
-    if (e == 0 && cvxm_isepi(x)) {
+    if (e == 0 && cvxm_isepi(x) && f) {
         cvxm_set(f, 0, 0, cvxm_get(f, 0, 0) - x->t);
     }
     return e;
