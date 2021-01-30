@@ -294,6 +294,7 @@ cvxc_size_t cvxc_index_elem(cvxc_matrix_t *x,
 
     switch (name) {
     case CVXDIM_CONVEX:
+        // map non-linear space + non-linear target
         if (ind->indnlt && ind->indnl) {
             m = ind->indnl[1] - ind->indnlt[0];
             n = ind->indnlt[0];
@@ -349,19 +350,21 @@ cvxc_size_t cvxc_index_elem(cvxc_matrix_t *x,
         }
         break;
     case CVXDIM_CONELP:
-        // map linear,socp and sdp parts onto x
+        // map linear,socp and sdp parts onto x; find start index
         if (ind->indl)
             n = ind->indl[0];  // have linear part
         else if (ind->indq)
             n = ind->indq[0];  // have socp part
         else if (ind->inds)
-            n = ind->inds[0];  // last resort; must have sdp part
+            n = ind->inds[0];  // have sdp part
+        else
+            n = ind->index[ind->indlen];
         m = ind->index[ind->indlen] - n;
         if (x)
             cvxm_map_data(x, m, 1, cvxm_data(y, n));
         break;
     case CVXDIM_CONVEXLP:
-        // map all but non-linear target function
+        // map all but non-linear target function; find start index
         if (ind->indnl)
             n = ind->indnl[0];  // have linear part
         else if (ind->indl)
@@ -369,7 +372,9 @@ cvxc_size_t cvxc_index_elem(cvxc_matrix_t *x,
         else if (ind->indq)
             n = ind->indq[0];  // have socp part
         else if (ind->inds)
-            n = ind->inds[0];  // last resort; must have sdp part
+            n = ind->inds[0];  // have sdp part
+        else
+            n = ind->index[ind->indlen];
         m = ind->index[ind->indlen] - n;
         if (x)
             cvxm_map_data(x, m, 1, cvxm_data(y, (ind->indnlt ? 1 : 0)));
