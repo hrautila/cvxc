@@ -322,11 +322,12 @@ cvxc_size_t cvxc_cpl_make(cvxc_problem_t *cp,
                         const cvxc_dimset_t *dims,
                         int nl,
                         void *memory,
-                        cvxc_size_t nbytes)
+                        cvxc_size_t msize)
 {
     cvxc_cpl_internal_t *cpi = &cp->u.cpl;
     cvxc_size_t offset = 0;
     cvxc_size_t used = 0;
+    cvxc_size_t nbytes = msize;
     unsigned char *bytes = (unsigned char *)memory;
 
     if (nl != 0)
@@ -483,7 +484,8 @@ cvxc_size_t cvxc_cpl_make(cvxc_problem_t *cp,
     cp->Df = &cpi->Df;
     cp->H  = &cpi->H;
 
-    cp->mlen = nbytes;
+    // save memory block and it's size
+    cp->mlen = msize;
     cp->memory = memory;
 
     return offset;
