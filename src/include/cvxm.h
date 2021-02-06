@@ -58,8 +58,9 @@ typedef struct cvxc_matrix {
 } cvxc_matrix_t;
 
 
-typedef armas_operator_t cvxc_oper_t;
-typedef armas_generator_t cvxc_generator_t;
+typedef armas_operator_t cvxm_oper_t;
+typedef armas_generator_t cvxm_generator_t;
+typedef armas_operator2_t cvxm_operator2_t;
 
 typedef struct cvxc_memblk cvxc_memblk_t;
 
@@ -255,7 +256,7 @@ void cvxm_set_epi(cvxc_matrix_t *A, cvxc_float_t v)
 
 // elementwise
 __CVXC_INLINE
-void cvxm_apply(cvxc_matrix_t *A, cvxc_oper_t f, int flags)
+void cvxm_apply(cvxc_matrix_t *A, cvxm_oper_t f, int flags)
 {
     armas_apply(&A->data, f, flags);
 }
@@ -451,6 +452,13 @@ int cvxm_update2_sym(cvxc_float_t beta, cvxc_matrix_t *C, cvxc_float_t alpha, co
     return armas_update2_sym(beta, &C->data, alpha, &A->data, &B->data, flags, &cf);
 }
 
+__CVXC_INLINE
+int cvxm_mplus(cvxc_float_t alpha, cvxc_matrix_t *A, cvxc_float_t beta, const cvxc_matrix_t *B)
+{
+    armas_conf_t cf = *armas_conf_default();
+    return armas_mplus(alpha, &A->data, beta, &B->data, 0, &cf);
+}
+
 
 extern int cvxm_mm_read_file(cvxc_matrix_t *A, FILE *fp);
 extern int cvxm_write_file(FILE *fp, const cvxc_matrix_t *m);
@@ -462,15 +470,13 @@ extern void cvxm_set_all(cvxc_matrix_t *A, cvxc_float_t val);
 extern void cvxm_unit_vector(cvxc_matrix_t *A);
 extern cvxc_float_t cvxm_min(const cvxc_matrix_t *x);
 extern cvxc_float_t cvxm_max(const cvxc_matrix_t *x);
-extern void cvxm_set_from(cvxc_matrix_t *A, cvxc_generator_t func);
+extern void cvxm_set_from(cvxc_matrix_t *A, cvxm_generator_t func);
+extern int cvxm_apply2(cvxc_matrix_t *A, cvxm_operator2_t func, void *p);
 
 // other functions
 extern cvxc_matrix_t *cvxm_mkident(cvxc_matrix_t *x);
 extern cvxc_matrix_t *cvxm_mkconst(cvxc_matrix_t *x, cvxc_float_t val);
-
 extern cvxc_matrix_t *cvxm_identity(cvxc_size_t n);
-extern cvxc_matrix_t *cvxm_new_vector(cvxc_size_t n, cvxc_float_t val);
-extern cvxc_matrix_t *cvxm_new_unit_vector(cvxc_size_t n, cvxc_float_t val);
 extern void cvxm_printf(FILE *, const char *fmt, const cvxc_matrix_t *);
 
 extern void cvxm_mksymm(cvxc_matrix_t *A, int n);
