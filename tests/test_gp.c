@@ -2,14 +2,15 @@
 // Copyright: Harri Rautila, 2016 <harri.rautila@gmail.com>
 
 #include <unistd.h>
-#include "convex.h"
+#include <math.h>
+#include "cvxc.h"
+
+extern int print_solution(cvxc_solution_t *sol);
 
 int main(int argc, char **argv)
 {
     cvxc_matrix_t G, h, A, b, F, g;
-    cvxc_matrix_t x, z;
     cvxc_problem_t cp;
-    cvxc_dimset_t dims;
     int opt;
 
     cvxc_float_t aflr = 1000.0;
@@ -30,9 +31,6 @@ int main(int argc, char **argv)
         1.0, 2.0/awall, 2.0/awall, 1.0/aflr, alpha, 1.0/beta, gamma, 1.0/delta
     };
     cvxc_size_t K[8] = { 1, 2, 1, 1, 1, 1, 1, 0 };
-
-    cvxc_float_t xdata[3] = {1.0, 1.0, 1.0};
-    cvxc_float_t zdata[7] = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
 
     cvxc_solopts_t opts = (cvxc_solopts_t){
         .abstol = 0.0,
@@ -55,8 +53,6 @@ int main(int argc, char **argv)
         }
     }
 
-    cvxc_dimset_alloc(&dims, 0, (cvxc_size_t *)0, (cvxc_size_t *)0);
-
     cvxm_map_data(&F, 8, 3, fdata);
     cvxm_map_data(&g, 8, 1, gdata);
     cvxm_map_data(&h, 0, 1, (cvxc_float_t *)0);
@@ -64,27 +60,19 @@ int main(int argc, char **argv)
     cvxm_map_data(&A, 0, 3, (cvxc_float_t *)0);
     cvxm_map_data(&b, 0, 1,  (cvxc_float_t *)0);
 
+    // g = log(g)
+    cvxm_apply(&g, log, 0);
+
     if (opts.max_iter == 0)
         return 0;
 
-    cvxc_gp_setup(&cp, K, &F, &g, &G, &h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
+    cvxc_gp_setup(&cp, K, &F, &g, &G, &h, &A, &b, (cvxc_kktsolver_t *)0);
 
-    cvxc_size_t m, n;
-    cvxm_map_data(&x, 3, 1, xdata);
-    cvxm_map_data(&z, 7, 1, zdata);
+    cvxc_gp_compute_start(&cp);
+    cvxc_gp_solve(&cp, &opts);
 
-    cvxm_size(&m, &n, &cp.u.cpl.f);
-    printf("f : [%ld,%ld]\n", m, n);
+    // x = exp(x)
+    cvxm_apply(cp.solution.x, exp, 0);
 
-    cvxm_size(&m, &n, &cp.u.cpl.Df);
-    printf("Df: [%ld,%ld]\n", m, n);
-
-    cvxm_size(&m, &n, &cp.u.cpl.H);
-    printf("H : [%ld,%ld]\n", m, n);
-
-    //cvxc_gp_f(&cp.u.cpl.f, &cp.u.cpl.Df, &cp.u.cpl.H, &x, &z);
-    //cvxc_gp_set_start(&cp, __cvxnil, __cvxnil, __cvxnil, __cvxnil);
-    //cvxc_gp_solve(&cp, &opts);
-    return 0;
+    return print_solution(&cp.solution);
 }
-
