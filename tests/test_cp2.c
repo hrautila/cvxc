@@ -1,5 +1,5 @@
 
-// Copyright: Harri Rautila, 2016 <harri.rautila@gmail.com>
+// Copyright: Harri Rautila, 2021 <harri.rautila@gmail.com>
 
 #include <unistd.h>
 #include "cvxc.h"
