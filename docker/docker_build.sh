@@ -1,7 +1,7 @@
 #!/bin/bash
 
-version=0.1
-base=alpine
+version=$(git describe | sed 's/^[a-z]*//')
+base=ubuntu
 name=cvxc
 
 if [ "$1" != "" ]; then
@@ -14,7 +14,8 @@ if [ ! -f $DOCKERFILE ]; then
     exit 1
 fi
 
-TAG="${name}:${version}-${base}"
+TAG="${name}:${version}"
 
 docker build -f $DOCKERFILE -t $TAG .
+docker tag $TAG ${name}:latest
 
