@@ -7,9 +7,9 @@
  */
 #include "cvxc.h"
 
-cvxc_size_t cvxc_gp_program_bytes(cvxc_size_t p, cvxc_size_t m)
+cvxc_size_t cvxc_gp_program_bytes(cvxc_size_t p, cvxc_size_t m, cvxc_size_t maxf)
 {
-    return (p + 1)*sizeof(cvxc_size_t) + m*sizeof(cvxc_float_t);
+    return (p + 1)*sizeof(cvxc_size_t) + (m + maxf)*sizeof(cvxc_float_t);
 }
 
 cvxc_size_t cvxc_gpi_make(cvxc_gpindex_t *gpi, cvxc_size_t p, void *memory, cvxc_size_t nbytes)
@@ -59,44 +59,68 @@ int cvxc_gpi_setup(cvxc_gpindex_t *gpi, cvxc_size_t *K, cvxc_size_t p)
     return 0;
 }
 
+struct logsum {
+    cvxc_float_t ymax;
+    cvxc_float_t ysum;
+};
+
+cvxc_float_t eval(cvxc_float_t e, void *p)
+{
+    struct logsum *lgs = (struct logsum *)p;
+    e = exp(e - lgs->ymax);
+    lgs->ysum += fabs(e);
+    return e;
+}
 
 int cvxc_gp_f(cvxc_matrix_t *f, cvxc_matrix_t *Df, cvxc_matrix_t *H,
              const cvxc_matrix_t *x, const cvxc_matrix_t *z, void *user)
 {
     cvxc_gp_program_t *gp = (cvxc_gp_program_t *)user;
-    cvxc_matrix_t iy, iF, iDf;
-    cvxc_float_t ymax, ysum;
-    cvxc_size_t n;
+    cvxc_matrix_t iy, iF, iDf, Fsc, *g, *y, *F, *Fs;
+    cvxc_gpindex_t *gpi;
+    cvxc_float_t ymax;
+    cvxc_size_t m, n;
+    struct logsum lg;
 
     if (!x && !z) {
         cvxm_set_all(f, 0.0);
         return 0;
     }
 
+    y  = &gp->gp_params.y;
+    Fs = &gp->gp_params.Fs;
+    g  = gp->gp_params.g;
+    F  = gp->gp_params.F;
+    gpi = &gp->gp_params.gpi;
+
     cvxm_set_all(f, 0.0);
     cvxm_set_all(Df, 0.0);
 
     // y = g + F*x
-    cvxm_copy(&gp->gp_params.y, gp->gp_params.g, 0);
-    cvxm_mvmult(1.0, &gp->gp_params.y, 1.0, gp->gp_params.F, x, 0);
+    cvxm_copy(y, g, 0);
+    cvxm_mvmult(1.0, y, 1.0, F, x, 0);
 
-    for (cvxc_size_t k = 0; k < gp->gp_params.gpi.p; k++) {
-        n = cvxc_gpi_elem(&gp->gp_params.gpi, &iy, &gp->gp_params.y, k);
-        cvxc_gpi_elem(&gp->gp_params.gpi, &iF, gp->gp_params.F, k);
-        cvxc_gpi_elem(&gp->gp_params.gpi, &iDf, Df, k);
+    cvxm_size(&m, &n, F);
+    if (z)
+        cvxm_set_all(H, 0.0);
+
+    for (cvxc_size_t k = 0; k < gpi->p; k++) {
+        cvxc_gpi_elem(gpi, &iy, y, k);
+        cvxc_gpi_elem(gpi, &iF, F, k);
+        cvxm_view_map(&iDf, Df, k, 0, 1, n);
+        m = cvxc_gpi_length(gpi, k);
 
         // yi := exp(yi) = exp(Fi*x+gi)
-        ymax = cvxm_amax(&iy);
-        for (cvxc_size_t i = 0; i < n; i++) {
-            cvxm_set(&iy, i, 0, exp(cvxm_get(&iy, i, 0) - ymax));
-        }
+        ymax = cvxm_max(&iy);
+        lg = (struct logsum){ .ymax = ymax, .ysum = 0.0 };
+        cvxm_apply2(&iy, eval, &lg);
 
         // f_i = log sum y_i = log sum exp(F_i*x + g_i)
-        ysum = cvxm_asum(&iy);
-        cvxm_set(f, k, 0, ymax + log(ysum));
+        if (f)
+            cvxm_set(f, k, 0, ymax + log(lg.ysum));
 
         // yi := yi / sum(yi) = exp(Fi*x+gi) / sum(exp(Fi*x+gi))
-        cvxm_scale(&iy, 1.0/ysum, 0);
+        cvxm_scale(&iy, 1.0/lg.ysum, 0);
 
         // gradfi := Fi' * yi
         //         = Fi' * exp(Fi*x+gi) / sum(exp(Fi*x+gi))
@@ -108,13 +132,41 @@ int cvxc_gp_f(cvxc_matrix_t *f, cvxc_matrix_t *Df, cvxc_matrix_t *H,
             // where
             // Fisc = diag(yi)^1/2 * (I - 1*yi') * Fi
             //      = diag(yi)^1/2 * (Fi - 1*gradfi')
+            cvxm_view_map(&Fsc, Fs, 0, 0, m, n);
+            cvxm_copy(&Fsc, &iF, 0);
+
+            for (int i = 0; i < m; i++) {
+                cvxc_matrix_t Fs_row;
+                cvxm_view_map(&Fs_row, &Fsc, i, 0, 1, n);
+                cvxm_axpy(&Fs_row, -1.0, &iDf);
+                cvxm_scale(&Fs_row, SQRT(cvxm_get(&iy, i, 0)), 0);
+            }
+            cvxc_float_t zi = cvxm_get(z, k, 0);
+            cvxm_update_sym(H, zi, &Fsc, CVXC_TRANS);
         }
     }
     return 0;
 }
 
-
-
+/**
+ * @brief Setup geometric program.
+ *
+ *   minimize    \f$ \log \sum \exp(F_0*x + g_0) \f$
+ *   subject to  \f$ \log \sum \exp(F_i*x + g_i) <= 0, i = 1, ..., m \f$
+ *               \f$ G \times x <= h \f$
+ *               \f$ A \times x = b \f$
+ *
+ * @param[in] K
+ *   Array of positive integers terminated with zero value [K0, K1, ..., Km, 0]
+ * @param[in] F
+ *   Matrix with submatrices [F0, F1, ..., Fm] where each submatrix is \$f K_i x n \f$.
+ * @param[in] g
+ *   Column vector with subvectors [g0, g1, ..., gm] where each subvector is \$f K_i x n \f$.
+ * @param[in] G
+ * @param[in] h
+ * @param[in] A
+ * @param[in] b
+ */
 int cvxc_gp_setup(cvxc_problem_t *cp,
                  cvxc_size_t *K,
                  cvxc_matrix_t *F,
@@ -123,73 +175,79 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
                  cvxc_matrix_t *h,
                  cvxc_matrix_t *A,
                  cvxc_matrix_t *b,
-                 cvxc_dimset_t *dims,
                  cvxc_kktsolver_t *kktsolver)
 {
     cvxc_cpl_internal_t *cpi;
-    cvxc_size_t mG, nG, mF, nF, mg, ng, p, mK, mA, nA, offset, gpbytes;
-    cvxc_dimset_t ldims = *dims;
+    cvxc_size_t mG, nG, mF, nF, mg, ng, p, mK, mA, nA, maxK, offset, gpbytes;
+    cvxc_dimset_t ldims;
 
     if (!cp)
         return 0;
 
     cpi = &cp->u.cpl;
-    mA = nA = 0;
+    mA = nA = maxK = 0;
     mG = nG = 0;
 
     cvxm_size(&mF, &nF, F);
     cvxm_size(&mg, &ng, g);
     for (mK = 0, p = 0; p < mF && K[p] > 0; p++) {
         mK += K[p];
+        if (K[p] > maxK)
+            maxK = K[p];
     }
-    //
     if (mK != mF || mg != mF) {
         return 0;
     }
-    gpbytes = cvxc_gp_program_bytes(p, mg);
     if (A)
         cvxm_size(&mA, &nA, A);
     if (G)
         cvxm_size(&mG, &nG, G);
 
-    ldims = *dims;
+    // p is count of F_i, g_i elements
+    gpbytes = cvxc_gp_program_bytes(p, mg, maxK*nF);
+    ldims = (cvxc_dimset_t){0};
     ldims.mnl = p - 1;
     ldims.iscpt = 1;
+    ldims.ldim = mG;
 
     offset = cvxc_cpl_allocate(cp, 1, nG, mA, gpbytes, &ldims);
     if (offset == 0)
         return 0;
 
-    cvxc_cpl_setvars(cp, 0, nG, mA, __cvxnil, G, h, A, b, dims, kktsolver);
+    cvxc_gp_program_t *gp = &cpi->gp;
+    gp->gp_params.F = F;
+    gp->gp_params.g = g;
+    gp->gp.F = cvxc_gp_f;
+    gp->gp.user = gp;
+
+    cvxc_cp_setvars(cp, &gp->gp, nG, mA, G, h, A, b, &ldims, kktsolver);
 
     cvxc_size_t used, nbytes;
 
     nbytes = cp->mlen;
-    // TODO: not right!!
-    cvxc_gp_program_t *gp = &cpi->gp;
-    gp->gp_params.F = F;
-    gp->gp_params.g = g;
-    gp->gp.user = &gp->gp_params;
-    cp->F = &gp->gp;
 
-    used = cvxm_make(&gp->gp_params.y, mg, 1, &cp->memory[nbytes], nbytes-offset);
+    // Workspace for computng gradients and Hessian
+    used = cvxm_make(&gp->gp_params.y, mg, 1, &cp->memory[offset], nbytes-offset);
     if (used == 0)
         return 0;
-
     offset += used;
-    used = cvxc_gpi_make(&gp->gp_params.gpi, p, &cp->memory[nbytes], nbytes-offset);
+
+    used = cvxm_make(&gp->gp_params.Fs, maxK, nG, &cp->memory[offset], nbytes-offset);
     if (used == 0)
         return 0;
+    offset += used;
+
+    used = cvxc_gpi_make(&gp->gp_params.gpi, p, &cp->memory[offset], nbytes-offset);
+    if (used == 0)
+        return 0;
+    offset += used;
+
     cvxc_gpi_setup(&gp->gp_params.gpi, K, p);
     return offset;
 }
 
 
-int cvxc_gp_set_start(cvxc_problem_t *cp,
-                     cvxc_matrix_t *x0,
-                     cvxc_matrix_t *s0,
-                     cvxc_matrix_t *y0,
-                     cvxc_matrix_t *z0)
+int cvxc_gp_compute_start(cvxc_problem_t *cp)
 {
     return cvxc_cp_compute_start(cp);
 }
