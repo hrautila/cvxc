@@ -721,6 +721,8 @@ typedef struct cvxc_gp_params {
     cvxc_matrix_t *F;
     cvxc_matrix_t *g;
     cvxc_matrix_t y;
+    cvxc_matrix_t u;
+    cvxc_matrix_t Fs;
     cvxc_gpindex_t gpi;
 } cvxc_gp_params_t;
 
@@ -1025,14 +1027,10 @@ extern int
 cvxc_gp_setup(cvxc_problem_t *cp, cvxc_size_t *K,
              cvxc_matrix_t *F, cvxc_matrix_t *g,
              cvxc_matrix_t *G, cvxc_matrix_t *h, cvxc_matrix_t *A,
-             cvxc_matrix_t *b,  cvxc_dimset_t *dims, cvxc_kktsolver_t *kktsolver);
+             cvxc_matrix_t *b, cvxc_kktsolver_t *kktsolver);
 
 extern int
-cvxc_gp_set_start(cvxc_problem_t *cp,
-                 cvxc_matrix_t *x0,
-                 cvxc_matrix_t *s0,
-                 cvxc_matrix_t *y0,
-                 cvxc_matrix_t *z0);
+cvxc_gp_compute_start(cvxc_problem_t *cp);
 
 extern int
 cvxc_gp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts);
