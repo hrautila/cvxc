@@ -62,7 +62,7 @@ int cp_factor(cvxc_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *x, cvxc_mat
 
     cvxm_size(&nr, &nc, &cpi->Df);
     cvxm_view_map(&Dfc, &cpi->Df, 1, 0, nr-1, nc);
-    F2(cp->F, __cvxnil, &cpi->Df, &cpi->H, x, z);
+    F2(cp->F, &cpi->f, &cpi->Df, &cpi->H, x, z);
 
     return cvxc_kktfactor(cp_solver->next, W, &cpi->H, &Dfc);
 }
