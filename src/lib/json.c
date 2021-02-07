@@ -108,60 +108,21 @@ int cvxc_json_matrix_write(cvxc_stream_t *ios, const cvxc_matrix_t *A)
 enum cvxc_json_states {
     JSON_STATE_KEY = 100,
     JSON_STATE_SEP,
-    JSON_STATE_NLSEP,
-    JSON_STATE_NLVAL,
-    JSON_STATE_LSEP,
-    JSON_STATE_LVAL,
-    JSON_STATE_QSEP,
-    JSON_STATE_QVAL,
-    JSON_STATE_SSEP,
-    JSON_STATE_SVAL,
-    JSON_STATE_QDIMS_SEP,
-    JSON_STATE_QDIMS_VAL,
-    JSON_STATE_SDIMS_SEP,
-    JSON_STATE_SDIMS_VAL,
+    JSON_STATE_VAL,
+    JSON_STATE_KEY_SEP,
+    JSON_STATE_KEY_VAL,
     JSON_STATE_HAVE_SIZES,
     JSON_STATE_HAVE_ALL,
-    //
-    JSON_STATE_OPTS_SEP,
-    JSON_STATE_ATOL_SEP,
-    JSON_STATE_ATOL_VAL,
-    JSON_STATE_RTOL_SEP,
-    JSON_STATE_RTOL_VAL,
-    JSON_STATE_FTOL_SEP,
-    JSON_STATE_FTOL_VAL,
-    JSON_STATE_MAXI_SEP,
-    JSON_STATE_MAXI_VAL,
-    //
-    JSON_STATE_KKT_SEP,
-    JSON_STATE_KKT_VAL,
-    JSON_STATE_DIMS_SEP,
-    JSON_STATE_DIMS_VAL,
-    JSON_STATE_MATC_SEP,
-    JSON_STATE_MATC_VAL,
-    JSON_STATE_MATG_SEP,
-    JSON_STATE_MATG_VAL,
-    JSON_STATE_MATH_SEP,
-    JSON_STATE_MATH_VAL,
-    JSON_STATE_MATA_SEP,
-    JSON_STATE_MATA_VAL,
-    JSON_STATE_MATB_SEP,
-    JSON_STATE_MATB_VAL,
-    JSON_STATE_MOD_SEP,
-    JSON_STATE_ARGS_SEP
 };
 
-enum cvxc_json_flags {
-    HAVE_SDIMS = 0x1,
-    HAVE_QDIMS = 0x2
-};
+extern int cvxc_json_intarray_read(cvxc_size_t *array, cvxc_size_t len, cvxc_stream_t *ios);
 
 /**
  * @brief Write dimension set into stream.
  *
- * JSON: 
+ * JSON:
  *    {"nl:int, "l":int , "qn":int, "sn":int, "q":[ints], "s":[ints]}
- * 
+ *
  *    nl : non-linear count
  *     l : linear count
  *    qn : SOCP dimension count
@@ -235,7 +196,7 @@ int cvxc_json_dimset_write(cvxc_stream_t *ios, const cvxc_dimset_t *dims)
 /**
  * @brief Deserialize dimensiot set structure.
  *
- * JSON: 
+ * JSON:
  *   {"nl":int, "l":int, "q":int, "s":int, "qdims":[int,..], "sdims":[int,...]}
  */
 int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios)
@@ -259,25 +220,21 @@ int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios)
         return -1;
     }
     // assume sizeof attributes l, nl, nq, ns first
+    int keyid = -1;
     for (ntok = 0; state != JSON_STATE_HAVE_SIZES ; ntok++) {
         tok = cvxc_json_read_token(iob, sizeof(iob), ios);
-        if (ntok == 0 && tok == '}') {
-            // null dimset if on first token
-            if (dd)
-                *dims = (cvxc_dimset_t *)0;
-            return 0;
-        }
         switch (state) {
         case JSON_STATE_KEY:
             if (tok == CVXC_JSON_STRING) {
+                state = JSON_STATE_KEY_SEP;
                 if (iob[0] == 'l' && iob[1] == '\0') {
-                    state = JSON_STATE_LSEP;
+                    keyid = 0;
                 } else if (strncmp(iob, "nq", 2) == 0) {
-                    state = JSON_STATE_QSEP;
+                    keyid = 1;
                 } else if (strncmp(iob, "ns", 2) == 0) {
-                    state = JSON_STATE_SSEP;
+                    keyid = 2;
                 } else if (strncmp(iob, "nl", 2) == 0) {
-                    state = JSON_STATE_NLSEP;
+                    keyid = 3;
                 } else {
                     if (*iob != 's' && *iob != 'q')
                         return -1;
@@ -290,55 +247,39 @@ int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios)
                 return -1;
             }
             break;
+
         case JSON_STATE_SEP:
             if (tok != ',' && tok != '}') return -1;
-            state = tok == ',' ? JSON_STATE_KEY : JSON_STATE_HAVE_SIZES;
-            break;
-        case JSON_STATE_NLSEP:
-            if (tok != ':') return -1;
-            state = JSON_STATE_NLVAL;
-            break;
-        case JSON_STATE_LSEP:
-            if (tok != ':') return -1;
-            state = JSON_STATE_LVAL;
-            break;
-        case JSON_STATE_QSEP:
-            if (tok != ':') return -1;
-            state = JSON_STATE_QVAL;
-            break;
-        case JSON_STATE_SSEP:
-            if (tok != ':') return -1;
-            state = JSON_STATE_SVAL;
+            state = JSON_STATE_KEY;
+            if (tok == '}' || (nldim != -1 && ldim != -1 && qdim != -1 && sdim != -1)) {
+                // if seen all sizes or end-of-object brace break out from this loop;
+                state = JSON_STATE_HAVE_SIZES;
+            }
             break;
 
-        case JSON_STATE_NLVAL:
-            if (tok != CVXC_JSON_NUMBER)
+        case JSON_STATE_KEY_SEP:
+            if (tok != ':') return -1;
+            tok = cvxc_json_read_token(iob, sizeof(iob), ios);
+            if (tok != CVXC_JSON_NUMBER) {
+                fprintf(stderr, "json(dimset): unexpected token: %d\n", tok);
                 return -1;
-            nldim = atoi(iob);
+            }
             state = JSON_STATE_SEP;
+            switch (keyid) {
+            case 0:
+                ldim = atoi(iob);
+                break;
+            case 1:
+                qdim = atoi(iob);
+                break;
+            case 2:
+                sdim = atoi(iob);
+                break;
+            case 3:
+                nldim = atoi(iob);
+                break;
+            }
             break;
-        case JSON_STATE_LVAL:
-            if (tok != CVXC_JSON_NUMBER)
-                return -1;
-            ldim = atoi(iob);
-            state = JSON_STATE_SEP;
-            break;
-        case JSON_STATE_QVAL:
-            if (tok != CVXC_JSON_NUMBER)
-                return -1;
-            qdim = atoi(iob);
-            state = JSON_STATE_SEP;
-            break;
-        case JSON_STATE_SVAL:
-            if (tok != CVXC_JSON_NUMBER)
-                return -1;
-            sdim = atoi(iob);
-            state = JSON_STATE_SEP;
-            break;
-        }
-        // if all sizes then break out from this loop;
-        if (nldim != -1 && ldim != -1 && qdim != -1 && sdim != -1) {
-            state = JSON_STATE_HAVE_SIZES;
         }
     }
 
@@ -368,12 +309,13 @@ int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios)
         return 0;
     }
 
-    // read dimension arrays; TODO: error handling, release reservations on error?
-    int read_bits = 0;
-    state = JSON_STATE_SEP;
+    // here last token was ',' or STRING matching 's' or 'q' arrays.
+    state = JSON_STATE_KEY;
+    keyid = -1;
     if (tok == CVXC_JSON_STRING) {
-        // last token was either 's' or 'q' key;
-        state = *iob == 's' ? JSON_STATE_SDIMS_SEP : JSON_STATE_QDIMS_SEP;
+        // last token was either 's' or 'q' key, we expect ':' token
+        keyid = *iob == 'q' ? 0 : (*iob == 's' ? 1 : -1);
+        state = JSON_STATE_KEY_SEP;
     }
 
     for (; state != JSON_STATE_HAVE_ALL;) {
@@ -382,12 +324,13 @@ int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios)
         case JSON_STATE_KEY:
             if (tok == CVXC_JSON_STRING) {
                 if (strncmp(iob, "q", 1) == 0) {
-                    state = JSON_STATE_QDIMS_SEP;
+                    keyid = 0;
                 } else if (strncmp(iob, "s", 1) == 0) {
-                    state = JSON_STATE_SDIMS_SEP;
+                    keyid = 1;
                 } else {
                     goto error_exit;
                 }
+                state = JSON_STATE_KEY_SEP;
             } else {
                 goto error_exit;
             }
@@ -398,54 +341,25 @@ int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios)
             state = tok == ',' ? JSON_STATE_KEY : JSON_STATE_HAVE_ALL;
             break;
 
-        case JSON_STATE_QDIMS_SEP:
+        case JSON_STATE_KEY_SEP:
             if (tok != ':') goto error_exit;
-            state = JSON_STATE_QDIMS_VAL;
-            break;
-        case JSON_STATE_SDIMS_SEP:
-            if (tok != ':') goto error_exit;
-            state = JSON_STATE_SDIMS_VAL;
-            break;
-
-        case JSON_STATE_QDIMS_VAL:
-            if (tok != '[')
-                goto error_exit;
-            for (int i = 0; i < dd->qlen; i++) {
-                if (i > 0) {
-                    if (cvxc_json_read_token(iob, sizeof(iob), ios) != ',')
-                        goto error_exit;
-                }
-                if (cvxc_json_read_token(iob, sizeof(iob), ios) != CVXC_JSON_NUMBER)
-                    goto error_exit;
-                dd->qdims[i] = atoi(iob);
-            }
-            if (cvxc_json_read_token(iob, sizeof(iob), ios) != ']')
-                goto error_exit;
-            read_bits |= HAVE_QDIMS;
             state = JSON_STATE_SEP;
-            break;
-
-        case JSON_STATE_SDIMS_VAL:
-            if (tok != '[')
-                goto error_exit;
-
-            for (int i = 0; i < dd->slen; i++) {
-                if (i > 0) {
-                    if (cvxc_json_read_token(iob, sizeof(iob), ios) != ',')
-                        goto error_exit;
-                }
-                if (cvxc_json_read_token(iob, sizeof(iob), ios) != CVXC_JSON_NUMBER)
+            switch (keyid) {
+            case 0:
+                if (cvxc_json_intarray_read(dd->qdims, dd->qlen, ios) < 0) {
                     goto error_exit;
-                dd->sdims[i] = atoi(iob);
-            }
-            if (cvxc_json_read_token(iob, sizeof(iob), ios) != ']')
+                }
+                break;
+            case 1:
+                if (cvxc_json_intarray_read(dd->sdims, dd->slen, ios) < 0) {
+                    goto error_exit;
+                }
+                break;
+            default:
+                fprintf(stderr, "json(dimset) unexpected key value: %s\n", iob );
                 goto error_exit;
-            read_bits |= HAVE_SDIMS;
-            state = JSON_STATE_SEP;
+            }
             break;
-        }
-        if ((read_bits & (HAVE_QDIMS|HAVE_SDIMS)) == (HAVE_QDIMS|HAVE_SDIMS)) {
-            state = JSON_STATE_HAVE_ALL;
         }
     }
     if (tok != '}') {
@@ -466,6 +380,198 @@ int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios)
     return -1;
 }
 
+int cvxc_json_intarray_read(cvxc_size_t *array, cvxc_size_t len, cvxc_stream_t *ios)
+{
+    char iob[IOBLEN];
+    int tok, ntok, cnt = 0;
+    cvxc_size_t value;
+    int state = JSON_STATE_VAL;
+
+    tok = cvxc_json_read_token(iob, sizeof(iob), ios);
+    if (tok != '[') {
+        fprintf(stderr, "json(intarray): unexpected array start: %d\n", tok);
+        return -1;
+    }
+    for (ntok = 0; state != JSON_STATE_HAVE_ALL; ntok++) {
+        tok = cvxc_json_read_token(iob, sizeof(iob), ios);
+        switch (state) {
+        case JSON_STATE_VAL:
+            if (ntok == 0 && tok == ']')
+                return 0;
+            if (tok == CVXC_JSON_NUMBER) {
+                value = strtol(iob, (char **)0, 10);
+                if (cnt < len && array)
+                    array[cnt++] = value;
+                state = JSON_STATE_SEP;
+            } else {
+                fprintf(stderr, "json(intarray): unexpected key: %s\n", iob);
+                return -1;
+            }
+            break;
+
+        case JSON_STATE_SEP:
+            state = JSON_STATE_VAL;
+            if (tok == ']') {
+                state = JSON_STATE_HAVE_ALL;
+            } else  if (tok != ',') {
+                fprintf(stderr, "json(intarray): unexpected token: %d\n", tok);
+                return -1;
+            }
+            break;
+
+        default:
+            return -1;
+        }
+    }
+    return cnt;
+}
+
+int cvxc_json_intarray_write(cvxc_stream_t *ios, const cvxc_size_t *array, cvxc_size_t len)
+{
+    ONERR(cvxc_json_write_simple_token(ios, '['));
+    for (int k = 0; k < len; k++) {
+        if (k > 0)
+            ONERR(cvxc_json_write_simple_token(ios, ','));
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_NUMBER, &array[k], sizeof(*array)));
+    }
+    ONERR(cvxc_json_write_simple_token(ios, ']'));
+    return 0;
+}
+
+/**
+ * @brief Deserialize GP problem index set.
+ *
+ * JSON:
+ *   {"len":int, "index":[int,..]}
+ */
+int cvxc_json_gpindex_read(cvxc_gpindex_t **gpi, cvxc_stream_t *ios)
+{
+    char iob[IOBLEN];
+    int tok, ntok, next_val = -1;
+    int state = JSON_STATE_KEY;
+    cvxc_gpindex_t *lgpi;
+
+    tok = cvxc_json_read_token(iob, sizeof(iob), ios);
+    // first token ...
+    switch (tok) {
+    case CVXC_JSON_NULL:
+        if (*gpi)
+            *gpi = (cvxc_gpindex_t *)0;
+        return 0;
+    case '{':
+        break;
+    default:
+        return -1;
+    }
+
+    if (*gpi)
+       lgpi = *gpi;
+    else {
+        lgpi = (cvxc_gpindex_t *)malloc(sizeof(*lgpi));
+        if (!lgpi)
+            return -1;
+    }
+    memset(lgpi, 0, sizeof(*lgpi));
+
+    state = JSON_STATE_KEY;
+    for (ntok = 0; state != JSON_STATE_HAVE_ALL; ntok++) {
+        tok = cvxc_json_read_token(iob, sizeof(iob), ios);
+        switch (state) {
+        case JSON_STATE_KEY:
+            if (tok == CVXC_JSON_STRING) {
+                if (strncmp(iob, "len", 3) == 0) {
+                    next_val = 0;
+                } else if (strncmp(iob, "sizes", 5) == 0) {
+                    next_val = 1;
+                } else {
+                    fprintf(stderr, "json(gpindex): unexpected key: %s\n", iob);
+                    goto error_exit;
+                }
+                state = JSON_STATE_KEY_SEP;
+            } else if (ntok == 0 && tok == '}') {
+                // empty structure
+                if (*gpi)
+                    *gpi = lgpi;
+                return 0;
+            } else {
+                fprintf(stderr, "json(gpindex): unexpected token: %d\n", tok);
+                goto error_exit;
+            }
+            break;
+
+        case JSON_STATE_SEP:
+            if (tok == '}') {
+                state = JSON_STATE_HAVE_ALL;
+                break;
+            }
+            if (tok != ',') {
+                fprintf(stderr, "json(gpindex): unexpected token: %d\n", tok);
+                goto error_exit;
+            }
+            state = JSON_STATE_KEY;
+            break;
+
+        case JSON_STATE_KEY_SEP:
+            if (tok != ':') {
+                fprintf(stderr, "json(gpindex): unexpected token: %d\n", tok);
+                goto error_exit;
+            }
+            switch (next_val) {
+            case 0:
+                tok = cvxc_json_read_token(iob, sizeof(iob), ios);
+                if (tok != CVXC_JSON_NUMBER) goto error_exit;
+                lgpi->p = strtol(iob, (char **)0, 10);
+                break;
+            case 1:
+                // if (tok != '[') goto error_exit;
+                if (!(lgpi->__bytes = malloc(lgpi->p * sizeof(*lgpi->index))))
+                    goto error_exit;
+                lgpi->index = (cvxc_size_t *)lgpi->__bytes;
+                // cvxc_json_unget_simple_token(ios, tok);
+                if (cvxc_json_intarray_read(lgpi->index, lgpi->p, ios) < 0) {
+                    free(lgpi->__bytes);
+                    goto error_exit;
+                }
+                break;
+            default:
+                goto error_exit;
+            }
+            state = JSON_STATE_SEP;
+            break;
+
+        default:
+            goto error_exit;
+        }
+    }
+    if (!*gpi)
+        *gpi = lgpi;
+    return 0;
+error_exit:
+    if (!*gpi)
+        free(lgpi);
+    return -1;
+}
+
+int cvxc_json_gpindex_write(cvxc_stream_t *ios, const cvxc_gpindex_t *gpi)
+{
+    if (!gpi) {
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_NULL, 0, 0));
+        return 0;
+    }
+    ONERR(cvxc_json_write_simple_token(ios, '{'));
+    // "abstol": NUM
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "len", 3));
+    ONERR(cvxc_json_write_simple_token(ios, ':'));
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_NUMBER, &gpi->p, sizeof(gpi->p)));
+    ONERR(cvxc_json_write_simple_token(ios, ','));
+
+    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "sizes", 5));
+    ONERR(cvxc_json_write_simple_token(ios, ':'));
+    ONERR(cvxc_json_intarray_write(ios, gpi->index, gpi->p));
+
+    ONERR(cvxc_json_write_simple_token(ios, '}'));
+    return 0;
+}
 
 /*
  *  JSON: problem parameters
@@ -477,6 +583,8 @@ int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios)
  *        "h": { ...matrix... },
  *        "A": { ...matrix... },
  *        "b": { ...matrix... },
+ *        "F": { ...matrix... },
+ *        "K": { "length": int, "data": [] },
  *   "module": STRING,
  *     "args": STRING
  *   }
@@ -576,83 +684,71 @@ int cvxc_json_read_options(cvxc_solopts_t **opts, cvxc_stream_t *ios)
     }
     memset(lopts, 0, sizeof(*lopts));
 
+    int keyid = -1;
     state = JSON_STATE_KEY;
     for (ntok = 0; state != JSON_STATE_HAVE_ALL; ntok++) {
         tok = cvxc_json_read_token(iob, sizeof(iob), ios);
         switch (state) {
         case JSON_STATE_KEY:
             if (strncmp(iob, "abstol", 6) == 0) {
-                state = JSON_STATE_ATOL_SEP;
+                keyid = 0;
             } else if (strncmp(iob, "reltol", 6) == 0) {
-                state = JSON_STATE_RTOL_SEP;
+                keyid = 1;
             } else if (strncmp(iob, "feastol", 7) == 0) {
-                state = JSON_STATE_FTOL_SEP;
+                keyid = 2;
             } else if (strncmp(iob, "maxiter", 7) == 0) {
-                state = JSON_STATE_MAXI_SEP;
+                keyid = 3;
             } else if (strncmp(iob, "kkt", 3) == 0) {
-                state = JSON_STATE_KKT_SEP;
+                keyid = 4;
             } else {
                 return -1;
             }
+            state = JSON_STATE_KEY_SEP;
             break;
+
         case JSON_STATE_SEP:
             if (tok == '}') {
                 state = JSON_STATE_HAVE_ALL;
                 break;
             }
-            if (tok != ',') goto error;
+            if (tok != ',') {
+                fprintf(stderr, "json(options): unexpected token: %d\n", tok);
+                goto error;
+            }
             state = JSON_STATE_KEY;
             break;
 
-        case JSON_STATE_ATOL_SEP:
-            if (tok != ':') goto error;
-            state = JSON_STATE_ATOL_VAL;
-            break;
-        case JSON_STATE_ATOL_VAL:
-            if (tok != CVXC_JSON_NUMBER) goto error;
-            lopts->abstol = strtod(iob, (char **)0);
-            state = JSON_STATE_SEP;
-            break;
-
-        case JSON_STATE_RTOL_SEP:
-            if (tok != ':') goto error;
-            state = JSON_STATE_RTOL_VAL;
-            break;
-        case JSON_STATE_RTOL_VAL:
-            if (tok != CVXC_JSON_NUMBER) goto error;
-            lopts->reltol = strtod(iob, (char **)0);
-            state = JSON_STATE_SEP;
-            break;
-
-        case JSON_STATE_FTOL_SEP:
-            if (tok != ':') goto error;
-            state = JSON_STATE_FTOL_VAL;
-            break;
-        case JSON_STATE_FTOL_VAL:
-            if (tok != CVXC_JSON_NUMBER) goto error;
-            lopts->feastol = strtod(iob, (char **)0);
-            state = JSON_STATE_SEP;
-            break;
-
-        case JSON_STATE_MAXI_SEP:
-            if (tok != ':') goto error;
-            state = JSON_STATE_MAXI_VAL;
-            break;
-        case JSON_STATE_MAXI_VAL:
-            if (tok != CVXC_JSON_NUMBER) goto error;
-            lopts->max_iter = strtol(iob, (char **)0, 0);
-            state = JSON_STATE_SEP;
+        case JSON_STATE_KEY_SEP:
+            if (tok == ':') {
+                fprintf(stderr, "json(options): unexpected token: %d\n", tok);
+                goto error;
+            }
+            tok = cvxc_json_read_token(iob, sizeof(iob), ios);
+            if (!(tok == CVXC_JSON_NUMBER || (keyid == 4 && tok == CVXC_JSON_STRING))) {
+                fprintf(stderr, "json(options): unexpected token: %d\n", tok);
+            }
+            switch (keyid) {
+            case 0:
+                lopts->abstol = strtod(iob, (char **)0);
+                break;
+            case 1:
+                lopts->reltol = strtod(iob, (char **)0);
+                break;
+            case 2:
+                lopts->feastol = strtod(iob, (char **)0);
+                break;
+            case 3:
+                lopts->max_iter = strtol(iob, (char **)0, 0);
+                break;
+            case 4:
+                lopts->kkt_solver_name = cvxc_solver_number(iob);
+                break;
+            }
+            state = JSON_STATE_KEY;
             break;
 
-        case JSON_STATE_KKT_SEP:
-            if (tok != ':') goto error;
-            state = JSON_STATE_KKT_VAL;
-            break;
-        case JSON_STATE_KKT_VAL:
-            if (tok != CVXC_JSON_NUMBER) goto error;
-            lopts->kkt_solver_name = cvxc_solver_number(iob);
-            state = JSON_STATE_SEP;
-            break;
+        default:
+            goto error;
         }
     }
     if (!*opts)
@@ -664,85 +760,120 @@ int cvxc_json_read_options(cvxc_solopts_t **opts, cvxc_stream_t *ios)
     return -1;
 }
 
-int cvxc_json_write_param_items(
-    cvxc_stream_t *ios,
-    const cvxc_solopts_t *opts,
-    const cvxc_dimset_t *dims,
-    const cvxc_matrix_t *c,
-    const cvxc_matrix_t *G,
-    const cvxc_matrix_t *h,
-    const cvxc_matrix_t *A,
-    const cvxc_matrix_t *b,
-    const char *module, const char *args)
+int cvxc_json_write_params(cvxc_stream_t *ios, cvxc_params_t *pars)
 {
+    int nelem = 0;
+    if (!pars) {
+        ONERR(cvxc_json_write_simple_token(ios, '{'));
+        ONERR(cvxc_json_write_simple_token(ios, '}'));
+        return 0;
+    }
+
     ONERR(cvxc_json_write_simple_token(ios, '{'));
 
-    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "dims", 4));
-    ONERR(cvxc_json_write_simple_token(ios, ':'));
-    ONERR(cvxc_json_dimset_write(ios, dims));
-    ONERR(cvxc_json_write_simple_token(ios, ','));
-
-    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "c", 1));
-    ONERR(cvxc_json_write_simple_token(ios, ':'));
-    ONERR(cvxc_json_matrix_write(ios, c));
-    ONERR(cvxc_json_write_simple_token(ios, ','));
-
-    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "G", 1));
-    ONERR(cvxc_json_write_simple_token(ios, ':'));
-    ONERR(cvxc_json_matrix_write(ios, G));
-    ONERR(cvxc_json_write_simple_token(ios, ','));
-
-    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "h", 1));
-    ONERR(cvxc_json_write_simple_token(ios, ':'));
-    ONERR(cvxc_json_matrix_write(ios, h));
-    ONERR(cvxc_json_write_simple_token(ios, ','));
-
-    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "A", 1));
-    ONERR(cvxc_json_write_simple_token(ios, ':'));
-    ONERR(cvxc_json_matrix_write(ios, A));
-    ONERR(cvxc_json_write_simple_token(ios, ','));
-
-    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "b", 1));
-    ONERR(cvxc_json_write_simple_token(ios, ':'));
-    ONERR(cvxc_json_matrix_write(ios, b));
-    ONERR(cvxc_json_write_simple_token(ios, ','));
-
-    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "opts", 4));
-    ONERR(cvxc_json_write_simple_token(ios, ':'));
-    ONERR(cvxc_json_write_options(ios, opts, (char *)0));
-
-    if (module) {
+    if (pars->dims) {
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "dims", 4));
+        ONERR(cvxc_json_write_simple_token(ios, ':'));
+        ONERR(cvxc_json_dimset_write(ios, pars->dims));
+        nelem++;
+    }
+    if (pars->c) {
+        if (nelem)
+            ONERR(cvxc_json_write_simple_token(ios, ','));
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "c", 1));
+        ONERR(cvxc_json_write_simple_token(ios, ':'));
+        ONERR(cvxc_json_matrix_write(ios, pars->c));
         ONERR(cvxc_json_write_simple_token(ios, ','));
+        nelem++;
+    }
+
+    if (pars->G) {
+        if (nelem)
+            ONERR(cvxc_json_write_simple_token(ios, ','));
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "G", 1));
+        ONERR(cvxc_json_write_simple_token(ios, ':'));
+        ONERR(cvxc_json_matrix_write(ios, pars->G));
+        nelem++;
+    }
+
+    if (pars->h) {
+        if (nelem)
+            ONERR(cvxc_json_write_simple_token(ios, ','));
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "h", 1));
+        ONERR(cvxc_json_write_simple_token(ios, ':'));
+        ONERR(cvxc_json_matrix_write(ios, pars->h));
+        nelem++;
+    }
+
+    if (pars->A) {
+        if (nelem)
+            ONERR(cvxc_json_write_simple_token(ios, ','));
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "A", 1));
+        ONERR(cvxc_json_write_simple_token(ios, ':'));
+        ONERR(cvxc_json_matrix_write(ios, pars->A));
+        nelem++;
+    }
+
+    if (pars->b) {
+        if (nelem)
+            ONERR(cvxc_json_write_simple_token(ios, ','));
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "b", 1));
+        ONERR(cvxc_json_write_simple_token(ios, ':'));
+        ONERR(cvxc_json_matrix_write(ios, pars->b));
+        nelem++;
+    }
+
+    if (pars->F) {
+        if (nelem)
+            ONERR(cvxc_json_write_simple_token(ios, ','));
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "F", 1));
+        ONERR(cvxc_json_write_simple_token(ios, ':'));
+        ONERR(cvxc_json_matrix_write(ios, pars->F));
+        nelem++;
+    }
+
+    if (pars->K) {
+        if (nelem)
+            ONERR(cvxc_json_write_simple_token(ios, ','));
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "K", 1));
+        ONERR(cvxc_json_write_simple_token(ios, ':'));
+        ONERR(cvxc_json_gpindex_write(ios, pars->K));
+        nelem++;
+    }
+
+    if (pars->opts) {
+        if (nelem)
+            ONERR(cvxc_json_write_simple_token(ios, ','));
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "opts", 4));
+        ONERR(cvxc_json_write_simple_token(ios, ':'));
+        ONERR(cvxc_json_write_options(ios, pars->opts, (char *)0));
+        nelem++;
+    }
+
+    if (pars->module) {
+        if (nelem)
+            ONERR(cvxc_json_write_simple_token(ios, ','));
         ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "module", 6));
         ONERR(cvxc_json_write_simple_token(ios, ':'));
-        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, module, strlen(module)));
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, pars->module, strlen(pars->module)));
+        nelem++;
     }
-    if (args) {
-        ONERR(cvxc_json_write_simple_token(ios, ','));
+    if (pars->args) {
+        if (nelem)
+            ONERR(cvxc_json_write_simple_token(ios, ','));
         ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "args", 4));
         ONERR(cvxc_json_write_simple_token(ios, ':'));
-        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, args, strlen(args)));
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, pars->args, strlen(pars->args)));
+        nelem++;
     }
 
     ONERR(cvxc_json_write_simple_token(ios, '}'));
     return 0;
 }
 
-int cvxc_json_write_params(cvxc_stream_t *ios, cvxc_params_t *pars)
-{
-    if (!pars) {
-        ONERR(cvxc_json_write_simple_token(ios, '{'));
-        ONERR(cvxc_json_write_simple_token(ios, '}'));
-        return 0;
-    }
-    return cvxc_json_write_param_items(
-        ios, pars->opts, pars->dims, pars->c, pars->G, pars->h,
-        pars->A, pars->b, pars->module, pars->args);
-}
-
 int cvxc_json_read_params(cvxc_params_t **pars, cvxc_stream_t *ios)
 {
-    int tok, ntok, state, err, bits = 0;
+    int tok, ntok, state, err;
     cvxc_params_t *pptr = (cvxc_params_t *)0;
     char iob[IOBLEN];
     if (*pars)
@@ -761,30 +892,38 @@ int cvxc_json_read_params(cvxc_params_t **pars, cvxc_stream_t *ios)
     }
 
     state = JSON_STATE_KEY;
+    int keyid = -1;
     for (ntok = 0; state != JSON_STATE_HAVE_ALL; ntok++) {
         tok = cvxc_json_read_token(iob, sizeof(iob), ios);
         switch (state) {
         case JSON_STATE_KEY:
             if (tok == CVXC_JSON_STRING) {
                 if (iob[0] == 'c' && iob[1] == '\0') {
-                    state = JSON_STATE_MATC_SEP;
+                    keyid = 0;
                 } else if (iob[0] == 'G' && iob[1] == '\0') {
-                    state = JSON_STATE_MATG_SEP;
+                    keyid = 1;
                 } else if (iob[0] == 'h' && iob[1] == '\0') {
-                    state = JSON_STATE_MATH_SEP;
+                    keyid = 2;
                 } else if (iob[0] == 'A' && iob[1] == '\0') {
-                    state = JSON_STATE_MATA_SEP;
+                    keyid = 3;
                 } else if (iob[0] == 'b' && iob[1] == '\0') {
-                    state = JSON_STATE_MATB_SEP;
+                    keyid = 4;
+                } else if (iob[0] == 'F' && iob[1] == '\0') {
+                    keyid = 5;
+                } else if (iob[0] == 'K' && iob[1] == '\0') {
+                    keyid = 6;
                 } else if (strncmp(iob, "opts", 4) == 0) {
-                    state = JSON_STATE_OPTS_SEP;
+                    keyid = 7;
                 } else if (strncmp(iob, "dims", 4) == 0) {
-                    state = JSON_STATE_DIMS_SEP;
+                    keyid = 8;
                 } else if (strncmp(iob, "module", 6) == 0) {
-                    state = JSON_STATE_MOD_SEP;
+                    keyid = 9;
                 } else if (strncmp(iob, "args", 4) == 0) {
-                    state = JSON_STATE_ARGS_SEP;
+                    keyid = 10;
+                } else {
+                    keyid = -1;
                 }
+                state = JSON_STATE_KEY_SEP;
             } else if (tok == '}' && ntok == 0) {
                 state = JSON_STATE_HAVE_ALL;
                 break;
@@ -802,77 +941,61 @@ int cvxc_json_read_params(cvxc_params_t **pars, cvxc_stream_t *ios)
             state = JSON_STATE_KEY;
             break;
 
-        case JSON_STATE_MATC_SEP:
+        case JSON_STATE_KEY_SEP:
             if (tok != ':') goto error_exit;
-            if ((err = cvxc_json_matrix_read(&pptr->c, ios)) < 0)
-                goto error_exit;
-            state = JSON_STATE_SEP;
-            bits |= HAVE_C;
-            break;
-
-        case JSON_STATE_MATG_SEP:
-            if (tok != ':') goto error_exit;
-            if ((err = cvxc_json_matrix_read(&pptr->G, ios)) < 0)
-                goto error_exit;
-            state = JSON_STATE_SEP;
-            bits |= HAVE_G;
-            break;
-
-        case JSON_STATE_MATH_SEP:
-            if (tok != ':') goto error_exit;
-            if ((err = cvxc_json_matrix_read(&pptr->h, ios)) < 0)
-                goto error_exit;
-            state = JSON_STATE_SEP;
-            bits |= HAVE_H;
-            break;
-
-        case JSON_STATE_MATA_SEP:
-            if (tok != ':') goto error_exit;
-            if ((err = cvxc_json_matrix_read(&pptr->A, ios)) < 0)
-                goto error_exit;
-            state = JSON_STATE_SEP;
-            bits |= HAVE_A;
-            break;
-
-        case JSON_STATE_MATB_SEP:
-            if (tok != ':') goto error_exit;
-            if ((err = cvxc_json_matrix_read(&pptr->b, ios)) < 0)
-                goto error_exit;
-            state = JSON_STATE_SEP;
-            bits |= HAVE_B;
-            break;
-
-        case JSON_STATE_DIMS_SEP:
-            if (tok != ':') goto error_exit;
-            if  (cvxc_json_dimset_read(&pptr->dims, ios) < 0)
-                goto error_exit;
-            state = JSON_STATE_SEP;
-            bits |= HAVE_DIMS;
-            break;
-
-        case JSON_STATE_OPTS_SEP:
-            if (tok != ':') goto error_exit;
-            if (cvxc_json_read_options(&pptr->opts, ios) < 0)
-                goto error_exit;
-            state = JSON_STATE_SEP;
-            bits |= HAVE_OPTS;
-            break;
-
-        case JSON_STATE_MOD_SEP:
-            if (tok != ':') goto error_exit;
-            if ((err = cvxc_json_read_token(iob, sizeof(iob), ios)) != CVXC_JSON_STRING)
-                goto error_exit;
-            pptr->module = malloc(strlen(iob) + 1);
-            memcpy(pptr->module, iob, strlen(iob) + 1);
-            state = JSON_STATE_SEP;
-            break;
-
-        case JSON_STATE_ARGS_SEP:
-            if (tok != ':') goto error_exit;
-            if ((err = cvxc_json_read_token(iob, sizeof(iob), ios)) != CVXC_JSON_STRING)
-                goto error_exit;
-            pptr->args = malloc(strlen(iob) + 1);
-            memcpy(pptr->args, iob, strlen(iob) + 1);
+            switch (keyid) {
+            case 0:
+                if ((err = cvxc_json_matrix_read(&pptr->c, ios)) < 0)
+                    goto error_exit;
+                break;
+            case 1:
+                if ((err = cvxc_json_matrix_read(&pptr->G, ios)) < 0)
+                    goto error_exit;
+                break;
+            case 2:
+                if ((err = cvxc_json_matrix_read(&pptr->h, ios)) < 0)
+                    goto error_exit;
+                break;
+            case 3:
+                if ((err = cvxc_json_matrix_read(&pptr->A, ios)) < 0)
+                    goto error_exit;
+                break;
+            case 4:
+                if ((err = cvxc_json_matrix_read(&pptr->b, ios)) < 0)
+                    goto error_exit;
+                break;
+            case 5:
+                if ((err = cvxc_json_matrix_read(&pptr->F, ios)) < 0)
+                    goto error_exit;
+                break;
+            case 6:
+                if ((err = cvxc_json_gpindex_read(&pptr->K, ios)) < 0)
+                    goto error_exit;
+                break;
+            case 7:
+                if (cvxc_json_read_options(&pptr->opts, ios) < 0)
+                    goto error_exit;
+                break;
+            case 8:
+                if  (cvxc_json_dimset_read(&pptr->dims, ios) < 0)
+                    goto error_exit;
+                break;
+            case 9:
+                if ((err = cvxc_json_read_token(iob, sizeof(iob), ios)) != CVXC_JSON_STRING)
+                    goto error_exit;
+                pptr->module = malloc(strlen(iob) + 1);
+                memcpy(pptr->module, iob, strlen(iob) + 1);
+                break;
+            case 10:
+                if ((err = cvxc_json_read_token(iob, sizeof(iob), ios)) != CVXC_JSON_STRING)
+                    goto error_exit;
+                pptr->args = malloc(strlen(iob) + 1);
+                memcpy(pptr->args, iob, strlen(iob) + 1);
+                break;
+            default:
+                fprintf(stderr, "unexpected parameter name: %s", iob);
+                break;
+            }
             state = JSON_STATE_SEP;
             break;
 
@@ -880,9 +1003,6 @@ int cvxc_json_read_params(cvxc_params_t **pars, cvxc_stream_t *ios)
             fprintf(stderr, "cvxc_json_read_params: unknown state %d\n", state);
             goto error_exit;
         }
-        /* if ((bits & HAVE_ALL) == HAVE_ALL) { */
-        /*     state = JSON_STATE_HAVE_ALL; */
-        /* } */
     }
     // must get ending '}'
     if (tok != '}') {
@@ -906,6 +1026,8 @@ int cvxc_json_read_params(cvxc_params_t **pars, cvxc_stream_t *ios)
         cvxm_free(pptr->A);
     if (pptr->b)
         cvxm_free(pptr->b);
+    if (pptr->F)
+        cvxm_free(pptr->F);
     if (pptr->dims)
         cvxc_dimset_free(pptr->dims);
     if (pptr->opts)
