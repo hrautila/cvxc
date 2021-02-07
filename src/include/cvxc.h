@@ -414,6 +414,7 @@ extern int
 cvxc_update_scaling(cvxc_scaling_t *W, cvxc_matgrp_t *s_g, cvxc_matgrp_t *z_g, cvxc_matgrp_t *l_g, cvxc_memblk_t *wrk);
 
 // ------------------------------------------------------------------------------------------
+struct cvxc_gpindex;
 
 typedef struct cvxc_solopts {
     cvxc_float_t abstol;         ///< Absolute tolerance
@@ -434,6 +435,8 @@ typedef struct cvxc_params
     cvxc_matrix_t *h;
     cvxc_matrix_t *A;
     cvxc_matrix_t *b;
+    cvxc_matrix_t *F;
+    struct cvxc_gpindex *K;
     struct cvxc_solopts *opts;
     char *module;
     char *args;
@@ -448,14 +451,14 @@ extern int cvxc_json_write_simple_token(cvxc_stream_t *ios, int tok);
 extern int cvxc_json_read_token(char *iob, size_t len, cvxc_stream_t *ios);
 extern int cvxc_json_dimset_write(cvxc_stream_t *ios, const cvxc_dimset_t *dims);
 extern int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios);
+extern int cvxc_json_gpindex_read(struct cvxc_gpindex **gpi, cvxc_stream_t *ios);
+extern int cvxc_json_gpindex_write(cvxc_stream_t *ios, const struct cvxc_gpindex *gpi);
+extern int cvxc_json_intarray_read(cvxc_size_t *array, cvxc_size_t len, cvxc_stream_t *ios);
+extern int cvxc_json_intarray_write(cvxc_stream_t *ios, const cvxc_size_t *array, cvxc_size_t len);
 extern int cvxc_json_write_solution(cvxc_stream_t *ios, const struct cvxc_solution *sol);
 extern int cvxc_json_write_result(cvxc_stream_t *ios, const struct cvxc_solution *sol);
 extern int cvxc_json_read_params(cvxc_params_t **pars, cvxc_stream_t *ios);
 extern int cvxc_json_write_params(cvxc_stream_t *ios, cvxc_params_t *pars);
-extern int cvxc_json_write_param_items(
-    cvxc_stream_t *ios, const cvxc_solopts_t *opts, const cvxc_dimset_t *dims,
-    const cvxc_matrix_t *c, const cvxc_matrix_t *G, const cvxc_matrix_t *h,
-    const cvxc_matrix_t *A, const cvxc_matrix_t *b, const char *mod, const char *args);
 extern int cvxc_json_read_options(cvxc_solopts_t **opts, cvxc_stream_t *ios);
 extern int cvxc_json_write_options(cvxc_stream_t *ios, const cvxc_solopts_t *opts, const char *kkt);
 
