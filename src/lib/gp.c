@@ -161,21 +161,21 @@ int cvxc_gp_f(cvxc_matrix_t *f, cvxc_matrix_t *Df, cvxc_matrix_t *H,
  * @param[in] F
  *   Matrix with submatrices [F0, F1, ..., Fm] where each submatrix is \$f K_i x n \f$.
  * @param[in] g
- *   Column vector with subvectors [g0, g1, ..., gm] where each subvector is \$f K_i x n \f$.
+ *   Column vector with subvectors [g0, g1, ..., gm] where each subvector is \$f K_i x 1 \f$.
  * @param[in] G
  * @param[in] h
  * @param[in] A
  * @param[in] b
  */
 int cvxc_gp_setup(cvxc_problem_t *cp,
-                 cvxc_size_t *K,
-                 cvxc_matrix_t *F,
-                 cvxc_matrix_t *g,
-                 cvxc_matrix_t *G,
-                 cvxc_matrix_t *h,
-                 cvxc_matrix_t *A,
-                 cvxc_matrix_t *b,
-                 cvxc_kktsolver_t *kktsolver)
+                  cvxc_gpindex_t *K,
+                  cvxc_matrix_t *F,
+                  cvxc_matrix_t *g,
+                  cvxc_matrix_t *G,
+                  cvxc_matrix_t *h,
+                  cvxc_matrix_t *A,
+                  cvxc_matrix_t *b,
+                  cvxc_kktsolver_t *kktsolver)
 {
     cvxc_cpl_internal_t *cpi;
     cvxc_size_t mG, nG, mF, nF, mg, ng, p, mK, mA, nA, maxK, offset, gpbytes;
@@ -190,10 +190,10 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
 
     cvxm_size(&mF, &nF, F);
     cvxm_size(&mg, &ng, g);
-    for (mK = 0, p = 0; p < mF && K[p] > 0; p++) {
-        mK += K[p];
-        if (K[p] > maxK)
-            maxK = K[p];
+    for (mK = 0, p = 0; p < mF && p < K->p; p++) {
+        mK += K->index[p];
+        if (K->index[p] > maxK)
+            maxK = K->index[p];
     }
     if (mK != mF || mg != mF) {
         return 0;
@@ -242,7 +242,7 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
         return 0;
     offset += used;
 
-    cvxc_gpi_setup(&gp->gp_params.gpi, K, p);
+    cvxc_gpi_setup(&gp->gp_params.gpi, K->index, p);
     return offset;
 }
 
