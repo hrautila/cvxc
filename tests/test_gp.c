@@ -11,6 +11,7 @@ int main(int argc, char **argv)
 {
     cvxc_matrix_t G, h, A, b, F, g;
     cvxc_problem_t cp;
+    cvxc_gpindex_t gpi;
     int opt;
 
     cvxc_float_t aflr = 1000.0;
@@ -53,6 +54,8 @@ int main(int argc, char **argv)
         }
     }
 
+    cvxc_gpi_init(&gpi, K, 7);
+
     cvxm_map_data(&F, 8, 3, fdata);
     cvxm_map_data(&g, 8, 1, gdata);
     cvxm_map_data(&h, 0, 1, (cvxc_float_t *)0);
@@ -66,13 +69,13 @@ int main(int argc, char **argv)
     if (opts.max_iter == 0)
         return 0;
 
-    cvxc_gp_setup(&cp, K, &F, &g, &G, &h, &A, &b, (cvxc_kktsolver_t *)0);
-
+    cvxc_gp_setup(&cp, &gpi, &F, &g, &G, &h, &A, &b, (cvxc_kktsolver_t *)0);
     cvxc_gp_compute_start(&cp);
     cvxc_gp_solve(&cp, &opts);
 
     // x = exp(x)
     cvxm_apply(cp.solution.x, exp, 0);
 
-    return print_solution(&cp.solution);
+    print_solution(&cp.solution);
+    cvxc_gpi_release(&gpi);
 }
