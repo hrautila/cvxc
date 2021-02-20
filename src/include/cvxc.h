@@ -721,13 +721,21 @@ typedef struct cvxc_gpindex {
     void *__bytes;
 } cvxc_gpindex_t;
 
+extern int cvxc_gpi_setup(cvxc_gpindex_t *gpi, const cvxc_size_t *K, cvxc_size_t p);
+extern int cvxc_gpi_init(cvxc_gpindex_t *gpi, const cvxc_size_t *K, cvxc_size_t p);
+extern cvxc_size_t cvxc_gpi_make(cvxc_gpindex_t *gpi, cvxc_size_t p, void *memory, cvxc_size_t nbytes);
+extern void cvxc_gpi_release(cvxc_gpindex_t *gpi);
+extern void cvxc_gpi_free(cvxc_gpindex_t *gpi);
+extern cvxc_size_t cvxc_gpi_elem(const cvxc_gpindex_t *gpi, cvxc_matrix_t *e, const cvxc_matrix_t *Fg, cvxc_size_t n);
+extern cvxc_size_t cvxc_gpi_length(const cvxc_gpindex_t *gpi, cvxc_size_t n);
+
 typedef struct cvxc_gp_params {
     cvxc_matrix_t *F;
     cvxc_matrix_t *g;
+    cvxc_gpindex_t *gpi;
     cvxc_matrix_t y;
     cvxc_matrix_t u;
     cvxc_matrix_t Fs;
-    cvxc_gpindex_t gpi;
 } cvxc_gp_params_t;
 
 typedef struct cvxc_gp_program {
