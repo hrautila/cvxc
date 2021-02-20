@@ -12,6 +12,7 @@ LIBFILES = \
 	lib/cvxmio.c \
 	lib/dims.c \
 	lib/gp.c \
+	lib/gpindex.c \
 	lib/index.c \
 	lib/json.c \
 	lib/kkt.c \
