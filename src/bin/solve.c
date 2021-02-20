@@ -108,3 +108,21 @@ int solve_cp(cvxc_params_t *params, cvxc_solopts_t *opts, struct solver_args *ar
 
     return 0;
 }
+
+int solve_gp(cvxc_params_t *params, cvxc_solopts_t *opts, struct solver_args *args)
+{
+    cvxc_size_t nbytes;
+    cvxc_problem_t cp;
+    nbytes = cvxc_gp_setup(&cp, params->K, params->F, params->g, params->G, params->h,
+                           params->A, params->b, (cvxc_kktsolver_t *)0);
+    if (nbytes == 0) {
+        fprintf(stderr, "error: conelp problem setup failed\n");
+        return -1;
+    }
+    cvxc_gp_compute_start(&cp);
+    cvxc_gp_solve(&cp, params->opts ? params->opts : opts);
+
+    solver_write_solution(args->output, &cp.solution);
+    // TODO: release all allocated resources
+    return 0;
+}
