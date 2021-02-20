@@ -12,53 +12,6 @@ cvxc_size_t cvxc_gp_program_bytes(cvxc_size_t p, cvxc_size_t m, cvxc_size_t maxf
     return (p + 1)*sizeof(cvxc_size_t) + (m + maxf)*sizeof(cvxc_float_t);
 }
 
-cvxc_size_t cvxc_gpi_make(cvxc_gpindex_t *gpi, cvxc_size_t p, void *memory, cvxc_size_t nbytes)
-{
-    if (nbytes < (p+1)*sizeof(cvxc_size_t))
-        return 0;
-
-    gpi->p = p;
-    gpi->index = (cvxc_size_t *)memory;
-    gpi->index[0] = 0;
-    for (cvxc_size_t k = 0; k < p; k++) {
-        gpi->index[k+1] = 0;
-    }
-    return (p+1)*sizeof(cvxc_size_t);
-}
-
-/**
- * @brief Get the n'th element in GP matrix F/g.
- *
- * @return Row index of element
- */
-cvxc_size_t cvxc_gpi_elem(const cvxc_gpindex_t *gpi, cvxc_matrix_t *e, const cvxc_matrix_t *Fg, cvxc_size_t n)
-{
-    cvxc_size_t mS, nS;
-    if (n < gpi->p) {
-        cvxm_size(&mS, &nS, Fg);
-        cvxm_view_map(e, Fg, gpi->index[n], 0, gpi->index[n+1]-gpi->index[n], nS);
-        return gpi->index[n];
-    }
-    return 0;
-}
-
-/**
- * @brief Get length of n'th GP index element.
- */
-cvxc_size_t cvxc_gpi_length(const cvxc_gpindex_t *gpi, cvxc_size_t n)
-{
-    return n < gpi->p ? gpi->index[n+1] - gpi->index[n] : 0;
-}
-
-int cvxc_gpi_setup(cvxc_gpindex_t *gpi, cvxc_size_t *K, cvxc_size_t p)
-{
-    gpi->index[0] = 0;
-    for (cvxc_size_t k = 0; k < p; k++) {
-        gpi->index[k+1] = gpi->index[k] + K[k];
-    }
-    return 0;
-}
-
 struct logsum {
     cvxc_float_t ymax;
     cvxc_float_t ysum;
@@ -91,7 +44,7 @@ int cvxc_gp_f(cvxc_matrix_t *f, cvxc_matrix_t *Df, cvxc_matrix_t *H,
     Fs = &gp->gp_params.Fs;
     g  = gp->gp_params.g;
     F  = gp->gp_params.F;
-    gpi = &gp->gp_params.gpi;
+    gpi = gp->gp_params.gpi;
 
     cvxm_set_all(f, 0.0);
     cvxm_set_all(Df, 0.0);
@@ -178,7 +131,7 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
                   cvxc_kktsolver_t *kktsolver)
 {
     cvxc_cpl_internal_t *cpi;
-    cvxc_size_t mG, nG, mF, nF, mg, ng, p, mK, mA, nA, maxK, offset, gpbytes;
+    cvxc_size_t mG, nG, mF, nF, mg, ng, p, mA, nA, maxK, offset, gpbytes;
     cvxc_dimset_t ldims;
 
     if (!cp)
@@ -190,12 +143,11 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
 
     cvxm_size(&mF, &nF, F);
     cvxm_size(&mg, &ng, g);
-    for (mK = 0, p = 0; p < mF && p < K->p; p++) {
-        mK += K->index[p];
-        if (K->index[p] > maxK)
-            maxK = K->index[p];
+    for (p = 0; p < mF && p < K->p; p++) {
+        if (cvxc_gpi_length(K, p) > maxK)
+            maxK = cvxc_gpi_length(K, p);
     }
-    if (mK != mF || mg != mF) {
+    if (K->index[K->p] != mF || mg != mF) {
         return 0;
     }
     if (A)
@@ -204,9 +156,9 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
         cvxm_size(&mG, &nG, G);
 
     // p is count of F_i, g_i elements
-    gpbytes = cvxc_gp_program_bytes(p, mg, maxK*nF);
+    gpbytes = cvxc_gp_program_bytes(K->p, mg, maxK*nF);
     ldims = (cvxc_dimset_t){0};
-    ldims.mnl = p - 1;
+    ldims.mnl = K->p - 1;
     ldims.iscpt = 1;
     ldims.ldim = mG;
 
@@ -217,6 +169,7 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
     cvxc_gp_program_t *gp = &cpi->gp;
     gp->gp_params.F = F;
     gp->gp_params.g = g;
+    gp->gp_params.gpi = K;
     gp->gp.F = cvxc_gp_f;
     gp->gp.user = gp;
 
@@ -237,12 +190,13 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
         return 0;
     offset += used;
 
-    used = cvxc_gpi_make(&gp->gp_params.gpi, p, &cp->memory[offset], nbytes-offset);
+#if 0
+    used = cvxc_gpi_make(&gp->gp_params.gpi, K->p, &cp->memory[offset], nbytes-offset);
     if (used == 0)
         return 0;
     offset += used;
-
-    cvxc_gpi_setup(&gp->gp_params.gpi, K->index, p);
+    //cvxc_gpi_setup(&gp->gp_params.gpi, K->index, p);
+#endif
     return offset;
 }
 
