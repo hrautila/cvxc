@@ -436,6 +436,7 @@ typedef struct cvxc_params
     cvxc_matrix_t *A;
     cvxc_matrix_t *b;
     cvxc_matrix_t *F;
+    cvxc_matrix_t *g;
     struct cvxc_gpindex *K;
     struct cvxc_solopts *opts;
     char *module;
@@ -1027,7 +1028,7 @@ cvxc_cp_bytes(int n, int m, const cvxc_dimset_t *dims);
 
 
 extern int
-cvxc_gp_setup(cvxc_problem_t *cp, cvxc_size_t *K,
+cvxc_gp_setup(cvxc_problem_t *cp, cvxc_gpindex_t *K,
              cvxc_matrix_t *F, cvxc_matrix_t *g,
              cvxc_matrix_t *G, cvxc_matrix_t *h, cvxc_matrix_t *A,
              cvxc_matrix_t *b, cvxc_kktsolver_t *kktsolver);
