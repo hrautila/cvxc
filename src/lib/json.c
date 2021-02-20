@@ -111,8 +111,6 @@ enum cvxc_json_states {
     JSON_STATE_VAL,
     JSON_STATE_KEY_SEP,
     JSON_STATE_KEY_VAL,
-    JSON_STATE_HAVE_SIZES,
-    JSON_STATE_HAVE_ALL,
 };
 
 extern int cvxc_json_intarray_read(cvxc_size_t *array, cvxc_size_t len, cvxc_stream_t *ios);
@@ -221,7 +219,8 @@ int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios)
     }
     // assume sizeof attributes l, nl, nq, ns first
     int keyid = -1;
-    for (ntok = 0; state != JSON_STATE_HAVE_SIZES ; ntok++) {
+    int ready = 0;
+    for (ntok = 0; !ready ; ntok++) {
         tok = cvxc_json_read_token(iob, sizeof(iob), ios);
         switch (state) {
         case JSON_STATE_KEY:
@@ -238,10 +237,10 @@ int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios)
                 } else {
                     if (*iob != 's' && *iob != 'q')
                         return -1;
-                    state = JSON_STATE_HAVE_SIZES;
+                    ready = 1;
                 }
             } else if (tok == '}') {
-                state = JSON_STATE_HAVE_SIZES;
+                ready = 1;
                 break;
             } else {
                 return -1;
@@ -253,7 +252,7 @@ int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios)
             state = JSON_STATE_KEY;
             if (tok == '}' || (nldim != -1 && ldim != -1 && qdim != -1 && sdim != -1)) {
                 // if seen all sizes or end-of-object brace break out from this loop;
-                state = JSON_STATE_HAVE_SIZES;
+                ready = 1;
             }
             break;
 
@@ -318,7 +317,7 @@ int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios)
         state = JSON_STATE_KEY_SEP;
     }
 
-    for (; state != JSON_STATE_HAVE_ALL;) {
+    for (ready = 0; !ready;) {
         tok = cvxc_json_read_token(iob, sizeof(iob), ios);
         switch (state) {
         case JSON_STATE_KEY:
@@ -338,7 +337,8 @@ int cvxc_json_dimset_read(cvxc_dimset_t **dims, cvxc_stream_t *ios)
 
         case JSON_STATE_SEP:
             if (tok != ',' && tok != '}') goto error_exit;
-            state = tok == ',' ? JSON_STATE_KEY : JSON_STATE_HAVE_ALL;
+            state = JSON_STATE_KEY;
+            ready = tok == '}';
             break;
 
         case JSON_STATE_KEY_SEP:
@@ -392,7 +392,9 @@ int cvxc_json_intarray_read(cvxc_size_t *array, cvxc_size_t len, cvxc_stream_t *
         fprintf(stderr, "json(intarray): unexpected array start: %d\n", tok);
         return -1;
     }
-    for (ntok = 0; state != JSON_STATE_HAVE_ALL; ntok++) {
+
+    int ready = 0;
+    for (ntok = 0; !ready; ntok++) {
         tok = cvxc_json_read_token(iob, sizeof(iob), ios);
         switch (state) {
         case JSON_STATE_VAL:
@@ -404,7 +406,7 @@ int cvxc_json_intarray_read(cvxc_size_t *array, cvxc_size_t len, cvxc_stream_t *
                     array[cnt++] = value;
                 state = JSON_STATE_SEP;
             } else {
-                fprintf(stderr, "json(intarray): unexpected key: %s\n", iob);
+                fprintf(stderr, "json(intarray): unexpected token: %d\n", tok);
                 return -1;
             }
             break;
@@ -412,7 +414,7 @@ int cvxc_json_intarray_read(cvxc_size_t *array, cvxc_size_t len, cvxc_stream_t *
         case JSON_STATE_SEP:
             state = JSON_STATE_VAL;
             if (tok == ']') {
-                state = JSON_STATE_HAVE_ALL;
+                ready = 1;
             } else  if (tok != ',') {
                 fprintf(stderr, "json(intarray): unexpected token: %d\n", tok);
                 return -1;
@@ -447,7 +449,7 @@ int cvxc_json_intarray_write(cvxc_stream_t *ios, const cvxc_size_t *array, cvxc_
 int cvxc_json_gpindex_read(cvxc_gpindex_t **gpi, cvxc_stream_t *ios)
 {
     char iob[IOBLEN];
-    int tok, ntok, next_val = -1;
+    int tok, ntok, ready, keyid;
     int state = JSON_STATE_KEY;
     cvxc_gpindex_t *lgpi;
 
@@ -474,15 +476,17 @@ int cvxc_json_gpindex_read(cvxc_gpindex_t **gpi, cvxc_stream_t *ios)
     memset(lgpi, 0, sizeof(*lgpi));
 
     state = JSON_STATE_KEY;
-    for (ntok = 0; state != JSON_STATE_HAVE_ALL; ntok++) {
+    keyid = -1;
+    ready = 0;
+    for (ntok = 0; !ready; ntok++) {
         tok = cvxc_json_read_token(iob, sizeof(iob), ios);
         switch (state) {
         case JSON_STATE_KEY:
             if (tok == CVXC_JSON_STRING) {
                 if (strncmp(iob, "len", 3) == 0) {
-                    next_val = 0;
+                    keyid = 0;
                 } else if (strncmp(iob, "sizes", 5) == 0) {
-                    next_val = 1;
+                    keyid = 1;
                 } else {
                     fprintf(stderr, "json(gpindex): unexpected key: %s\n", iob);
                     goto error_exit;
@@ -501,7 +505,7 @@ int cvxc_json_gpindex_read(cvxc_gpindex_t **gpi, cvxc_stream_t *ios)
 
         case JSON_STATE_SEP:
             if (tok == '}') {
-                state = JSON_STATE_HAVE_ALL;
+                ready = 1;
                 break;
             }
             if (tok != ',') {
@@ -516,18 +520,16 @@ int cvxc_json_gpindex_read(cvxc_gpindex_t **gpi, cvxc_stream_t *ios)
                 fprintf(stderr, "json(gpindex): unexpected token: %d\n", tok);
                 goto error_exit;
             }
-            switch (next_val) {
+            switch (keyid) {
             case 0:
                 tok = cvxc_json_read_token(iob, sizeof(iob), ios);
                 if (tok != CVXC_JSON_NUMBER) goto error_exit;
                 lgpi->p = strtol(iob, (char **)0, 10);
                 break;
             case 1:
-                // if (tok != '[') goto error_exit;
                 if (!(lgpi->__bytes = malloc(lgpi->p * sizeof(*lgpi->index))))
                     goto error_exit;
                 lgpi->index = (cvxc_size_t *)lgpi->__bytes;
-                // cvxc_json_unget_simple_token(ios, tok);
                 if (cvxc_json_intarray_read(lgpi->index, lgpi->p, ios) < 0) {
                     free(lgpi->__bytes);
                     goto error_exit;
@@ -685,8 +687,9 @@ int cvxc_json_read_options(cvxc_solopts_t **opts, cvxc_stream_t *ios)
     memset(lopts, 0, sizeof(*lopts));
 
     int keyid = -1;
+    int ready = 0;
     state = JSON_STATE_KEY;
-    for (ntok = 0; state != JSON_STATE_HAVE_ALL; ntok++) {
+    for (ntok = 0; !ready; ntok++) {
         tok = cvxc_json_read_token(iob, sizeof(iob), ios);
         switch (state) {
         case JSON_STATE_KEY:
@@ -701,14 +704,14 @@ int cvxc_json_read_options(cvxc_solopts_t **opts, cvxc_stream_t *ios)
             } else if (strncmp(iob, "kkt", 3) == 0) {
                 keyid = 4;
             } else {
-                return -1;
+                goto error;
             }
             state = JSON_STATE_KEY_SEP;
             break;
 
         case JSON_STATE_SEP:
             if (tok == '}') {
-                state = JSON_STATE_HAVE_ALL;
+                ready = 1;
                 break;
             }
             if (tok != ',') {
@@ -832,6 +835,15 @@ int cvxc_json_write_params(cvxc_stream_t *ios, cvxc_params_t *pars)
         nelem++;
     }
 
+    if (pars->g) {
+        if (nelem)
+            ONERR(cvxc_json_write_simple_token(ios, ','));
+        ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "g", 1));
+        ONERR(cvxc_json_write_simple_token(ios, ':'));
+        ONERR(cvxc_json_matrix_write(ios, pars->g));
+        nelem++;
+    }
+
     if (pars->K) {
         if (nelem)
             ONERR(cvxc_json_write_simple_token(ios, ','));
@@ -893,7 +905,8 @@ int cvxc_json_read_params(cvxc_params_t **pars, cvxc_stream_t *ios)
 
     state = JSON_STATE_KEY;
     int keyid = -1;
-    for (ntok = 0; state != JSON_STATE_HAVE_ALL; ntok++) {
+    int ready = 0;
+    for (ntok = 0; !ready; ntok++) {
         tok = cvxc_json_read_token(iob, sizeof(iob), ios);
         switch (state) {
         case JSON_STATE_KEY:
@@ -920,12 +933,14 @@ int cvxc_json_read_params(cvxc_params_t **pars, cvxc_stream_t *ios)
                     keyid = 9;
                 } else if (strncmp(iob, "args", 4) == 0) {
                     keyid = 10;
+                } else if (iob[0] == 'g' && iob[1] == '\0') {
+                    keyid = 11;
                 } else {
                     keyid = -1;
                 }
                 state = JSON_STATE_KEY_SEP;
             } else if (tok == '}' && ntok == 0) {
-                state = JSON_STATE_HAVE_ALL;
+                ready = 1;
                 break;
             } else {
                 goto error_exit;
@@ -934,7 +949,7 @@ int cvxc_json_read_params(cvxc_params_t **pars, cvxc_stream_t *ios)
 
         case JSON_STATE_SEP:
             if (tok == '}') {
-                state = JSON_STATE_HAVE_ALL;
+                ready = 1;
                 break;
             }
             if (tok != ',') goto error_exit;
@@ -991,6 +1006,10 @@ int cvxc_json_read_params(cvxc_params_t **pars, cvxc_stream_t *ios)
                     goto error_exit;
                 pptr->args = malloc(strlen(iob) + 1);
                 memcpy(pptr->args, iob, strlen(iob) + 1);
+                break;
+            case 11:
+                if ((err = cvxc_json_matrix_read(&pptr->g, ios)) < 0)
+                    goto error_exit;
                 break;
             default:
                 fprintf(stderr, "unexpected parameter name: %s", iob);
