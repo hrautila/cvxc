@@ -121,8 +121,8 @@ int ldl2_factor(cvxc_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_m
 
         // TODO: works only w/o non-linear part (z_g.index ??)
         cvxc_mgrp_init(&g_g, &g1, cp->index_g);
-        cvxc_scale(&g_g, W, CVXC_INV|CVXC_TRANS, &cp->work);
-        cvxc_scale(&g_g, W, CVXC_INV, &cp->work);
+        cvxc_scale(&g_g, W, CVXC_INV|CVXC_TRANS, cp->work);
+        cvxc_scale(&g_g, W, CVXC_INV, cp->work);
 
         if (Df && mnl > 0) {
             cvxm_mvmult(1.0, &Kt, 1.0, Df, &g0, CVXC_TRANS);
@@ -173,8 +173,8 @@ int ldl2_solve(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_mat
     cvxm_copy(&ldl->g, z_g->mat, 0);
     cvxc_mgrp_init(&g_g, &ldl->g, z_g->index);
 
-    cvxc_scale(&g_g, ldl->W, CVXC_INV|CVXC_TRANS, &cp->work);
-    cvxc_scale(&g_g, ldl->W, CVXC_INV, &cp->work);
+    cvxc_scale(&g_g, ldl->W, CVXC_INV|CVXC_TRANS, cp->work);
+    cvxc_scale(&g_g, ldl->W, CVXC_INV, cp->work);
     if (mnl > 0) {
         // TODO: non-linear
         beta = 1.0;
@@ -197,7 +197,7 @@ int ldl2_solve(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_mat
     cvxc_mgrp_init(&x_g, x, (cvxc_index_t *)0);
     // z = G*x - z
     cvxc_sgemv(-1.0, z_g->mat, 1.0, cp->G, &x_g, 0);
-    cvxc_scale(z_g, ldl->W, CVXC_TRANS|CVXC_INV, &cp->work);
+    cvxc_scale(z_g, ldl->W, CVXC_TRANS|CVXC_INV, cp->work);
 
     return err;
 }

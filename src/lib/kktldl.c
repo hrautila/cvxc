@@ -121,7 +121,7 @@ int ldl_factor(cvxc_kktsolver_t *S,
         // make it matrix group; like group on z vector
         cvxc_mgrp_init(&col_g, &ldl->g, cp->index_g);
         // scale column; with W^-T
-        cvxc_scale(&col_g, W, CVXC_INV|CVXC_TRANS, &cp->work);
+        cvxc_scale(&col_g, W, CVXC_INV|CVXC_TRANS, cp->work);
         // copy to K in packed storage;
         cvxm_view_map(&colvec, &ldl->K, ldl->n+ldl->p, k, ldl->ldK-ldl->p-ldl->n, 1);
         cvxc_pack(&colvec, col_g.mat, col_g.index);
@@ -164,7 +164,7 @@ int ldl_solve(cvxc_kktsolver_t *S,
     cvxm_copy(&u0, y, CVXC_ALL);
 
     // map z part; scale and copy to temp result vector as packed
-    cvxc_scale(z_g, ldl->W, CVXC_INV|CVXC_TRANS, &cp->work);
+    cvxc_scale(z_g, ldl->W, CVXC_INV|CVXC_TRANS, cp->work);
     cvxm_view_map(&u0, &ldl->u, ldl->n+ldl->p, 0, ldl->ldK-ldl->p-ldl->n, 1);
     cvxc_pack(&u0, z_g->mat, z_g->index);
 
