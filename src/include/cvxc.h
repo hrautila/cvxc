@@ -672,6 +672,8 @@ typedef struct cvxc_stats {
 
 
 typedef struct cvxc_conelp_internal {
+    int primalstart;
+    int dualstart;
     cvxc_float_t tau, kappa;
     cvxc_float_t dkappa, dtau;
     cvxc_float_t wkappa3;
@@ -712,6 +714,9 @@ typedef struct cvxc_conelp_internal {
     cvxc_index_t index_packed;           // indexing to matrix group with packed 'S' space
     cvxc_index_t index_diag;             // indexing to matrix group with diagonal 'S' space
     cvxc_index_t index_sig;              // indexing to matrix group with only diagonal 'S" space
+
+    cvxc_scaling_t W;                    // scaling matrix group
+    cvxc_memblk_t work;                  // workspace
 
 } cvxc_conelp_internal_t;
 
@@ -865,7 +870,10 @@ typedef struct cvxc_cpl_internal {
     cvxc_index_t index_diag;             // indexing to matrix group with diagonal 'S' space
     cvxc_index_t index_sig;              // indexing to matrix group with only diagonal 'S" space
     cvxc_index_t index_cpt;              // indexing for G/h matrix with convex target function
+    cvxc_scaling_t W;                    // scaling matrix group
     cvxc_scaling_t W0;
+    cvxc_memblk_t work;                  // workspace
+
     cvxc_gp_program_t gp;                // Internal GP program structure.
 } cvxc_cpl_internal_t;
 
@@ -878,20 +886,8 @@ typedef struct cvxc_problem {
     // const cvxc_dimset_t *dims;           ///< Problems dimensions
     cvxc_kktsolver_t *solver;            ///< KKT solver
 
-    // user defined starting points for CONELP solver
-    cvxc_matrix_t *primal_x;             ///< User defined starting point for primal
-    cvxc_matrix_t *primal_s;             ///< User defined starintg point for primal slacks
-    cvxc_matrix_t *dual_y;               ///< User defined starting point for dual
-    cvxc_matrix_t *dual_z;               ///< User defined starting point for dual slacks
-
     // Convex program for CP/CPL solver
     cvxc_convex_program_t *F;
-
-    // result
-    cvxc_matrix_t *x;
-    cvxc_matrix_t *y;
-    cvxc_matrix_t *s;
-    cvxc_matrix_t *z;
 
     // pointers to
     cvxc_matrix_t *f;
@@ -913,15 +909,14 @@ typedef struct cvxc_problem {
     // solver options
     cvxc_solopts_t *solopts;
 
-    cvxc_scaling_t W;                    // scaling matrix group
-
     // solver internal variables
     union {
-        cvxc_conelp_internal_t conelp;
-        cvxc_cpl_internal_t cpl;
+        unsigned char *space;
+        cvxc_conelp_internal_t *conelp;
+        cvxc_cpl_internal_t *cpl;
     } u;
 
-    cvxc_memblk_t work;                  // workspace
+    cvxc_memblk_t *work;                  // workspace
     cvxc_size_t mlen;
     cvxc_float_t *memory;
 
@@ -945,10 +940,10 @@ cvxc_conelp_setup(cvxc_problem_t *prob,
                  cvxc_matrix_t *c, cvxc_matrix_t *G, cvxc_matrix_t *h,
                  cvxc_matrix_t *A, cvxc_matrix_t *b, cvxc_dimset_t *dims,
                  cvxc_kktsolver_t *kktsolver);
-extern void
-cvxc_conelp_set_start(cvxc_problem_t *prob,
-                     cvxc_matrix_t *primal_x, cvxc_matrix_t *primal_s,
-                     cvxc_matrix_t *dual_y, cvxc_matrix_t *dual_z);
+extern int
+cvxc_conelp_compute_start_with(cvxc_problem_t *prob,
+                               cvxc_matrix_t *primal_x, cvxc_matrix_t *primal_s,
+                               cvxc_matrix_t *dual_y, cvxc_matrix_t *dual_z);
 extern int
 cvxc_conelp_compute_start(cvxc_problem_t *prob);
 
