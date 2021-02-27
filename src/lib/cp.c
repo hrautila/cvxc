@@ -57,7 +57,7 @@ int cp_factor(cvxc_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *x, cvxc_mat
     cvxc_chainsolver_t *cp_solver = (cvxc_chainsolver_t *)S;
     cvxc_matrix_t Dfc;
     cvxc_problem_t *cp = cp_solver->cp;
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
     cvxc_size_t nr, nc;
 
     cvxm_size(&nr, &nc, &cpi->Df);
@@ -72,7 +72,7 @@ int cp_solve(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgr
 {
     cvxc_chainsolver_t *cp_solver = (cvxc_chainsolver_t *)S;
     cvxc_problem_t *cp = cp_solver->cp;
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
     cvxc_matrix_t gradf, dnlt, z_nlt, z_cpl;
     cvxc_index_t index_cpl;
     cvxc_matgrp_t z_cpl_g;
@@ -81,7 +81,7 @@ int cp_solve(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgr
 
     cvxm_size(&nr, &nc, &cpi->Df);
     cvxm_view_map(&gradf, &cpi->Df, 0, 0, 1, nc);
-    cvxc_scaling_elem(&dnlt, &cp->W, CVXWS_DNLT, 0);
+    cvxc_scaling_elem(&dnlt, &cpi->W, CVXWS_DNLT, 0);
     cvxc_mgrp_elem(&z_nlt, z_g, CVXDIM_NLTARGET, 0);
     cvxc_mgrp_elem(&z_cpl, z_g, CVXDIM_CONVEXLP, 0);
 
@@ -127,7 +127,7 @@ int cvxc_cp_setvars(cvxc_problem_t *cp,
     cvxc_cpl_setvars(cp, F, n, m, __cvxnil, G, h, A, b, dims, kktsolver);
 
     // fix index set G/h matrices
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
     cp->index_g = &cpi->index_cpt;
     cp->c = &cpi->c0;
     cvxc_mgrp_init(&cpi->h_g, cp->h, &cpi->index_cpt);
@@ -181,11 +181,11 @@ cvxc_size_t cvxc_cp_setup(cvxc_problem_t *cp,
 
 int cvxc_cp_compute_start(cvxc_problem_t *cp)
 {
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
     F0(cp->F, &cpi->x0);
     cvxc_mgrp_initial_value(&cpi->z_g, 0);
     cvxc_mgrp_initial_value(&cpi->s_g, 0);
-    cvxc_scaling_initial_value(&cp->W);
+    cvxc_scaling_initial_value(&cpi->W);
     cvxm_set_all(&cpi->c0, 0.0);
     cpi->c0.t = 1.0;
 

@@ -51,7 +51,7 @@ int cpl_res(cvxc_problem_t *cp,
             cvxc_matgrp_t *lmbda_g)
 {
     int err = 0;
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
 
     cvxc_matrix_t *us = us_g->mat, *uz = uz_g->mat;
     cvxc_matrix_t *vs = vs_g->mat, *vz = vz_g->mat;
@@ -62,7 +62,7 @@ int cpl_res(cvxc_problem_t *cp,
     cvxm_mult(1.0, vx, -1.0, &cpi->H, ux, 0);
     cvxm_mult(1.0, vx, -1.0, cp->A, uy, CVXC_TRANSA);
     cvxm_copy(&cpi->wz3, uz, CVXC_ALL);
-    cvxc_scale(&cpi->wz3_g, &cp->W, CVXC_INV, &cp->work);
+    cvxc_scale(&cpi->wz3_g, &cpi->W, CVXC_INV, &cpi->work);
     cvxc_sgemv2(1.0, vx, -1.0, &cpi->Df, cp->G, &cpi->wz3_g, CVXC_TRANS);
 
     // vy = vy - A*ux
@@ -70,14 +70,14 @@ int cpl_res(cvxc_problem_t *cp,
 
     // vz = vz - W'*us - GG*ux
     cvxm_copy(&cpi->ws3, us, 0);
-    cvxc_scale(&cpi->ws3_g, &cp->W, CVXC_TRANS, &cp->work);
+    cvxc_scale(&cpi->ws3_g, &cpi->W, CVXC_TRANS, &cpi->work);
     cvxm_axpy(vz, -1.0, &cpi->ws3);
     cvxc_sgemv2(1.0, vz, -1.0, &cpi->Df, cp->G, &ux_g, 0);
 
     // vs = vs - lmbda o (uz + us)
     cvxm_copy(&cpi->ws3, us, 0);
     cvxm_axpy(&cpi->ws3, 1.0, uz);
-    cvxc_sprod(&cpi->ws3_g, lmbda_g, CVXC_DIAG, &cp->work);
+    cvxc_sprod(&cpi->ws3_g, lmbda_g, CVXC_DIAG, &cpi->work);
     cvxm_axpy(vs, -1.0, &cpi->ws3);
 
     return err;
@@ -98,14 +98,14 @@ int f4_no_ir(cvxc_problem_t *cp,
              cvxc_matgrp_t *s_g)
 {
     cvxc_matrix_t *s = s_g->mat, *z = z_g->mat;
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
 
     // s = lmbda o\ s
-    cvxc_sinv(s_g, &cpi->lmbda_g, &cp->work);
+    cvxc_sinv(s_g, &cpi->lmbda_g, &cpi->work);
 
     // z := z - W'*s
     cvxm_copy(&cpi->ws3, s, 0);
-    cvxc_scale(&cpi->ws3_g, &cp->W, CVXC_TRANS, &cp->work);
+    cvxc_scale(&cpi->ws3_g, &cpi->W, CVXC_TRANS, &cpi->work);
     cvxm_axpy(z, -1.0, &cpi->ws3);
     // solve
     cvxc_kktsolve(cp->solver, x, y, z_g);
@@ -128,7 +128,7 @@ int f4(cvxc_problem_t *cp,
        int refinement)
 {
     cvxc_matrix_t *s = s_g->mat, *z = z_g->mat;
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
     int err = 0;
 
     if (refinement > 0 /*|| (flags | CVXC_DEBUG) != 0*/) {
@@ -145,7 +145,7 @@ int f4(cvxc_problem_t *cp,
         cvxm_copy(&cpi->ws2, &cpi->ws, 0);
 
         cpl_res(cp, x, y, z_g, s_g, &cpi->wx2, &cpi->wy2, &cpi->wz2_g,
-                &cpi->ws2_g, &cp->W, &cpi->lmbda_g);
+                &cpi->ws2_g, &cpi->W, &cpi->lmbda_g);
 
         f4_no_ir(cp, &cpi->wx2, &cpi->wy2, &cpi->wz2_g, &cpi->ws2_g);
 
@@ -162,7 +162,7 @@ int cpl_factor(cvxc_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *x, cvxc_ma
 {
     cvxc_chainsolver_t *cpl_solver = (cvxc_chainsolver_t *)S;
     cvxc_problem_t *cp = cpl_solver->cp;
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
     F2(cp->F, __cvxnil, &cpi->Df, &cpi->H, x, z);
     return cvxc_kktfactor(cpl_solver->next, W, &cpi->H, &cpi->Df);
 }
@@ -324,7 +324,7 @@ cvxc_size_t cvxc_cpl_make(cvxc_problem_t *cp,
                         void *memory,
                         cvxc_size_t msize)
 {
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
     cvxc_size_t offset = 0;
     cvxc_size_t used = 0;
     cvxc_size_t nbytes = msize;
@@ -440,13 +440,13 @@ cvxc_size_t cvxc_cpl_make(cvxc_problem_t *cp,
     __INIT(used, cvxm_make(&cpi->H, n, n, &bytes[offset], nbytes));
 
     // scaling matrix
-    __INIT(used, cvxc_scaling_make(&cp->W,   dims, &bytes[offset], nbytes));
+    __INIT(used, cvxc_scaling_make(&cpi->W,   dims, &bytes[offset], nbytes));
     __INIT(used, cvxc_scaling_make(&cpi->W0, dims, &bytes[offset], nbytes));
 
     // workspace for SDP contraints handling
-    cvxc_mblk_empty(&cp->work);
+    cvxc_mblk_empty(&cpi->work);
     if (maxsdp > 0) {
-        __INIT(used, cvxc_mblk_make(&cp->work, __WORKBYTES(maxsdp), &bytes[offset], nbytes));
+        __INIT(used, cvxc_mblk_make(&cpi->work, __WORKBYTES(maxsdp), &bytes[offset], nbytes));
     }
 
     // setup matrix group variables
@@ -480,13 +480,13 @@ cvxc_size_t cvxc_cpl_make(cvxc_problem_t *cp,
     cvxc_mgrp_init(&cpi->lmbda_g,   &cpi->lmbda,   &cpi->index_diag);
     cvxc_mgrp_init(&cpi->lmbdasq_g, &cpi->lmbdasq, &cpi->index_diag);
 
-    cp->f  = &cpi->f;
-    cp->Df = &cpi->Df;
-    cp->H  = &cpi->H;
+    //cp->f  = &cpi->f;
+    //cp->Df = &cpi->Df;
+    //cp->H  = &cpi->H;
 
     // save memory block and it's size
     cp->mlen = msize;
-    cp->memory = memory;
+    // cp->memory = memory;
 
     return offset;
 }
@@ -558,11 +558,6 @@ int cvxc_cpl_setvars(cvxc_problem_t *cp,
     cp->b = b;
     cp->F = F;
 
-    cp->primal_x = (cvxc_matrix_t *)0;
-    cp->primal_s = (cvxc_matrix_t *)0;
-    cp->dual_y = (cvxc_matrix_t *)0;
-    cp->dual_z = (cvxc_matrix_t *)0;
-
     return 0;
 }
 
@@ -576,17 +571,21 @@ cvxc_size_t cvxc_cpl_allocate(cvxc_problem_t *cp,
     cvxc_size_t used, nbytes = cvxc_cpl_bytes(n, m, dims, nl);
     if (extra)
         nbytes += extra;
-    void *memory = calloc(nbytes, 1);
-    if (!memory) {
+    cp->u.space = calloc(nbytes + sizeof(cvxc_cpl_internal_t), 1);
+    if (!cp->u.space) {
         cp->error = CVXC_ERR_MEMORY;
         return 0;
     }
 
+
+    unsigned char *memory = &cp->u.space[sizeof(cvxc_cpl_internal_t)];
     if ((used = cvxc_cpl_make(cp, n, m, dims, nl, memory, nbytes)) == 0) {
         cp->error = CVXC_ERR_MEMORY;
-        free(memory);
+        free(cp->u.space);
+        cp->u.space = 0;
         return 0;
     }
+    cp->work = &cp->u.cpl->work;
     return used;
 }
 
@@ -622,7 +621,7 @@ cvxc_size_t cvxc_cpl_setup(cvxc_problem_t *cp,
     }
     cvxc_cpl_setvars(cp, F, mc, mb, c, G, h, A, b, dims, kktsolver);
 
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
     // provide full index set
     cp->index_g = &cpi->index_full;
     cvxc_mgrp_init(&cpi->h_g, cp->h, cp->index_g);
@@ -644,7 +643,7 @@ int cvxc_cpl_ready(cvxc_problem_t *cp,
                   int iter,
                   int stat)
 {
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
 
     if (stat == CVXC_STAT_OPTIMAL && iter == -1) {
         // constructed initial point is feasible and optimal
@@ -699,8 +698,8 @@ int cvxc_cpl_ready(cvxc_problem_t *cp,
         cvxm_scale(&cpi->z, 1.0/cpi->tau, CVXC_ALL);
         cvxc_mksymm(&cpi->s_g);
         cvxc_mksymm(&cpi->z_g);
-        cpi->ts = cvxc_max_step(&cpi->s_g, __nilgrp, &cp->work);
-        cpi->tz = cvxc_max_step(&cpi->z_g, __nilgrp, &cp->work);
+        cpi->ts = cvxc_max_step(&cpi->s_g, __nilgrp, &cpi->work);
+        cpi->tz = cvxc_max_step(&cpi->z_g, __nilgrp, &cpi->work);
 
         cp->error = stat == CVXC_STAT_UNKNOWN ? CVXC_ERR_MAXITER : 0;
         cp->solution.x = &cpi->x;
@@ -733,11 +732,11 @@ int cvxc_cpl_ready(cvxc_problem_t *cp,
 static
 void cvxc_cpl_save_or_restore(cvxc_problem_t *cp, int restore)
 {
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
     //cvxc_stats_t *stats = &cp->stats;
 
     if (restore) {
-        cvxc_scaling_copy(&cp->W, &cpi->W0);
+        cvxc_scaling_copy(&cpi->W, &cpi->W0);
         cvxm_copy(&cpi->x, &cpi->x0, 0);
         cvxm_copy(&cpi->y, &cpi->y0, 0);
         cvxm_copy(&cpi->s, &cpi->s0, 0);
@@ -756,7 +755,7 @@ void cvxc_cpl_save_or_restore(cvxc_problem_t *cp, int restore)
         return;
     }
     // save
-    cvxc_scaling_copy(&cpi->W0, &cp->W);
+    cvxc_scaling_copy(&cpi->W0, &cpi->W);
     cvxm_copy(&cpi->x0, &cpi->x, 0);
     cvxm_copy(&cpi->y0, &cpi->y, 0);
     cvxm_copy(&cpi->s0, &cpi->s, 0);
@@ -779,7 +778,7 @@ int cvxc_cpl_linesearch(cvxc_problem_t *cp,
                        int iter,
                        int relaxed_iters)
 {
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
     int backtrack;
     cvxc_matrix_t news_nl, newrznl;
     cvxc_float_t newresznl, newgap, newphi, newresx;
@@ -895,11 +894,11 @@ int cvxc_cpl_linesearch(cvxc_problem_t *cp,
 
 int cvxc_cpl_compute_start(cvxc_problem_t *cp)
 {
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
     F0(cp->F, &cpi->x0);
     cvxc_mgrp_initial_value(&cpi->z_g, 0);
     cvxc_mgrp_initial_value(&cpi->s_g, 0);
-    cvxc_scaling_initial_value(&cp->W);
+    cvxc_scaling_initial_value(&cpi->W);
     cvxm_copy(&cpi->x,    &cpi->x0, 0);
     cvxm_copy(&cpi->rx,   &cpi->x0, 0);
     cvxm_copy(&cpi->dx,   &cpi->x0, 0);
@@ -920,7 +919,7 @@ int cvxc_cpl_compute_start(cvxc_problem_t *cp)
 int cvxc_cpl_solve(cvxc_problem_t *cp,
                   cvxc_solopts_t *opts)
 {
-    cvxc_cpl_internal_t *cpi = &cp->u.cpl;
+    cvxc_cpl_internal_t *cpi = cp->u.cpl;
     // cvxc_stats_t *stats = &cp->stats;
 
     cvxc_float_t cx, dy, dz, dr;
@@ -1068,7 +1067,7 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
         //     W * z = W^{-T} * s = lambda
         //     dg * tau = 1/dg * kappa = lambdag.
         if (iter == 0) {
-            cvxc_compute_scaling(&cp->W, &cpi->s_g, &cpi->z_g, &cpi->lmbda_g, &cp->work);
+            cvxc_compute_scaling(&cpi->W, &cpi->s_g, &cpi->z_g, &cpi->lmbda_g, &cpi->work);
         }
 
         // lmdasq = lmda o lmbda
@@ -1083,7 +1082,7 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
         // On entry, x, y, z contain bx, by, bz.
         // On exit, they contain ux, uy, uz.
         int relaxed_iters = 0;
-        int err = cvxc_kktfactor(cp->solver, &cp->W, &cpi->x, &z_nl);
+        int err = cvxc_kktfactor(cp->solver, &cpi->W, &cpi->x, &z_nl);
 
         if (err < 0) {
             int singular_kkt = 0;
@@ -1098,7 +1097,7 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
                 cpi->resznl = cvxm_nrm2(&rz_nl);
                 relaxed_iters = -1;
                 F2(cp->F, __cvxnil, &cpi->Df, &cpi->H, &cpi->x, &z_nl);
-                err = cvxc_kktfactor(cp->solver, &cp->W, &cpi->H, &cpi->Df);
+                err = cvxc_kktfactor(cp->solver, &cpi->W, &cpi->H, &cpi->Df);
                 if (err)
                     singular_kkt = 1;
             } else {
@@ -1115,8 +1114,8 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
             if (refinement > 0 || opts->debug) {
                 cvxm_copy(&cpi->wx, cp->c, 0);
                 cvxm_copy(&cpi->wy, cp->b, 0);
-                cvxm_copy(&cpi->wz, cp->z, 0);
-                cvxm_copy(&cpi->ws, cp->s, 0);
+                cvxm_copy(&cpi->wz, &cpi->z, 0);
+                cvxm_copy(&cpi->ws, &cpi->s, 0);
             }
             if (refinement > 0) {
                 cvxm_copy(&cpi->wx2, cp->c, 0);
@@ -1160,16 +1159,16 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
             // line search needs ds'*dz and unscaled steps
             cpi->dsdz = cvxc_sdot(&cpi->ds_g, &cpi->dz_g);
             cvxm_copy(&cpi->dz2, &cpi->dz, 0);
-            cvxc_scale(&cpi->dz2_g, &cp->W, CVXC_INV, &cp->work);
+            cvxc_scale(&cpi->dz2_g, &cpi->W, CVXC_INV, &cpi->work);
             cvxm_copy(&cpi->ds2, &cpi->ds, 0);
-            cvxc_scale(&cpi->ds2_g, &cp->W, CVXC_TRANS, &cp->work);
+            cvxc_scale(&cpi->ds2_g, &cpi->W, CVXC_TRANS, &cpi->work);
 
             // max step to boundary
-            cvxc_scale2(&cpi->ds_g, &cpi->lmbda_g, 0, &cp->work);
-            cvxc_scale2(&cpi->dz_g, &cpi->lmbda_g, 0, &cp->work);
+            cvxc_scale2(&cpi->ds_g, &cpi->lmbda_g, 0, &cpi->work);
+            cvxc_scale2(&cpi->dz_g, &cpi->lmbda_g, 0, &cpi->work);
 
-            cpi->ts = cvxc_max_step(&cpi->ds_g, &cpi->sigs_g, &cp->work);
-            cpi->tz = cvxc_max_step(&cpi->dz_g, &cpi->sigz_g, &cp->work);
+            cpi->ts = cvxc_max_step(&cpi->ds_g, &cpi->sigs_g, &cpi->work);
+            cpi->tz = cvxc_max_step(&cpi->dz_g, &cpi->sigz_g, &cpi->work);
             cvxc_float_t t = cvxc_maxvec(3, (cvxc_float_t[]){0.0, cpi->ts, cpi->tz});
             if (t == 0.0)
                 cpi->step = 1.0;
@@ -1218,8 +1217,8 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
         // diag(lmbda_k)^{1/2} * Qs * diag(lmbda_k)^{1/2}
         // diag(lmbda_k)^{1/2} * Qz * diag(lmbda_k)^{1/2}
 
-        cvxc_scale2(&cpi->ds_g, &cpi->lmbda_g, CVXC_INV, &cp->work);
-        cvxc_scale2(&cpi->dz_g, &cpi->lmbda_g, CVXC_INV, &cp->work);
+        cvxc_scale2(&cpi->ds_g, &cpi->lmbda_g, CVXC_INV, &cpi->work);
+        cvxc_scale2(&cpi->dz_g, &cpi->lmbda_g, CVXC_INV, &cpi->work);
 
         // sigs := ( e + step*sigs ) ./ lambda for 's' blocks.
         // sigz := ( e + step*sigz ) ./ lambda for 's' blocks.
@@ -1256,15 +1255,15 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
                 cvxm_scale(&lk, a, 0);
             }
         }
-        cvxc_update_scaling(&cp->W, &cpi->lmbda_g, &cpi->ds_g, &cpi->dz_g, &cp->work);
+        cvxc_update_scaling(&cpi->W, &cpi->lmbda_g, &cpi->ds_g, &cpi->dz_g, &cpi->work);
 
         // Unscale s, z, tau, kappa (unscaled variables are used only to
         // compute feasibility residuals).
         cvxc_mgrp_copy_lambda(&cpi->s_g, &cpi->lmbda_g);
-        cvxc_scale(&cpi->s_g, &cp->W, CVXC_TRANS, &cp->work);
+        cvxc_scale(&cpi->s_g, &cpi->W, CVXC_TRANS, &cpi->work);
 
         cvxc_mgrp_copy_lambda(&cpi->z_g, &cpi->lmbda_g);
-        cvxc_scale(&cpi->z_g, &cp->W, CVXC_INV, &cp->work);
+        cvxc_scale(&cpi->z_g, &cpi->W, CVXC_INV, &cpi->work);
 
         cpi->gap = cvxm_dot(&cpi->lmbda, &cpi->lmbda);
     }

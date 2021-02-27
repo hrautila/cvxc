@@ -137,7 +137,7 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
     if (!cp)
         return 0;
 
-    cpi = &cp->u.cpl;
+    cpi = cp->u.cpl;
     mA = nA = maxK = 0;
     mG = nG = 0;
 
