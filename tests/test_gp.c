@@ -69,13 +69,15 @@ int main(int argc, char **argv)
     if (opts.max_iter == 0)
         return 0;
 
+    cvxc_solution_t solution = {0};
+
     cvxc_gp_setup(&cp, &gpi, &F, &g, &G, &h, &A, &b, (cvxc_kktsolver_t *)0);
     cvxc_gp_compute_start(&cp);
-    cvxc_gp_solve(&cp, &opts);
+    cvxc_gp_solve(&solution, &cp, &opts);
 
     // x = exp(x)
-    cvxm_apply(cp.solution.x, exp, 0);
+    cvxm_apply(solution.x, exp, 0);
 
-    print_solution(&cp.solution);
+    print_solution(&solution);
     cvxc_gpi_release(&gpi);
 }

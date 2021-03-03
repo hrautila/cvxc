@@ -59,9 +59,10 @@ int main(int argc, char **argv)
     cvxc_dimset_alloc(&dims, 2, (cvxc_size_t *)0, (cvxc_size_t[]){3, 0});
 
     cvxc_conelp_setup(&cp, &c, &G, &h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
-    //cp.solver->debug = 2;
+
+    cvxc_solution_t solution = {0};
 
     cvxc_conelp_compute_start(&cp);
-    cvxc_conelp_solve(&cp, &opts);
-    return print_solution(&cp.solution);
+    cvxc_conelp_solve(&solution, &cp, &opts);
+    return print_solution(&solution);
 }

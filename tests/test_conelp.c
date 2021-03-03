@@ -63,9 +63,9 @@ int main(int argc, char **argv)
     if (nbytes == 0)
         exit(1);
 
-    //cp.solver->debug = 2;
+    cvxc_solution_t solution = {0};
 
     cvxc_conelp_compute_start(&cp);
-    cvxc_conelp_solve(&cp, &opts);
-    return print_solution(&cp.solution);
+    cvxc_conelp_solve(&solution, &cp, &opts);
+    return print_solution(&solution);
 }

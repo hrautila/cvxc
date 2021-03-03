@@ -293,13 +293,14 @@ int main(int argc, char **argv)
     cvxm_map_data(&b, 0, 1,  (cvxc_float_t *)0);
 
     floorplan_constraints(c, G, h, rho, gamma);
-    //cvxc_mat_printf(stderr, "%9.2e", G, "G");
 
     if (opts.max_iter == 0)
         return 0;
 
+    cvxc_solution_t solution = {0};
+
     cvxc_cpl_setup(&cpl, &F, c, G, h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
     cvxc_cpl_compute_start(&cpl);
-    cvxc_cpl_solve(&cpl, &opts);
-    return print_solution(&cpl.solution);
+    cvxc_cpl_solve(&solution, &cpl, &opts);
+    return print_solution(&solution);
 }

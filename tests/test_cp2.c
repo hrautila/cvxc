@@ -174,8 +174,10 @@ int main(int argc, char **argv)
     if (opts.max_iter == 0)
         return 0;
 
+    cvxc_solution_t solution = {0};
+
     cvxc_cp_setup(&cp, &F, &G, &h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
     cvxc_cp_compute_start(&cp);
-    cvxc_cp_solve(&cp, &opts);
-    return print_solution(&cp.solution);
+    cvxc_cp_solve(&solution, &cp, &opts);
+    return print_solution(&solution);
 }
