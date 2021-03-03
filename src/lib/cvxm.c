@@ -138,6 +138,16 @@ cvxc_size_t cvxm_ldlwork(const cvxc_matrix_t *A)
     return wb.bytes;
 }
 
+cvxc_size_t cvxm_ldl_worksize(int N)
+{
+    armas_conf_t cf = *armas_conf_default();
+    armas_wbuf_t wb = {0};
+    armas_dense_t K = {0};
+    K.rows = K.cols = N;
+    armas_bkfactor_w(&K, (armas_pivot_t *)0, ARMAS_LOWER, &wb, &cf);
+    return wb.bytes;
+}
+
 int cvxm_ldlfactor(cvxc_matrix_t *A, int *ipiv, int flags, cvxc_memblk_t *wrk)
 {
     armas_pivot_t pv;
@@ -153,6 +163,7 @@ int cvxm_ldlfactor(cvxc_matrix_t *A, int *ipiv, int flags, cvxc_memblk_t *wrk)
     // min workspace is 2*N
     if (armas_bkfactor_w(&A->data, &pv, flags, &wb, &cf) < 0) {
         printf("bkfactor error: %d\n", cf.error);
+        return -1;
     }
     return 0;
 }
