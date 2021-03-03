@@ -13,19 +13,6 @@
 #include <stdio.h>
 #include <stddef.h>
 
-#if ! defined(__CVXC_INLINE)
-#  if __GNUC__
-#    if ! __STDC_VERSION__
-#      define __CVXC_INLINE extern inline
-#    else
-#      define __CVXC_INLINE inline
-#      define __ARMAS_INLINE inline
-#    endif
-#  else
-#    define __CVXC_INLINE inline
-#  endif
-#endif
-
 #if ENABLE_FLOAT32
 
 #include <armas/sdense.h>

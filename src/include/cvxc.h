@@ -16,6 +16,19 @@
 #include <float.h>
 #include <math.h>
 
+#if ! defined(__CVXC_INLINE)
+#  if __GNUC__
+#    if ! __STDC_VERSION__
+#      define __CVXC_INLINE extern inline
+#    else
+#      define __CVXC_INLINE inline
+#      define __ARMAS_INLINE inline
+#    endif
+#  else
+#    define __CVXC_INLINE inline
+#  endif
+#endif
+
 /**
  * LibTool version numbering.
  */
@@ -29,7 +42,6 @@
 #define POW    powf
 #define MAXF   fmaxf
 #define MINF   fminf
-
 
 #else
 /* float64 */
@@ -69,55 +81,6 @@
 
 #include "cvxm.h"
 
-static inline
-cvxc_float_t __NaN()
-{
-#ifdef NAN
-    return NAN;
-#else
-    return SQRT(-1.0);
-#endif
-}
-
-static inline
-int __isnull(const void *ptr) {
-    return ptr == (void *)0;
-}
-
-static inline
-cvxc_size_t __aligned128(cvxc_size_t n)
-{
-    return (n & 0xF) != 0 ? 16 - (n & 0xF) : 0;
-}
-
-static inline
-cvxc_size_t __aligned64(cvxc_size_t n)
-{
-    return (n & 0x7) != 0 ? 8 - (n & 0x7) : 0;
-}
-
-static inline
-cvxc_float_t cvxc_maxvec(int n, const cvxc_float_t *vec)
-{
-    cvxc_float_t r = vec[0];
-    for (int k = 1; k < n; k++) {
-        r = MAXF(vec[k], r);
-    }
-    return r;
-}
-
-static inline
-cvxc_float_t cvxc_minvec(int n, const cvxc_float_t *vec)
-{
-    cvxc_float_t r = vec[0];
-    for (int k = 1; k < n; k++) {
-        r = MINF(vec[k], r);
-    }
-    return r;
-}
-
-#define __MAX2(a, b)  __maxvec(2, (cvxc_float_t []){(a), (b)})
-#define __MIN2(a, b)  __minvec(2, (cvxc_float_t []){(a), (b)})
 
 // -------------------------------------------------------------------------------------
 // problem dimension data structures
@@ -179,81 +142,10 @@ typedef enum  {
 
 // very simple
 typedef struct cvxc_memblk {
-    cvxc_float_t *memory;
-    cvxc_size_t mlen;
-    void *__bytes;
+    cvxc_float_t *memory;   ///< Array of floats
+    cvxc_size_t mlen;       ///< Array length
+    void *__bytes;          ///< Allocates bytes. If null then memory array provided externally
 } cvxc_memblk_t;
-
-static inline
-void cvxc_mblk_empty(cvxc_memblk_t *m)
-{
-    if (m) {
-        m->memory = (cvxc_float_t *)0;
-        m->mlen = 0;
-    }
-}
-static inline
-void cvxc_mblk_init(cvxc_memblk_t *m, cvxc_size_t n)
-{
-    m->memory = (cvxc_float_t *)0;
-    m->mlen = 0;
-    cvxc_float_t *space = (cvxc_float_t *)calloc(n, sizeof(cvxc_float_t));
-    if (space) {
-        m->memory = space;
-        m->mlen = n;
-        m->__bytes = space;
-    }
-}
-
-static inline
-cvxc_size_t cvxc_mblk_make(cvxc_memblk_t *m, cvxc_size_t mlen, void *ptr, cvxc_size_t nbytes)
-{
-    if (!ptr || nbytes < mlen)
-        return 0;
-    m->memory = (cvxc_float_t *)ptr;
-    m->mlen = mlen/sizeof(cvxc_float_t);
-    m->__bytes = (void *)0;
-    return mlen;
-}
-
-static inline
-void cvxc_mblk_release(cvxc_memblk_t *m)
-{
-    if (m->__bytes)
-        free(m->__bytes);
-    m->memory = (cvxc_float_t *)0;
-    m->mlen = 0;
-    m->__bytes = (void *)0;
-}
-
-static inline
-cvxc_float_t *cvxc_mblk_offset(cvxc_memblk_t *m, cvxc_size_t off)
-{
-    if (off >= m->mlen) {
-        abort();
-        return (cvxc_float_t *)0;
-    }
-    return &m->memory[off];
-}
-
-static inline
-void cvxc_mblk_subblk(cvxc_memblk_t *d, cvxc_memblk_t *m, cvxc_size_t off)
-{
-    if (off >= m->mlen) {
-        d->memory = (cvxc_float_t *)0;
-        d->mlen = 0;
-    } else {
-        d->memory = &m->memory[off];
-        d->mlen = m->mlen - off;
-    }
-}
-
-static inline
-void cvxc_mblk_clear(cvxc_memblk_t *m)
-{
-    if (m && m->mlen > 0)
-        memset(m->memory, 0, m->mlen*sizeof(cvxc_float_t));
-}
 
 //----------------------------------------------------------------------------------------
 
@@ -473,50 +365,21 @@ extern void cvxc_str_stream(cvxc_stream_t *ios, const char *s, int len);
 // ------------------------------------------------------------------------------------------
 // solver things
 
-typedef int (*cvxc_convex_f0)(cvxc_matrix_t *x0, void *user);
-typedef int (*cvxc_convex_f1)(cvxc_matrix_t *f, cvxc_matrix_t *Df, const cvxc_matrix_t *x, void *user);
-typedef int (*cvxc_convex_f2)(cvxc_matrix_t *f, cvxc_matrix_t *Df, cvxc_matrix_t *H,
+typedef int (*cvxc_convex_func)(cvxc_matrix_t *f, cvxc_matrix_t *Df, cvxc_matrix_t *H,
                              const cvxc_matrix_t *x, const cvxc_matrix_t *z, void *user);
 
 typedef struct cvxc_convex_program {
-    cvxc_convex_f2 F;
+    cvxc_convex_func F;
     void *user;
 }  cvxc_convex_program_t;
 
 typedef int (*cvxc_cp_initfunc)(cvxc_convex_program_t *, void *);
 
 static inline
-void cvxc_convex_program_init(cvxc_convex_program_t *cp, cvxc_convex_f2 F, void *user)
+void cvxc_convex_program_init(cvxc_convex_program_t *cp, cvxc_convex_func F, void *user)
 {
     cp->F = F;
     cp->user = user;
-}
-
-static inline
-int F0(cvxc_convex_program_t *cp, cvxc_matrix_t *x0)
-{
-    return cp->F(x0, __cvxnil, __cvxnil, __cvxnil, __cvxnil, cp->user);
-}
-
-static inline
-int F1(cvxc_convex_program_t *cp, cvxc_matrix_t *f, cvxc_matrix_t *Df, const cvxc_matrix_t *x)
-{
-    int e = cp->F(f, Df, __cvxnil, x, __cvxnil, cp->user);
-    if (e == 0 && cvxm_isepi(x) && f) {
-        cvxm_set(f, 0, 0, cvxm_get(f, 0, 0) - x->t);
-    }
-    return e;
-}
-
-static inline
-int F2(cvxc_convex_program_t *cp, cvxc_matrix_t *f, cvxc_matrix_t *Df, cvxc_matrix_t *H,
-       const cvxc_matrix_t *x, const cvxc_matrix_t *z)
-{
-    int e = cp->F(f, Df, H, x, z, cp->user);
-    if (e == 0 && cvxm_isepi(x) && f) {
-        cvxm_set(f, 0, 0, cvxm_get(f, 0, 0) - x->t);
-    }
-    return e;
 }
 
 
@@ -525,107 +388,54 @@ typedef struct cvxc_problem cvxc_problem_t;
 typedef struct cvxc_kktsolver cvxc_kktsolver_t;
 
 typedef struct cvxc_kktfuncs {
-    cvxc_kktsolver_t *(*new)(cvxc_problem_t *cp, int n, int m, const cvxc_dimset_t *dims);
     int (*init)(cvxc_kktsolver_t *S, cvxc_problem_t *cp, int n, int m, const cvxc_dimset_t *dims);
     int (*factor)(cvxc_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_matrix_t *Df);
     int (*solve)(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g);
     cvxc_size_t (*bytes)(int n, int m, const cvxc_dimset_t *dims);
     cvxc_size_t (*make)(cvxc_kktsolver_t *S, cvxc_problem_t *cp, int n, int m, const cvxc_dimset_t *dims, void *ptr, cvxc_size_t nbytes);
-    void (*free)(cvxc_kktsolver_t *S);
+    void (*release)(cvxc_kktsolver_t *S);
 } cvxc_kktfuncs_t;
 
-#if 0
 typedef struct cvxc_kktsolver {
-    cvxc_kktfuncs_t *fnc;
-    cvxc_problem_t *cp;
-} cvxc_kktsolver_t;
-#endif
-
-typedef struct cvxc_ldlsolver {
-    cvxc_kktfuncs_t *fnc;
-    cvxc_problem_t *cp;
-    cvxc_matrix_t K;
-    cvxc_matrix_t u;
-    cvxc_matrix_t g;
-    cvxc_memblk_t work;
-    cvxc_scaling_t *W;
-    cvxc_matrix_t *A;
-    cvxc_matrix_t *G;
-    cvxc_matrix_t *Df;
-    const cvxc_dimset_t *dims;
-    size_t ldK;
-    int *ipiv;
-    size_t p;
-    size_t n;
-    size_t mnl;
-} cvxc_ldlsolver_t;
-
-typedef struct cvxc_qrsolver {
-    cvxc_kktfuncs_t *fnc;
-    cvxc_matrix_t QA;
-    cvxc_matrix_t tauA;
-    cvxc_matrix_t Gs;
-    cvxc_matrix_t tauG;
-    cvxc_matrix_t u;
-    cvxc_matrix_t vv;
-    cvxc_matrix_t w;
-    cvxc_memblk_t work;
-    cvxc_scaling_t *W;
-    cvxc_matrix_t *A;
-    cvxc_matrix_t *G;
-    cvxc_problem_t *cp;
-    const cvxc_dimset_t *dims;
-    size_t p;
-    size_t n;
-} cvxc_qrsolver_t;
-
-typedef struct cvxc_chainsolver {
-    cvxc_kktfuncs_t *fnc;
-    cvxc_problem_t *cp;
+    cvxc_kktfuncs_t *vtable;
+    void *private;
     cvxc_kktsolver_t *next;
-} cvxc_chainsolver_t;
+} cvxc_kktsolver_t;
 
-struct cvxc_kktsolver {
-    union {
-        cvxc_kktfuncs_t *fnc;
-        cvxc_ldlsolver_t ldl;
-        cvxc_chainsolver_t next;
-    } u;
-    int debug;
-};
 
-extern cvxc_kktfuncs_t *cvxc_ldlload(void *ptr);
-
-__CVXC_INLINE
-void cvxc_ldlsolver_init(cvxc_kktsolver_t *kkt,
-                        cvxc_problem_t *cp,
-                        int n, int m, const cvxc_dimset_t *dims)
-{
-    cvxc_kktfuncs_t *fnc = cvxc_ldlload((void *)0);
-    fnc->init(kkt, cp, n, m, dims);
-}
+extern void cvxc_kktldl_load(cvxc_kktsolver_t *);
 
 __CVXC_INLINE
 int cvxc_kktinit(cvxc_kktsolver_t *S,
                 cvxc_problem_t *cp,
                 int n, int m, const cvxc_dimset_t *dims)
 {
-    return (*S->u.fnc->init)(S, cp, n, m, dims);
+    return (*S->vtable->init)(S, cp, n, m, dims);
 }
 
 __CVXC_INLINE
 int cvxc_kktfactor(cvxc_kktsolver_t *S,
                   cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_matrix_t *Df)
 {
-    return (*S->u.fnc->factor)(S, W, H, Df);
+    return (*S->vtable->factor)(S, W, H, Df);
 }
 
 __CVXC_INLINE
 int cvxc_kktsolve(cvxc_kktsolver_t *S,
                  cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g)
 {
-    return (*S->u.fnc->solve)(S, x, y, z_g);
+    return (*S->vtable->solve)(S, x, y, z_g);
 }
+
+__CVXC_INLINE
+void cvxc_ldlsolver_init(cvxc_kktsolver_t *kkt,
+                        cvxc_problem_t *cp,
+                        int n, int m, const cvxc_dimset_t *dims)
+{
+    cvxc_kktldl_load(kkt);
+    cvxc_kktinit(kkt, cp, n, m, dims);
+}
+
 
 typedef struct cvxc_solution {
     int status;
@@ -670,56 +480,6 @@ typedef struct cvxc_stats {
     cvxc_float_t dcost;
 } cvxc_stats_t;
 
-
-typedef struct cvxc_conelp_internal {
-    int primalstart;
-    int dualstart;
-    cvxc_float_t tau, kappa;
-    cvxc_float_t dkappa, dtau;
-    cvxc_float_t wkappa3;
-    cvxc_float_t nrms, nrmz;
-    cvxc_float_t dg, dgi;
-    cvxc_float_t ts, tz;                 // step sizes
-
-    // internal result
-    cvxc_matrix_t x, y, s, z;
-
-    cvxc_matrix_t dx, dy, ds, dz;
-    cvxc_matrix_t x1, y1, z1;
-    cvxc_matrix_t rx, ry, rz;
-    cvxc_matrix_t hrx, hry, hrz;
-    cvxc_matrix_t sigs, sigz;
-    cvxc_matrix_t lmbda, lmbdasq;
-
-    cvxc_matrix_t wx, wy, ws, wz;
-    cvxc_matrix_t wx2, wy2, ws2, wz2;
-    cvxc_matrix_t ws3, wz3;
-    cvxc_matrix_t th;
-
-    // matrix groups with correct indexing
-    cvxc_matgrp_t h_g;
-    cvxc_matgrp_t s_g, z_g;
-    cvxc_matgrp_t ds_g, dz_g;
-    cvxc_matgrp_t hrz_g;
-    cvxc_matgrp_t rz_g;
-    cvxc_matgrp_t ws_g, wz_g;
-    cvxc_matgrp_t ws2_g, wz2_g;
-    cvxc_matgrp_t ws3_g, wz3_g;
-    cvxc_matgrp_t th_g;
-    cvxc_matgrp_t z1_g;
-    cvxc_matgrp_t lmbda_g, lmbdasq_g;
-    cvxc_matgrp_t sigs_g, sigz_g;
-
-    cvxc_index_t index_full;             // indexing to full matrix group
-    cvxc_index_t index_packed;           // indexing to matrix group with packed 'S' space
-    cvxc_index_t index_diag;             // indexing to matrix group with diagonal 'S' space
-    cvxc_index_t index_sig;              // indexing to matrix group with only diagonal 'S" space
-
-    cvxc_scaling_t W;                    // scaling matrix group
-    cvxc_memblk_t work;                  // workspace
-
-} cvxc_conelp_internal_t;
-
 typedef struct cvxc_gpindex {
     cvxc_size_t p;
     cvxc_size_t *index;
@@ -734,148 +494,8 @@ extern void cvxc_gpi_free(cvxc_gpindex_t *gpi);
 extern cvxc_size_t cvxc_gpi_elem(const cvxc_gpindex_t *gpi, cvxc_matrix_t *e, const cvxc_matrix_t *Fg, cvxc_size_t n);
 extern cvxc_size_t cvxc_gpi_length(const cvxc_gpindex_t *gpi, cvxc_size_t n);
 
-typedef struct cvxc_gp_params {
-    cvxc_matrix_t *F;
-    cvxc_matrix_t *g;
-    cvxc_gpindex_t *gpi;
-    cvxc_matrix_t y;
-    cvxc_matrix_t u;
-    cvxc_matrix_t Fs;
-} cvxc_gp_params_t;
-
-typedef struct cvxc_gp_program {
-    cvxc_convex_program_t gp;
-    cvxc_gp_params_t gp_params;
-} cvxc_gp_program_t;
-
-
-
-typedef struct cvxc_cpl_internal {
-    cvxc_float_t tau, kappa;
-    cvxc_float_t dkappa, dtau;
-    cvxc_float_t wkappa3;
-    cvxc_float_t nrms, nrmz;
-    cvxc_float_t dg, dgi;
-    cvxc_float_t ts, tz;                 // step sizes
-    cvxc_float_t phi;
-    cvxc_float_t dphi;
-    cvxc_float_t phi0;
-    cvxc_float_t dphi0;
-    cvxc_float_t mu;
-    cvxc_float_t sigma;
-    cvxc_float_t sigma0;
-    cvxc_float_t eta;
-    cvxc_float_t eta0;
-    cvxc_float_t theta1;
-    cvxc_float_t theta2;
-    cvxc_float_t theta3;
-    cvxc_float_t step;
-    cvxc_float_t step0;
-    cvxc_float_t gap;
-    cvxc_float_t gap0;
-    cvxc_float_t dsdz;
-    cvxc_float_t dsdz0;
-
-    cvxc_float_t relgap;
-    cvxc_float_t resznl;
-    cvxc_float_t reszl;
-    cvxc_float_t resrznl;
-    cvxc_float_t resrzl;
-    cvxc_float_t relgap0;
-    cvxc_float_t resznl0;
-    cvxc_float_t reszl0;
-    cvxc_float_t resrznl0;
-    cvxc_float_t resrzl0;
-
-    cvxc_float_t resx0;
-    cvxc_float_t resy0;
-    cvxc_float_t resz0;
-    cvxc_float_t resx;
-    cvxc_float_t resy;
-    cvxc_float_t resz;
-    cvxc_float_t hresx;
-    cvxc_float_t hresy;
-    cvxc_float_t hresz;
-    cvxc_float_t cx;
-    cvxc_float_t by;
-    cvxc_float_t hz;
-    cvxc_float_t rt;
-    cvxc_float_t dres;
-    cvxc_float_t pres;
-    cvxc_float_t dinfres;
-    cvxc_float_t pinfres;
-    cvxc_float_t pcost;
-    cvxc_float_t dcost;
-    cvxc_float_t dres0;
-    cvxc_float_t pres0;
-
-    // KKT solver for CPL and CP problems; chaning to proper KKT solver
-    cvxc_chainsolver_t cp_solver;
-
-    // solution matrix
-    cvxc_matrix_t x, y, s, z;  // ok
-
-    cvxc_matrix_t c0;   // internal vector for non-linear target function
-    cvxc_matrix_t z_mnl;
-
-    // f is point in domain of F (mln,1); Df gradient (mnl,n)
-    // H is Hessian (n, n);
-    cvxc_matrix_t f, Df, H;
-    cvxc_matrix_t newf, newDf; //, H;
-
-    cvxc_matrix_t dx, dy, ds, dz;
-    cvxc_matrix_t dx0, dy0, ds0, dz0;
-    cvxc_matrix_t ds2, dz2, ds20, dz20;
-
-    cvxc_matrix_t x0, y0, s0, z0;
-    cvxc_matrix_t x1, y1, s1, z1;
-
-    cvxc_matrix_t rx, ry, rz;
-    cvxc_matrix_t rx0, ry0, rz0;
-    cvxc_matrix_t newx, newy, newz, news, newrx;
-    cvxc_matrix_t newrz0;
-    cvxc_matrix_t hrx, hry, hrz;
-    cvxc_matrix_t sigs, sigz;
-    cvxc_matrix_t lmbda, lmbdasq;
-    cvxc_matrix_t lmbda0;
-    cvxc_matrix_t lmbdasq0;
-
-    cvxc_matrix_t wx, wy, ws, wz;
-    cvxc_matrix_t wx2, wy2, ws2, wz2;
-    cvxc_matrix_t ws3, wz3;
-
-    // matrix groups with correct indexing
-    cvxc_matgrp_t h_g;
-    cvxc_matgrp_t s_g, z_g;
-    cvxc_matgrp_t s0_g, z0_g;
-    cvxc_matgrp_t ds_g, dz_g;
-    cvxc_matgrp_t ds0_g, dz0_g;
-    cvxc_matgrp_t ds2_g, dz2_g;
-    cvxc_matgrp_t ds20_g, dz20_g;
-    cvxc_matgrp_t newz_g;
-    cvxc_matgrp_t newrz_g;
-    cvxc_matgrp_t news_g;
-    cvxc_matgrp_t rz_g;
-    cvxc_matgrp_t rzl_g, rznl_g;
-    cvxc_matgrp_t ws_g, wz_g;
-    cvxc_matgrp_t ws2_g, wz2_g;
-    cvxc_matgrp_t ws3_g, wz3_g;
-    cvxc_matgrp_t th_g;
-    cvxc_matgrp_t z1_g;
-    cvxc_matgrp_t lmbda_g, lmbdasq_g;
-    cvxc_matgrp_t sigs_g, sigz_g;
-
-    cvxc_index_t index_full;             // indexing to full matrix group
-    cvxc_index_t index_packed;           // indexing to matrix group with packed 'S' space
-    cvxc_index_t index_diag;             // indexing to matrix group with diagonal 'S' space
-    cvxc_index_t index_sig;              // indexing to matrix group with only diagonal 'S" space
-    cvxc_index_t index_cpt;              // indexing for G/h matrix with convex target function
-    cvxc_scaling_t W;                    // scaling matrix group
-    cvxc_scaling_t W0;
-    cvxc_memblk_t work;                  // workspace
-
-    cvxc_gp_program_t gp;                // Internal GP program structure.
-} cvxc_cpl_internal_t;
+struct cvxc_conelp_internal;
+struct cvxc_cpl_internal;
 
 typedef struct cvxc_problem {
     cvxc_matrix_t *c;                    ///< Cost function coefficients
@@ -883,42 +503,27 @@ typedef struct cvxc_problem {
     cvxc_matrix_t *h;                    ///< Inequality constraint limits
     cvxc_matrix_t *A;                    ///< Equality constraint coefficients
     cvxc_matrix_t *b;                    ///< Equality constraint limits
-    // const cvxc_dimset_t *dims;           ///< Problems dimensions
     cvxc_kktsolver_t *solver;            ///< KKT solver
-
-    // Convex program for CP/CPL solver
-    cvxc_convex_program_t *F;
-
-    // pointers to
-    cvxc_matrix_t *f;
-    cvxc_matrix_t *Df;
-    cvxc_matrix_t *H;
+    cvxc_convex_program_t *F;            ///< Convex program for CP/CPL solver
 
     cvxc_index_t *index_g;
-    int error;                          ///< Last error
-
-    cvxc_solution_t solution;            ///< Solution data
-
+    int error;                           ///< Last error
     // internal
     cvxc_kktsolver_t __S;        // internal solver structure
-
     cvxc_size_t cdim, cdim_diag;
 
     // statistics
     cvxc_stats_t stats;
-    // solver options
-    cvxc_solopts_t *solopts;
 
     // solver internal variables
     union {
         unsigned char *space;
-        cvxc_conelp_internal_t *conelp;
-        cvxc_cpl_internal_t *cpl;
+        struct cvxc_conelp_internal *conelp;
+        struct cvxc_cpl_internal *cpl;
     } u;
 
     cvxc_memblk_t *work;                  // workspace
-    cvxc_size_t mlen;
-    cvxc_float_t *memory;
+    cvxc_size_t nbytes;
 
 } cvxc_problem_t;
 
@@ -948,13 +553,13 @@ extern int
 cvxc_conelp_compute_start(cvxc_problem_t *prob);
 
 extern int
-cvxc_conelp_solve(cvxc_problem_t *prob, cvxc_solopts_t *opts);
+cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *prob, cvxc_solopts_t *opts);
 
 extern int
 cvxc_cpl_compute_start(cvxc_problem_t *cp);
 
 extern int
-cvxc_cpl_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts);
+cvxc_cpl_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *opts);
 
 extern cvxc_size_t
 cvxc_cpl_setup(cvxc_problem_t *cp, cvxc_convex_program_t *F,
@@ -1009,7 +614,7 @@ extern int
 cvxc_cp_compute_start(cvxc_problem_t *cp);
 
 extern int
-cvxc_cp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts);
+cvxc_cp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *opts);
 
 extern cvxc_size_t
 cvxc_cp_setup(cvxc_problem_t *cp, cvxc_convex_program_t *F,
@@ -1040,7 +645,7 @@ extern int
 cvxc_gp_compute_start(cvxc_problem_t *cp);
 
 extern int
-cvxc_gp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts);
+cvxc_gp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *opts);
 
 
 
