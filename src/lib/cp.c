@@ -5,13 +5,11 @@
  * distributed under the terms of GNU Lesser General Public License Version 3, or
  * any later version. See the COPYING file included in this archive.
  */
-#include "cvxc.h"
 
-#ifndef __ZERO
-#define __ZERO 0.0
-#endif
+#include "internal.h"
 
-
+/**
+ */
 int cvxc_cp_isok(const cvxc_convex_program_t *F,
                 const cvxc_matrix_t *G,
                 const cvxc_matrix_t *h,
@@ -54,9 +52,8 @@ int cvxc_cp_isok(const cvxc_convex_program_t *F,
 static
 int cp_factor(cvxc_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *x, cvxc_matrix_t *z)
 {
-    cvxc_chainsolver_t *cp_solver = (cvxc_chainsolver_t *)S;
     cvxc_matrix_t Dfc;
-    cvxc_problem_t *cp = cp_solver->cp;
+    cvxc_problem_t *cp = (cvxc_problem_t *)S->private;
     cvxc_cpl_internal_t *cpi = cp->u.cpl;
     cvxc_size_t nr, nc;
 
@@ -64,14 +61,13 @@ int cp_factor(cvxc_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *x, cvxc_mat
     cvxm_view_map(&Dfc, &cpi->Df, 1, 0, nr-1, nc);
     F2(cp->F, &cpi->f, &cpi->Df, &cpi->H, x, z);
 
-    return cvxc_kktfactor(cp_solver->next, W, &cpi->H, &Dfc);
+    return cvxc_kktfactor(S->next, W, &cpi->H, &Dfc);
 }
 
 static
 int cp_solve(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g)
 {
-    cvxc_chainsolver_t *cp_solver = (cvxc_chainsolver_t *)S;
-    cvxc_problem_t *cp = cp_solver->cp;
+    cvxc_problem_t *cp = (cvxc_problem_t *)S->private;
     cvxc_cpl_internal_t *cpi = cp->u.cpl;
     cvxc_matrix_t gradf, dnlt, z_nlt, z_cpl;
     cvxc_index_t index_cpl;
@@ -93,7 +89,7 @@ int cp_solve(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgr
     znlt  = cvxm_get(&z_nlt, 0, 0);
     cvxm_axpy(x, epi_x, &gradf);
 
-    int err = cvxc_kktsolve(cp_solver->next, x, y, &z_cpl_g);
+    int err = cvxc_kktsolve(S->next, x, y, &z_cpl_g);
 
     cvxm_set(&z_nlt, 0, 0, -epi_x*dnlt0);
     epi_x = cvxm_dot(&gradf, x) + dnlt0*dnlt0*epi_x - znlt;
@@ -101,19 +97,34 @@ int cp_solve(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgr
     return err;
 }
 
-static cvxc_kktfuncs_t cp_kktfunctions = {
-    .factor = cp_factor,
-    .solve  = cp_solve
-};
-
-cvxc_chainsolver_t *cvxc_cp_solver_init(cvxc_chainsolver_t *cs, cvxc_problem_t *cp, cvxc_kktsolver_t *next)
+static
+void cp_release(cvxc_kktsolver_t *kkt)
 {
-    cs->fnc = &cp_kktfunctions;
-    cs->next = next;
-    cs->cp = cp;
-    return cs;
+    if (!kkt)
+        return;
+
+    if (kkt->next && kkt->next->vtable->release)
+        (*kkt->next->vtable->release)(kkt->next);
+    kkt->private = 0;
 }
 
+static cvxc_kktfuncs_t cp_kktfunctions = {
+    .factor = cp_factor,
+    .solve  = cp_solve,
+    .release= cp_release
+};
+
+static
+void cvxc_cp_solver_init(cvxc_kktsolver_t *cs, cvxc_problem_t *cp, cvxc_kktsolver_t *next)
+{
+    cs->vtable = &cp_kktfunctions;
+    cs->next = next;
+    cs->private = cp;
+}
+
+/**
+ * @brief Initialize internal variables for convex program.
+ */
 int cvxc_cp_setvars(cvxc_problem_t *cp,
                    cvxc_convex_program_t *F,
                    cvxc_size_t n, cvxc_size_t m,
@@ -145,6 +156,9 @@ int cvxc_cp_setvars(cvxc_problem_t *cp,
     return 0;
 }
 
+/**
+ * @brief Allocate space and initialize variables for convex program.
+ */
 cvxc_size_t cvxc_cp_setup(cvxc_problem_t *cp,
                         cvxc_convex_program_t *F,
                         cvxc_matrix_t *G,
@@ -179,6 +193,9 @@ cvxc_size_t cvxc_cp_setup(cvxc_problem_t *cp,
     return used;
 }
 
+/**
+ * @brief Compute starting point for solver.
+ */
 int cvxc_cp_compute_start(cvxc_problem_t *cp)
 {
     cvxc_cpl_internal_t *cpi = cp->u.cpl;
@@ -200,8 +217,10 @@ int cvxc_cp_compute_start(cvxc_problem_t *cp)
     return 0;
 }
 
-int cvxc_cp_solve(cvxc_problem_t *cp,
-                 cvxc_solopts_t *opts)
+/**
+ * @brief Solve convex program with convex target function.
+ */
+int cvxc_cp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *opts)
 {
-    return cvxc_cpl_solve(cp, opts);
+    return cvxc_cpl_solve(sol, cp, opts);
 }
