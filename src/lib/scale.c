@@ -5,7 +5,7 @@
  * distributed under the terms of GNU Lesser General Public License Version 3, or
  * any later version. See the COPYING file included in this archive.
  */
-#include "cvxc.h"
+#include "internal.h"
 
 #ifndef SQRT2
 #define SQRT2    1.41421356237309504880D

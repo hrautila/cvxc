@@ -5,7 +5,7 @@
  * distributed under the terms of GNU Lesser General Public License Version 3, or
  * any later version. See the COPYING file included in this archive.
  */
-#include "cvxc.h"
+#include "internal.h"
 
 static inline
 void mksymm(cvxc_matrix_t *x, int n)

@@ -6,7 +6,7 @@
  * any later version. See the COPYING file included in this archive.
  */
 #include <stdio.h>
-#include "cvxc.h"
+#include "internal.h"
 
 /**
  *   @brief y = pack(x), copy x to y using packed storage.

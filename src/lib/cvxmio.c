@@ -9,7 +9,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
-#include "cvxm.h"
+
+#include "cvxc.h"
 
 /*
  * \brief Read matrix from string buffer
