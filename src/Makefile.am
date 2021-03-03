@@ -35,9 +35,8 @@ libcvxc_la_LDFLAGS = -version-info @SOVERSION@
 include_HEADERS = include/cvxc.h
 
 noinst_HEADERS = \
-	include/cpl.h \
-	include/cvxm.h \
-	include/epi.h
+	include/internal.h \
+	include/cvxm.h
 
 LIBCVXC = libcvxc.la
 
