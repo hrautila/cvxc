@@ -5,8 +5,8 @@
  * distributed under the terms of GNU Lesser General Public License Version 3, or
  * any later version. See the COPYING file included in this archive.
  */
-#include "epi.h"
-#include "cvxc.h"
+
+#include "internal.h"
 
 #ifndef __ZERO
 #define __ZERO 0.0
@@ -160,32 +160,42 @@ int f4(cvxc_problem_t *cp,
 static
 int cpl_factor(cvxc_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *x, cvxc_matrix_t *z)
 {
-    cvxc_chainsolver_t *cpl_solver = (cvxc_chainsolver_t *)S;
-    cvxc_problem_t *cp = cpl_solver->cp;
+    cvxc_problem_t *cp = (cvxc_problem_t *)S->private;
     cvxc_cpl_internal_t *cpi = cp->u.cpl;
     F2(cp->F, __cvxnil, &cpi->Df, &cpi->H, x, z);
-    return cvxc_kktfactor(cpl_solver->next, W, &cpi->H, &cpi->Df);
+    return cvxc_kktfactor(S->next, W, &cpi->H, &cpi->Df);
 }
 
 static
 int cpl_solve(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g)
 {
-    cvxc_chainsolver_t *cpl_solver = (cvxc_chainsolver_t *)S;
-    return cvxc_kktsolve(cpl_solver->next, x, y, z_g);
+    return cvxc_kktsolve(S->next, x, y, z_g);
+}
+
+static
+void cpl_release(cvxc_kktsolver_t *kkt)
+{
+    if (!kkt)
+        return;
+
+    if (kkt->next && kkt->next->vtable->release)
+        (*kkt->next->vtable->release)(kkt->next);
+    kkt->private = 0;
 }
 
 static cvxc_kktfuncs_t cpl_kktfunctions = {
     .factor = cpl_factor,
-    .solve  = cpl_solve
+    .solve  = cpl_solve,
+    .release= cpl_release
 };
 
-cvxc_chainsolver_t *cvxc_cpl_solver_init(cvxc_chainsolver_t *cs, cvxc_problem_t *cp, cvxc_kktsolver_t *next)
+void cvxc_cpl_solver_init(cvxc_kktsolver_t *cs, cvxc_problem_t *cp, cvxc_kktsolver_t *next)
 {
-    cs->fnc = &cpl_kktfunctions;
+    cs->vtable = &cpl_kktfunctions;
     cs->next = next;
-    cs->cp = cp;
-    return cs;
+    cs->private = cp;
 }
+
 /**
  * @brief Compute memory allocation needed for CONVEXLP problem
  *
@@ -480,14 +490,6 @@ cvxc_size_t cvxc_cpl_make(cvxc_problem_t *cp,
     cvxc_mgrp_init(&cpi->lmbda_g,   &cpi->lmbda,   &cpi->index_diag);
     cvxc_mgrp_init(&cpi->lmbdasq_g, &cpi->lmbdasq, &cpi->index_diag);
 
-    //cp->f  = &cpi->f;
-    //cp->Df = &cpi->Df;
-    //cp->H  = &cpi->H;
-
-    // save memory block and it's size
-    cp->mlen = msize;
-    // cp->memory = memory;
-
     return offset;
 }
 
@@ -561,6 +563,24 @@ int cvxc_cpl_setvars(cvxc_problem_t *cp,
     return 0;
 }
 
+/**
+ * @brief Allocate space for CPL internal variables.
+ *
+ * @param cp
+ *   On exit cp->u.space is pointer to allocated memory block and cp->mlen number of
+ *   reserved bytes.
+ * @param nl
+ *   If non-zero then problem target function is convex otherwise linear.
+ * @param n
+ *   Number of variables
+ * @param m
+ *   Number of equality constraints
+ * @param dims
+ *   Structure and sizes of unequality constraints.
+ *
+ * @retval 0  Failure
+ * @retval >0 Number of bytes used for internal variables.
+ */
 cvxc_size_t cvxc_cpl_allocate(cvxc_problem_t *cp,
                             int nl,
                             cvxc_size_t n,
@@ -571,12 +591,14 @@ cvxc_size_t cvxc_cpl_allocate(cvxc_problem_t *cp,
     cvxc_size_t used, nbytes = cvxc_cpl_bytes(n, m, dims, nl);
     if (extra)
         nbytes += extra;
-    cp->u.space = calloc(nbytes + sizeof(cvxc_cpl_internal_t), 1);
+    nbytes += sizeof(cvxc_cpl_internal_t);
+
+    cp->u.space = calloc(nbytes, 1);
     if (!cp->u.space) {
         cp->error = CVXC_ERR_MEMORY;
         return 0;
     }
-
+    cp->nbytes = nbytes;
 
     unsigned char *memory = &cp->u.space[sizeof(cvxc_cpl_internal_t)];
     if ((used = cvxc_cpl_make(cp, n, m, dims, nl, memory, nbytes)) == 0) {
@@ -586,9 +608,15 @@ cvxc_size_t cvxc_cpl_allocate(cvxc_problem_t *cp,
         return 0;
     }
     cp->work = &cp->u.cpl->work;
-    return used;
+    return used + sizeof(cvxc_cpl_internal_t);
 }
 
+/**
+ * @brief Setup CPL problem.
+ *
+ * @retval 0  Failure
+ * @retval >0 Number of bytes used for internal variables.
+ */
 cvxc_size_t cvxc_cpl_setup(cvxc_problem_t *cp,
                          cvxc_convex_program_t *F,
                          cvxc_matrix_t *c,
@@ -639,9 +667,7 @@ cvxc_size_t cvxc_cpl_setup(cvxc_problem_t *cp,
     return used;
 }
 
-int cvxc_cpl_ready(cvxc_problem_t *cp,
-                  int iter,
-                  int stat)
+int cvxc_cpl_ready(cvxc_solution_t *sol, cvxc_problem_t *cp, int iter, int stat)
 {
     cvxc_cpl_internal_t *cpi = cp->u.cpl;
 
@@ -673,23 +699,23 @@ int cvxc_cpl_ready(cvxc_problem_t *cp,
         cpi->by = cvxm_dot(cp->b, &cpi->y);
         cpi->hz = cvxc_sdot(&cpi->h_g, &cpi->z_g);
 
-        cp->solution.x = &cpi->x;
-        cp->solution.s = &cpi->s;
-        cp->solution.y = &cpi->y;
-        cp->solution.z = &cpi->z;
+        sol->x = &cpi->x;
+        sol->s = &cpi->s;
+        sol->y = &cpi->y;
+        sol->z = &cpi->z;
 
-        cp->solution.status = stat;
-        cp->solution.gap = cpi->gap;
-        cp->solution.relative_gap = cpi->relgap;
-        cp->solution.primal_objective = cpi->cx;
-        cp->solution.dual_objective = - (cpi->by + cpi->hz);
-        cp->solution.primal_infeasibility = cpi->pres;
-        cp->solution.dual_infeasibility = cpi->dres;
-        cp->solution.primal_slack = - cpi->ts;
-        cp->solution.dual_slack = - cpi->tz;
-        cp->solution.primal_residual_cert = __NaN();
-        cp->solution.dual_residual_cert = __NaN();
-        cp->solution.iterations = 0;
+        sol->status = stat;
+        sol->gap = cpi->gap;
+        sol->relative_gap = cpi->relgap;
+        sol->primal_objective = cpi->cx;
+        sol->dual_objective = - (cpi->by + cpi->hz);
+        sol->primal_infeasibility = cpi->pres;
+        sol->dual_infeasibility = cpi->dres;
+        sol->primal_slack = - cpi->ts;
+        sol->dual_slack = - cpi->tz;
+        sol->primal_residual_cert = __NaN();
+        sol->dual_residual_cert = __NaN();
+        sol->iterations = 0;
     }
     else if (stat == CVXC_STAT_UNKNOWN || stat == CVXC_STAT_OPTIMAL) {
         cvxm_scale(&cpi->x, 1.0/cpi->tau, CVXC_ALL);
@@ -702,29 +728,29 @@ int cvxc_cpl_ready(cvxc_problem_t *cp,
         cpi->tz = cvxc_max_step(&cpi->z_g, __nilgrp, &cpi->work);
 
         cp->error = stat == CVXC_STAT_UNKNOWN ? CVXC_ERR_MAXITER : 0;
-        cp->solution.x = &cpi->x;
-        cp->solution.s = &cpi->s;
-        cp->solution.y = &cpi->y;
-        cp->solution.z = &cpi->z;
+        sol->x = &cpi->x;
+        sol->s = &cpi->s;
+        sol->y = &cpi->y;
+        sol->z = &cpi->z;
 
-        cp->solution.status = stat;
+        sol->status = stat;
 
-        cp->solution.gap = cpi->gap;
-        cp->solution.relative_gap = cpi->relgap;
-        cp->solution.primal_objective = cpi->cx;
-        cp->solution.dual_objective = - (cpi->by + cpi->hz);
-        cp->solution.primal_infeasibility = cpi->pres;
-        cp->solution.dual_infeasibility = cpi->dres;
-        cp->solution.primal_slack = - cpi->ts;
-        cp->solution.dual_slack = - cpi->tz;
+        sol->gap = cpi->gap;
+        sol->relative_gap = cpi->relgap;
+        sol->primal_objective = cpi->cx;
+        sol->dual_objective = - (cpi->by + cpi->hz);
+        sol->primal_infeasibility = cpi->pres;
+        sol->dual_infeasibility = cpi->dres;
+        sol->primal_slack = - cpi->ts;
+        sol->dual_slack = - cpi->tz;
         if (stat == CVXC_STAT_OPTIMAL) {
-            cp->solution.primal_residual_cert = __NaN();
-            cp->solution.dual_residual_cert = __NaN();
+            sol->primal_residual_cert = __NaN();
+            sol->dual_residual_cert = __NaN();
         } else {
-            cp->solution.primal_residual_cert = cpi->pinfres;
-            cp->solution.dual_residual_cert = cpi->dinfres;
+            sol->primal_residual_cert = cpi->pinfres;
+            sol->dual_residual_cert = cpi->dinfres;
         }
-        cp->solution.iterations = iter;
+        sol->iterations = iter;
     }
     return -stat;
 }
@@ -910,17 +936,12 @@ int cvxc_cpl_compute_start(cvxc_problem_t *cp)
     return 0;
 }
 
-/*
- * Notes:
- * phase 1 implementation: CPL (convex program with linear objective)
- *   stardard matrix elements c, x, G, h, A, b, s, z
- *   convex programs CP with F0, F1, F2
+/**
+ * @brief Solve convex problem with linear objective.
  */
-int cvxc_cpl_solve(cvxc_problem_t *cp,
-                  cvxc_solopts_t *opts)
+int cvxc_cpl_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *opts)
 {
     cvxc_cpl_internal_t *cpi = cp->u.cpl;
-    // cvxc_stats_t *stats = &cp->stats;
 
     cvxc_float_t cx, dy, dz, dr;
     cvxc_matrix_t lk, sk, zk, ls, lz, s_l, s_nl, z_l, z_nl, rz_nl, rz_l;
@@ -1058,7 +1079,7 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
             (cpi->gap <= abstol ||
              (!isnan(cpi->relgap) && cpi->relgap < reltol))) {
 
-            return cvxc_cpl_ready(cp, iter, CVXC_STAT_OPTIMAL);
+            return cvxc_cpl_ready(sol, cp, iter, CVXC_STAT_OPTIMAL);
         }
 
         // -----------------------------------------------------------------------
@@ -1106,7 +1127,7 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
 
             if (singular_kkt) {
                 // terminate in singular KKT_matrix
-                return cvxc_cpl_ready(cp, /*stats,*/ iter, CVXC_STAT_SINGULAR);
+                return cvxc_cpl_ready(sol, cp, iter, CVXC_STAT_SINGULAR);
             }
         }
 
@@ -1154,7 +1175,7 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
             err = f4(cp, &cpi->dx, &cpi->dy, &cpi->dz_g, &cpi->ds_g, refinement);
             if (err < 0) {
                 // terminated ....
-                return cvxc_cpl_ready(cp, iter, CVXC_STAT_SINGULAR);
+                return cvxc_cpl_ready(sol, cp, iter, CVXC_STAT_SINGULAR);
             }
             // line search needs ds'*dz and unscaled steps
             cpi->dsdz = cvxc_sdot(&cpi->ds_g, &cpi->dz_g);
@@ -1268,5 +1289,5 @@ int cvxc_cpl_solve(cvxc_problem_t *cp,
         cpi->gap = cvxm_dot(&cpi->lmbda, &cpi->lmbda);
     }
 
-    return cvxc_cpl_ready(cp, maxiter, CVXC_STAT_UNKNOWN);
+    return cvxc_cpl_ready(sol, cp, maxiter, CVXC_STAT_UNKNOWN);
 }

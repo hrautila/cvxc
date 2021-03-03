@@ -5,7 +5,8 @@
  * distributed under the terms of GNU Lesser General Public License Version 3, or
  * any later version. See the COPYING file included in this archive.
  */
-#include "cvxc.h"
+
+#include "internal.h"
 
 cvxc_size_t cvxc_gp_program_bytes(cvxc_size_t p, cvxc_size_t m, cvxc_size_t maxf)
 {
@@ -28,7 +29,7 @@ cvxc_float_t eval(cvxc_float_t e, void *p)
 int cvxc_gp_f(cvxc_matrix_t *f, cvxc_matrix_t *Df, cvxc_matrix_t *H,
              const cvxc_matrix_t *x, const cvxc_matrix_t *z, void *user)
 {
-    cvxc_gp_program_t *gp = (cvxc_gp_program_t *)user;
+    cvxc_gp_params_t *gp = (cvxc_gp_params_t *)user;
     cvxc_matrix_t iy, iF, iDf, Fsc, *g, *y, *F, *Fs;
     cvxc_gpindex_t *gpi;
     cvxc_float_t ymax;
@@ -40,11 +41,11 @@ int cvxc_gp_f(cvxc_matrix_t *f, cvxc_matrix_t *Df, cvxc_matrix_t *H,
         return 0;
     }
 
-    y  = &gp->gp_params.y;
-    Fs = &gp->gp_params.Fs;
-    g  = gp->gp_params.g;
-    F  = gp->gp_params.F;
-    gpi = gp->gp_params.gpi;
+    y  = &gp->y;
+    Fs = &gp->Fs;
+    gpi = gp->gpi;
+    g  = gp->g;
+    F  = gp->F;
 
     cvxm_set_all(f, 0.0);
     cvxm_set_all(Df, 0.0);
@@ -101,6 +102,26 @@ int cvxc_gp_f(cvxc_matrix_t *f, cvxc_matrix_t *Df, cvxc_matrix_t *H,
     return 0;
 }
 
+/*
+ * GP program memory layout:
+ *
+ *  +----------------------+
+ *  | cvxc_cpl_internal_t  |
+ *  +----------------------+
+ *  |    CPL program       |
+ *  |   internal data      |
+ *  |       area           |
+ *  +----------------------+
+ *  | cvxc_convex_program_t|
+ *  +----------------------+
+ *  |  cvxc_gp_params_t    |
+ *  +----------------------+
+ *  |    GP program        |
+ *  |   internal data      |
+ *  |      area            |
+ *  +----------------------+
+ */
+
 /**
  * @brief Setup geometric program.
  *
@@ -130,14 +151,12 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
                   cvxc_matrix_t *b,
                   cvxc_kktsolver_t *kktsolver)
 {
-    cvxc_cpl_internal_t *cpi;
     cvxc_size_t mG, nG, mF, nF, mg, ng, p, mA, nA, maxK, offset, gpbytes;
     cvxc_dimset_t ldims;
 
     if (!cp)
         return 0;
 
-    cpi = cp->u.cpl;
     mA = nA = maxK = 0;
     mG = nG = 0;
 
@@ -155,8 +174,9 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
     if (G)
         cvxm_size(&mG, &nG, G);
 
-    // p is count of F_i, g_i elements
     gpbytes = cvxc_gp_program_bytes(K->p, mg, maxK*nF);
+    gpbytes += sizeof(cvxc_convex_program_t) + sizeof(cvxc_gp_params_t);
+
     ldims = (cvxc_dimset_t){0};
     ldims.mnl = K->p - 1;
     ldims.iscpt = 1;
@@ -166,37 +186,36 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
     if (offset == 0)
         return 0;
 
-    cvxc_gp_program_t *gp = &cpi->gp;
-    gp->gp_params.F = F;
-    gp->gp_params.g = g;
-    gp->gp_params.gpi = K;
-    gp->gp.F = cvxc_gp_f;
-    gp->gp.user = gp;
+    cvxc_size_t used;
 
-    cvxc_cp_setvars(cp, &gp->gp, nG, mA, G, h, A, b, &ldims, kktsolver);
+    /* Layout CPL internal memory */
+    cvxc_cp_setvars(cp, 0, nG, mA, G, h, A, b, &ldims, kktsolver);
 
-    cvxc_size_t used, nbytes;
+    /* Append cvxc_convex_program structure. */
+    unsigned char *memory = cp->u.space;
+    cp->F = (cvxc_convex_program_t *)&memory[offset];
+    offset += sizeof(cvxc_convex_program_t);
 
-    nbytes = cp->mlen;
+    /* Append cvxc_gp_program structure. */
+    cvxc_gp_params_t *gp = (cvxc_gp_params_t *)&memory[offset];
+    offset += sizeof(cvxc_gp_params_t);
 
-    // Workspace for computng gradients and Hessian
-    used = cvxm_make(&gp->gp_params.y, mg, 1, &cp->memory[offset], nbytes-offset);
+    cvxc_convex_program_init(cp->F, cvxc_gp_f, gp);
+    gp->F = F;
+    gp->g = g;
+    gp->gpi = K;
+
+    /* Append GP internal variables. */
+    used = cvxm_make(&gp->y, mg, 1, &memory[offset], cp->nbytes-offset);
     if (used == 0)
         return 0;
     offset += used;
 
-    used = cvxm_make(&gp->gp_params.Fs, maxK, nG, &cp->memory[offset], nbytes-offset);
+    used = cvxm_make(&gp->Fs, maxK, nG, &memory[offset], cp->nbytes-offset);
     if (used == 0)
         return 0;
     offset += used;
 
-#if 0
-    used = cvxc_gpi_make(&gp->gp_params.gpi, K->p, &cp->memory[offset], nbytes-offset);
-    if (used == 0)
-        return 0;
-    offset += used;
-    //cvxc_gpi_setup(&gp->gp_params.gpi, K->index, p);
-#endif
     return offset;
 }
 
@@ -206,7 +225,7 @@ int cvxc_gp_compute_start(cvxc_problem_t *cp)
     return cvxc_cp_compute_start(cp);
 }
 
-int cvxc_gp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
+int cvxc_gp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *opts)
 {
-    return cvxc_cp_solve(cp, opts);
+    return cvxc_cp_solve(sol, cp, opts);
 }
