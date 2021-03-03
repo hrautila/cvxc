@@ -6,7 +6,27 @@
  * any later version. See the COPYING file included in this archive.
  */
 
-#include "cvxc.h"
+#include "internal.h"
+
+typedef struct cvxc_ldlsolver {
+    cvxc_kktfuncs_t *fnc;
+    cvxc_problem_t *cp;
+    cvxc_matrix_t K;
+    cvxc_matrix_t u;
+    cvxc_matrix_t g;
+    cvxc_memblk_t work;
+    cvxc_scaling_t *W;
+    cvxc_matrix_t *A;
+    cvxc_matrix_t *G;
+    cvxc_matrix_t *Df;
+    const cvxc_dimset_t *dims;
+    size_t ldK;
+    int *ipiv;
+    size_t p;
+    size_t n;
+    size_t mnl;
+} cvxc_ldlsolver_t;
+
 
 // forward declarations
 static
@@ -50,13 +70,13 @@ void ldl2_free(cvxc_kktsolver_t *S);
 
 // function table
 static cvxc_kktfuncs_t ldl2functions = {
-    .new    = ldl2_new,
+    //.new    = ldl2_new,
     .factor = ldl2_factor,
     .solve  = ldl2_solve,
     .init   = ldl2_init,
     .bytes  = ldl2_bytes,
     .make   = ldl2_make,
-    .free   = ldl2_free
+    .release   = ldl2_free
 };
 
 /*

@@ -5,58 +5,26 @@
  * distributed under the terms of GNU Lesser General Public License Version 3, or
  * any later version. See the COPYING file included in this archive.
  */
-#include "cvxc.h"
+#include "internal.h"
 
-// forward declarations
-static
-int ldl_init(cvxc_kktsolver_t *S,
-             cvxc_problem_t *cp,
-             int n,
-             int m,
-             const cvxc_dimset_t *dims);
-
-static
-int ldl_factor(cvxc_kktsolver_t *S,
-               cvxc_scaling_t *W,
-               cvxc_matrix_t *H,
-               cvxc_matrix_t *Df);
-static
-int ldl_solve(cvxc_kktsolver_t *S,
-              cvxc_matrix_t *x,
-              cvxc_matrix_t *y,
-              cvxc_matgrp_t *z_g);
-
-static
-cvxc_size_t ldl_bytes(int n, int m, const cvxc_dimset_t *dims);
-
-static
-cvxc_size_t ldl_make(cvxc_kktsolver_t *kkt,
-                    cvxc_problem_t *cp,
-                    int n,
-                    int m,
-                    const cvxc_dimset_t *dims,
-                    void *mem,
-                    cvxc_size_t nbytes);
-
-static
-cvxc_kktsolver_t *ldl_new(cvxc_problem_t *cp,
-                         int n,
-                         int m,
-                         const cvxc_dimset_t *dims);
-
-static
-void ldl_free(cvxc_kktsolver_t *S);
-
-// function table
-static cvxc_kktfuncs_t ldlfunctions = {
-    .new    = ldl_new,
-    .factor = ldl_factor,
-    .solve  = ldl_solve,
-    .init   = ldl_init,
-    .bytes  = ldl_bytes,
-    .make   = ldl_make,
-    .free   = ldl_free
-};
+typedef struct cvxc_ldlsolver {
+    cvxc_kktfuncs_t *fnc;
+    cvxc_problem_t *cp;
+    cvxc_matrix_t K;
+    cvxc_matrix_t u;
+    cvxc_matrix_t g;
+    cvxc_memblk_t work;
+    cvxc_scaling_t *W;
+    cvxc_matrix_t *A;
+    cvxc_matrix_t *G;
+    cvxc_matrix_t *Df;
+    const cvxc_dimset_t *dims;
+    size_t ldK;
+    int *ipiv;
+    size_t p;
+    size_t n;
+    size_t mnl;
+} cvxc_ldlsolver_t;
 
 
 // Solution of KKT equations by a dense LDL factorization of the 
@@ -84,8 +52,7 @@ int ldl_factor(cvxc_kktsolver_t *S,
                cvxc_matrix_t *H,
                cvxc_matrix_t *Df)
 {
-    //cvxc_ldlsolver_t *ldl = &S->u.ldl;
-    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)S;
+    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)S->private;
     cvxc_problem_t *cp = ldl->cp;
     cvxc_size_t rG, cG;
     cvxc_matrix_t Kt, colvec, g0;
@@ -152,7 +119,7 @@ int ldl_solve(cvxc_kktsolver_t *S,
               cvxc_matrix_t *y,
               cvxc_matgrp_t *z_g)
 {
-    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)S;
+    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)S->private;
     cvxc_problem_t *cp = ldl->cp;
     cvxc_matrix_t u0;
     int err = 0;
@@ -181,55 +148,26 @@ int ldl_solve(cvxc_kktsolver_t *S,
     return err;
 }
 
-
-static
-int ldl_init(cvxc_kktsolver_t *S,
-             cvxc_problem_t *cp,
-             int n,
-             int m,
-             const cvxc_dimset_t *dims)
-{
-    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)S;
-    ldl->fnc = &ldlfunctions;
-
-    ldl->cp = cp;
-    ldl->ldK = n + m;                                   // space for H and A (H can be zeroes)
-    ldl->ldK += cvxc_dimset_sum(dims, CVXDIM_NONLINEAR); // space for Df (can be zero)
-    ldl->ldK += cvxc_dimset_sum(dims, CVXDIM_LINEAR);    // rest is space for G
-    ldl->ldK += cvxc_dimset_sum(dims, CVXDIM_SOCP);
-    ldl->ldK += cvxc_dimset_sum_packed(dims, CVXDIM_SDP);
-
-    cvxm_init(&ldl->K, ldl->ldK, ldl->ldK);
-    ldl->ipiv = (int *)calloc(ldl->ldK, sizeof(int));
-
-    cvxm_init(&ldl->u, ldl->ldK, 1);
-    cvxm_init(&ldl->g, ldl->ldK, 1);
-
-    // compute size for workspace
-    cvxc_size_t wbytes = cvxm_ldlwork(&ldl->K);
-    cvxc_mblk_init(&ldl->work, 4*wbytes);
-
-    ldl->dims = dims;
-    ldl->A = cp->A;
-    ldl->G = cp->G;
-    ldl->n = n;
-    ldl->p = m;
-    ldl->mnl = cvxc_dimset_sum(dims, CVXDIM_NONLINEAR);
-    return 0;
-}
-
+extern cvxc_size_t cvxm_ldl_worksize(int);
 
 static
 cvxc_size_t ldl_bytes(int n, int m, const cvxc_dimset_t *dims)
 {
-    cvxc_size_t sz = n + m + cvxc_dimset_sum_packed(dims, CVXDIM_CONELP);
+    cvxc_size_t neqn = cvxc_dimset_sum(dims, CVXDIM_NONLINEAR)
+        + cvxc_dimset_sum(dims, CVXDIM_LINEAR)
+        + cvxc_dimset_sum(dims, CVXDIM_SOCP)
+        + cvxc_dimset_sum_packed(dims, CVXDIM_SDP);
+
+    cvxc_size_t sz = n + m + neqn;
     cvxc_size_t need = sz*sz + 2*sz;  // dense matrix + 2 vectors;
     cvxc_size_t ipvlen = sz;
+    cvxc_size_t nwork = 2 * cvxm_ldl_worksize(neqn);
+
     ipvlen *= sizeof(int);
     ipvlen += __aligned128(ipvlen);
     need   *= sizeof(cvxc_float_t);
     need   += __aligned128(need);
-    return need + ipvlen;
+    return need + ipvlen + nwork;
 }
 
 static
@@ -241,36 +179,79 @@ cvxc_size_t ldl_make(cvxc_kktsolver_t *kkt,
                     void *mem,
                     cvxc_size_t nbytes)
 {
+    cvxc_ldlsolver_t *ldl = kkt->private;
+    cvxc_size_t offset = sizeof(cvxc_ldlsolver_t);
+    unsigned char *buf = (unsigned char *)mem;
+
+    ldl->cp = cp;
+    ldl->ldK = n + m;
+    ldl->ldK += cvxc_dimset_sum(dims, CVXDIM_NONLINEAR);
+    ldl->ldK += cvxc_dimset_sum(dims, CVXDIM_LINEAR);
+    ldl->ldK += cvxc_dimset_sum(dims, CVXDIM_SOCP);
+    ldl->ldK += cvxc_dimset_sum_packed(dims, CVXDIM_SDP);
+
+    offset += cvxm_make(&ldl->K, ldl->ldK, ldl->ldK, &buf[offset], nbytes - offset);
+    offset += cvxm_make(&ldl->u, ldl->ldK, 1, &buf[offset], nbytes - offset);
+    offset += cvxm_make(&ldl->g, ldl->ldK, 1, &buf[offset], nbytes - offset);
+
+    ldl->ipiv = (int *)&buf[offset];
+    offset += sizeof(int) * ldl->ldK;
+
+    // rest of the space for LDL workspace
+    cvxc_mblk_make(&ldl->work, nbytes - offset, &buf[offset], nbytes - offset);
+
+    ldl->dims = dims;
+    ldl->A = cp->A;
+    ldl->G = cp->G;
+    ldl->n = n;
+    ldl->p = m;
+    ldl->mnl = cvxc_dimset_sum(dims, CVXDIM_NONLINEAR);
     return 0;
 }
 
 static
-cvxc_kktsolver_t *ldl_new(cvxc_problem_t *cp,
-                         int n,
-                         int m,
-                         const cvxc_dimset_t *dims)
+int ldl_init(cvxc_kktsolver_t *S,
+             cvxc_problem_t *cp,
+             int n,
+             int m,
+             const cvxc_dimset_t *dims)
 {
-    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)calloc(sizeof(cvxc_ldlsolver_t), 1);
-    ldl_init((cvxc_kktsolver_t *)ldl, cp, n, m, dims);
-    return  (cvxc_kktsolver_t *)ldl;
+
+    cvxc_size_t nbytes = ldl_bytes(n, m, dims);
+    S->private = calloc(nbytes + sizeof(cvxc_ldlsolver_t), 1);
+    if (!S->private)
+        return -1;
+
+    return ldl_make(S, cp, n, m, dims, S->private, nbytes + sizeof(cvxc_ldlsolver_t));
 }
 
 static
-void ldl_free(cvxc_kktsolver_t *kkt)
+void ldl_release(cvxc_kktsolver_t *kkt)
 {
     if (!kkt)
         return;
 
-    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)kkt;
-    cvxm_release(&ldl->K);
-    cvxm_release(&ldl->u);
-    cvxm_release(&ldl->g);
-    cvxc_mblk_release(&ldl->work);
-    if (ldl->ipiv)
-        free(ldl->ipiv);
-    free(kkt);
+    free(kkt->private);
+    kkt->private = 0;
 }
 
+// function table
+static cvxc_kktfuncs_t ldlfunctions = {
+    .factor = ldl_factor,
+    .solve  = ldl_solve,
+    .init   = ldl_init,
+    .bytes  = ldl_bytes,
+    .make   = ldl_make,
+    .release= ldl_release
+};
+
+
+void cvxc_kktldl_load(cvxc_kktsolver_t *kkt)
+{
+    kkt->vtable = &ldlfunctions;
+    kkt->private = 0;
+    kkt->next = 0;
+}
 
 
 cvxc_kktfuncs_t *cvxc_ldlload(void *ptr)

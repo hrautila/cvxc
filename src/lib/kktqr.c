@@ -5,7 +5,26 @@
  * distributed under the terms of GNU Lesser General Public License Version 3, or
  * any later version. See the COPYING file included in this archive.
  */
-#include "cvxc.h"
+#include "internal.h"
+
+typedef struct cvxc_qrsolver {
+    cvxc_kktfuncs_t *fnc;
+    cvxc_matrix_t QA;
+    cvxc_matrix_t tauA;
+    cvxc_matrix_t Gs;
+    cvxc_matrix_t tauG;
+    cvxc_matrix_t u;
+    cvxc_matrix_t vv;
+    cvxc_matrix_t w;
+    cvxc_memblk_t work;
+    cvxc_scaling_t *W;
+    cvxc_matrix_t *A;
+    cvxc_matrix_t *G;
+    cvxc_problem_t *cp;
+    const cvxc_dimset_t *dims;
+    size_t p;
+    size_t n;
+} cvxc_qrsolver_t;
 
 // forward declarations
 static
