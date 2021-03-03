@@ -456,30 +456,6 @@ typedef struct cvxc_solution {
     int iterations;
 } cvxc_solution_t;
 
-typedef struct cvxc_stats {
-    cvxc_float_t resx0;
-    cvxc_float_t resy0;
-    cvxc_float_t resz0;
-    cvxc_float_t resx;
-    cvxc_float_t resy;
-    cvxc_float_t resz;
-    cvxc_float_t hresx;
-    cvxc_float_t hresy;
-    cvxc_float_t hresz;
-    cvxc_float_t cx;
-    cvxc_float_t by;
-    cvxc_float_t hz;
-    cvxc_float_t rt;
-    cvxc_float_t dres;
-    cvxc_float_t pres;
-    cvxc_float_t dinfres;
-    cvxc_float_t pinfres;
-    cvxc_float_t gap;
-    cvxc_float_t relgap;
-    cvxc_float_t pcost;
-    cvxc_float_t dcost;
-} cvxc_stats_t;
-
 typedef struct cvxc_gpindex {
     cvxc_size_t p;
     cvxc_size_t *index;
@@ -508,14 +484,11 @@ typedef struct cvxc_problem {
 
     cvxc_index_t *index_g;
     int error;                           ///< Last error
-    // internal
-    cvxc_kktsolver_t __S;        // internal solver structure
-    cvxc_size_t cdim, cdim_diag;
-
-    // statistics
-    cvxc_stats_t stats;
 
     // solver internal variables
+    cvxc_kktsolver_t __S;
+    cvxc_size_t cdim, cdim_diag;
+
     union {
         unsigned char *space;
         struct cvxc_conelp_internal *conelp;
@@ -524,7 +497,6 @@ typedef struct cvxc_problem {
 
     cvxc_memblk_t *work;                  // workspace
     cvxc_size_t nbytes;
-
 } cvxc_problem_t;
 
 

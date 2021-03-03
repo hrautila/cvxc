@@ -622,7 +622,6 @@ int cvxc_conelp_compute_start_with(cvxc_problem_t *cp,
 
 {
     cvxc_conelp_internal_t *cpi = cp->u.conelp;
-    cvxc_stats_t *stats = &cp->stats;
 
     cpi->primalstart = ! (primal_x && primal_s);
     cpi->dualstart = ! (dual_y && dual_z);
@@ -682,29 +681,28 @@ int cvxc_conelp_compute_start_with(cvxc_problem_t *cp,
         return -1;
     }
 
-    stats->resx0 = MAXF(1.0, cvxm_nrm2(cp->c));
-    stats->resy0 = MAXF(1.0, cvxm_nrm2(cp->b));
-    stats->resz0 = MAXF(1.0, cvxc_snrm2(&cpi->h_g));
+    cpi->resx0 = MAXF(1.0, cvxm_nrm2(cp->c));
+    cpi->resy0 = MAXF(1.0, cvxm_nrm2(cp->b));
+    cpi->resz0 = MAXF(1.0, cvxc_snrm2(&cpi->h_g));
 
     cpi->nrms = cvxc_snrm2(&cpi->s_g);
     cpi->nrmz = cvxc_snrm2(&cpi->z_g);
 
-    stats->gap = stats->pcost = stats->dcost = stats->relgap = 0.0;
+    cpi->gap = cpi->pcost = cpi->dcost = cpi->relgap = 0.0;
 
     return 0;
 }
 
+/** */
 int cvxc_conelp_compute_start(cvxc_problem_t *cp)
 {
     return cvxc_conelp_compute_start_with(cp, __cvxnil, __cvxnil, __cvxnil, __cvxnil);
 }
 
-
-int cvxc_conelp_ready(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_stats_t *stats, int iter, int stat)
+/** */
+int cvxc_conelp_ready(cvxc_solution_t *sol, cvxc_problem_t *cp, int iter, int stat)
 {
     cvxc_conelp_internal_t *cpi = cp->u.conelp;
-
-    //cvxc_stats_t *stats = &cp->stats;
 
     if (stat == CVXC_STAT_OPTIMAL && iter == -1) {
         // constructed initial point is feasible and optimal
@@ -715,24 +713,24 @@ int cvxc_conelp_ready(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_stats_t *st
         cvxm_copy(&cpi->rx, cp->c, CVXC_ALL);
         cvxm_mvmult(1.0, &cpi->rx, 1.0, cp->A, &cpi->y, CVXC_TRANS);
         cvxm_mvmult(1.0, &cpi->rx, 1.0, cp->G, &cpi->z, CVXC_TRANS);
-        stats->resx = cvxm_nrm2(&cpi->rx);
+        cpi->resx = cvxm_nrm2(&cpi->rx);
 
         // ry = b - A*x  ; TODO - computes -b - A*x ;; check
         cvxm_copy(&cpi->ry, cp->b, CVXC_ALL);
         cvxm_mvmult(-1.0, &cpi->ry, -1.0, cp->A, &cpi->x, CVXC_TRANS);
-        stats->resy = cvxm_nrm2(&cpi->ry);
+        cpi->resy = cvxm_nrm2(&cpi->ry);
 
         // rz = s + G*x - h
         cvxm_copy(&cpi->rz, &cpi->s, CVXC_ALL);
         cvxm_mvmult(1.0, &cpi->rz, 1.0, cp->G, &cpi->x, 0);
         cvxm_axpy(&cpi->rz, 1.0, cp->h);
-        stats->resz = cvxc_snrm2(&cpi->rz_g);
+        cpi->resz = cvxc_snrm2(&cpi->rz_g);
 
-        stats->pres = MAXF(stats->resy/stats->resy0, stats->resz/stats->resz0);
-        stats->dres = stats->resx/stats->resx0;
-        stats->cx = cvxm_dot(cp->c, &cpi->x);
-        stats->by = cvxm_dot(cp->b, &cpi->y);
-        stats->hz = cvxc_sdot(&cpi->h_g, &cpi->z_g);
+        cpi->pres = MAXF(cpi->resy/cpi->resy0, cpi->resz/cpi->resz0);
+        cpi->dres = cpi->resx/cpi->resx0;
+        cpi->cx = cvxm_dot(cp->c, &cpi->x);
+        cpi->by = cvxm_dot(cp->b, &cpi->y);
+        cpi->hz = cvxc_sdot(&cpi->h_g, &cpi->z_g);
 
         sol->x = &cpi->x;
         sol->s = &cpi->s;
@@ -740,12 +738,12 @@ int cvxc_conelp_ready(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_stats_t *st
         sol->z = &cpi->z;
 
         sol->status = stat;
-        sol->gap = stats->gap;
-        sol->relative_gap = stats->relgap;
-        sol->primal_objective = stats->cx;
-        sol->dual_objective = - (stats->by + stats->hz);
-        sol->primal_infeasibility = stats->pres;
-        sol->dual_infeasibility = stats->dres;
+        sol->gap = cpi->gap;
+        sol->relative_gap = cpi->relgap;
+        sol->primal_objective = cpi->cx;
+        sol->dual_objective = - (cpi->by + cpi->hz);
+        sol->primal_infeasibility = cpi->pres;
+        sol->dual_infeasibility = cpi->dres;
         sol->primal_slack = - cpi->ts;
         sol->dual_slack = - cpi->tz;
         sol->primal_residual_cert = __NaN();
@@ -770,28 +768,28 @@ int cvxc_conelp_ready(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_stats_t *st
 
         sol->status = stat;
 
-        sol->gap = stats->gap;
-        sol->relative_gap = stats->relgap;
-        sol->primal_objective = stats->cx;
-        sol->dual_objective = - (stats->by + stats->hz);
-        sol->primal_infeasibility = stats->pres;
-        sol->dual_infeasibility = stats->dres;
+        sol->gap = cpi->gap;
+        sol->relative_gap = cpi->relgap;
+        sol->primal_objective = cpi->cx;
+        sol->dual_objective = - (cpi->by + cpi->hz);
+        sol->primal_infeasibility = cpi->pres;
+        sol->dual_infeasibility = cpi->dres;
         sol->primal_slack = - cpi->ts;
         sol->dual_slack = - cpi->tz;
         if (stat == CVXC_STAT_OPTIMAL) {
             sol->primal_residual_cert = __NaN();
             sol->dual_residual_cert = __NaN();
         } else {
-            sol->primal_residual_cert = stats->pinfres;
-            sol->dual_residual_cert = stats->dinfres;
+            sol->primal_residual_cert = cpi->pinfres;
+            sol->dual_residual_cert = cpi->dinfres;
         }
         sol->iterations = iter;
     }
     else if (stat == CVXC_STAT_PRIMAL_INFEASIBLE) {
         sol->status = stat;
         cp->error = stat;
-        cvxm_scale(&cpi->y, 1.0/(-stats->hz - stats->by), CVXC_ALL);
-        cvxm_scale(&cpi->z, 1.0/(-stats->hz - stats->by), CVXC_ALL);
+        cvxm_scale(&cpi->y, 1.0/(-cpi->hz - cpi->by), CVXC_ALL);
+        cvxm_scale(&cpi->z, 1.0/(-cpi->hz - cpi->by), CVXC_ALL);
         cvxc_mksymm(&cpi->z_g);
 
         sol->x = __cvxnil;
@@ -809,15 +807,15 @@ int cvxc_conelp_ready(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_stats_t *st
         sol->dual_infeasibility = __NaN();
         sol->primal_slack = __NaN();
         sol->dual_slack = - cpi->tz;
-        sol->primal_residual_cert = stats->pinfres;
+        sol->primal_residual_cert = cpi->pinfres;
         sol->dual_residual_cert = __NaN();
         sol->iterations = iter;
     }
     else if (stat == CVXC_STAT_DUAL_INFEASIBLE) {
         cp->error = stat;
         sol->status = stat;
-        cvxm_scale(&cpi->x, 1.0/-stats->cx, CVXC_ALL);
-        cvxm_scale(&cpi->s, 1.0/-stats->cx, CVXC_ALL);
+        cvxm_scale(&cpi->x, 1.0/-cpi->cx, CVXC_ALL);
+        cvxm_scale(&cpi->s, 1.0/-cpi->cx, CVXC_ALL);
         cvxc_mksymm(&cpi->s_g);
 
         sol->x = __cvxnil;
@@ -836,16 +834,18 @@ int cvxc_conelp_ready(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_stats_t *st
         sol->primal_slack = - cpi->ts;
         sol->dual_slack = __NaN();
         sol->primal_residual_cert = __NaN();
-        sol->dual_residual_cert = stats->dinfres;
+        sol->dual_residual_cert = cpi->dinfres;
         sol->iterations = iter;
     }
     return -stat;
 }
 
+/**
+ * @brief Solve linear problem with conic constraints.
+ */
 int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *opts)
 {
     cvxc_conelp_internal_t *cpi = cp->u.conelp;
-    cvxc_stats_t *stats = &cp->stats;
 
     cvxc_float_t max_nrms, max_nrmz;
     cvxc_matrix_t lk, sk, zk, ls, lz;
@@ -865,25 +865,25 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
 
     if (cpi->primalstart && cpi->dualstart) {
         // check for constructed initial point
-        stats->gap = cvxc_sdot(&cpi->s_g, &cpi->z_g);
-        stats->pcost = cvxm_dot(cp->c, &cpi->x);
-        stats->dcost =
+        cpi->gap = cvxc_sdot(&cpi->s_g, &cpi->z_g);
+        cpi->pcost = cvxm_dot(cp->c, &cpi->x);
+        cpi->dcost =
             - cvxm_dot(cp->b, &cpi->y) - cvxc_sdot(&cpi->h_g, &cpi->z_g);
 
-        if (stats->pcost < 0.0) {
-            stats->relgap = stats->gap / - stats->pcost;
-        } else if (stats->dcost > 0.0) {
-            stats->relgap = stats->gap / stats->dcost;
+        if (cpi->pcost < 0.0) {
+            cpi->relgap = cpi->gap / - cpi->pcost;
+        } else if (cpi->dcost > 0.0) {
+            cpi->relgap = cpi->gap / cpi->dcost;
         } else {
-            stats->relgap = __NaN();
+            cpi->relgap = __NaN();
         }
 
         if (cpi->ts <= 0.0 && cpi->tz < 0 &&
-            (stats->gap <= abstol ||
-             (!isnan(stats->relgap) && stats->relgap <= reltol))) {
+            (cpi->gap <= abstol ||
+             (!isnan(cpi->relgap) && cpi->relgap <= reltol))) {
 
             // initial point is feasible and optimal
-            return cvxc_conelp_ready(sol, cp, stats, -1, CVXC_STAT_OPTIMAL);
+            return cvxc_conelp_ready(sol, cp, -1, CVXC_STAT_OPTIMAL);
         }
 
         max_nrms = MAXF(1.0, cpi->nrms);
@@ -916,7 +916,7 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
     cvxm_copy(&cpi->ry,  cp->b, 0);
     cvxm_copy(&cpi->hry, cp->b, 0);
 
-    stats->gap = cvxc_sdot(&cpi->s_g, &cpi->z_g);
+    cpi->gap = cvxc_sdot(&cpi->s_g, &cpi->z_g);
 
     // -----------------------------------------------------------------------------
 
@@ -926,67 +926,67 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
         cvxm_scale(&cpi->hrx, 0.0, CVXC_ALL);
         cvxm_mvmult(0.0, &cpi->hrx, -1.0, cp->A, &cpi->y, CVXC_TRANS);
         cvxc_sgemv(1.0, &cpi->hrx, -1.0, cp->G, &cpi->z_g, CVXC_TRANS);
-        stats->hresx = SQRT(cvxm_dot(&cpi->hrx, &cpi->hrx));
+        cpi->hresx = SQRT(cvxm_dot(&cpi->hrx, &cpi->hrx));
 
         // rx  = hrx - c*tau
         //     = -A'*y - G'*z - c*tau
         cvxm_copy(&cpi->rx, &cpi->hrx, 0);
         cvxm_axpy(&cpi->rx, -cpi->tau, cp->c);
-        stats->resx = cvxm_nrm2(&cpi->rx) / cpi->tau;
+        cpi->resx = cvxm_nrm2(&cpi->rx) / cpi->tau;
 
         // hry = A*x
         cvxm_scale(&cpi->hry, 0.0, CVXC_ALL);
         cvxm_mvmult(0.0, &cpi->hry, 1.0, cp->A, &cpi->x, 0);
-        stats->hresy = cvxm_nrm2(&cpi->hry);
+        cpi->hresy = cvxm_nrm2(&cpi->hry);
 
         // ry  = hry - b*tau
         //     = A*x - b*tau
         cvxm_copy(&cpi->ry, &cpi->hry, 0);
         cvxm_axpy(&cpi->ry, -cpi->tau, cp->b);
-        stats->resy = cvxm_nrm2(&cpi->ry) / cpi->tau;
+        cpi->resy = cvxm_nrm2(&cpi->ry) / cpi->tau;
 
         // hrz = s + G*x
         cvxm_scale(&cpi->hrz, 0.0, CVXC_ALL);
         cvxm_mvmult(0.0, &cpi->hrz, 1.0, cp->G, &cpi->x, 0);
         cvxm_axpy(&cpi->hrz, 1.0, &cpi->s);
-        stats->hresz = cvxc_snrm2(&cpi->hrz_g);
+        cpi->hresz = cvxc_snrm2(&cpi->hrz_g);
 
         //  rz = hrz = h*tau
         //     = s + G*x - h*tau
         cvxm_copy(&cpi->rz, &cpi->hrz, 0);
         cvxm_axpy(&cpi->rz, -cpi->tau, cp->h);
 
-        stats->resz = cvxc_snrm2(&cpi->rz_g) / cpi->tau;
+        cpi->resz = cvxc_snrm2(&cpi->rz_g) / cpi->tau;
 
         // rt = kappa + c'*x + b'*y + h'*z '
-        stats->cx = cvxm_dot(cp->c, &cpi->x);
-        stats->by = cvxm_dot(cp->b, &cpi->y);
-        stats->hz = cvxc_sdot(&cpi->h_g, &cpi->z_g);
-        stats->rt = cpi->kappa + stats->cx + stats->by + stats->hz;
+        cpi->cx = cvxm_dot(cp->c, &cpi->x);
+        cpi->by = cvxm_dot(cp->b, &cpi->y);
+        cpi->hz = cvxc_sdot(&cpi->h_g, &cpi->z_g);
+        cpi->rt = cpi->kappa + cpi->cx + cpi->by + cpi->hz;
 
-        assert(isfinite(stats->cx));
+        assert(isfinite(cpi->cx));
         assert(isfinite(cpi->tau));
 
         // statistics for stopping
-        stats->pcost = stats->cx / cpi->tau;
-        stats->dcost = -(stats->by + stats->hz) / cpi->tau;
-        if (stats->pcost < 0.0) {
-            stats->relgap = stats->gap / -stats->pcost;
-        } else if (stats->dcost > 0.0) {
-            stats->relgap = stats->gap / stats->dcost;
+        cpi->pcost = cpi->cx / cpi->tau;
+        cpi->dcost = -(cpi->by + cpi->hz) / cpi->tau;
+        if (cpi->pcost < 0.0) {
+            cpi->relgap = cpi->gap / -cpi->pcost;
+        } else if (cpi->dcost > 0.0) {
+            cpi->relgap = cpi->gap / cpi->dcost;
         } else {
-            stats->relgap = __NaN();
+            cpi->relgap = __NaN();
         }
 
-        stats->pres = MAXF((stats->resy/stats->resy0), (stats->resz/stats->resz0));
-        stats->dres = stats->resx / stats->resx0;
-        stats->pinfres = __NaN();
-        if (stats->hz + stats->by < 0.0) {
-            stats->pinfres = stats->hresx / stats->resx0 / (-stats->hz - stats->by);
+        cpi->pres = MAXF((cpi->resy/cpi->resy0), (cpi->resz/cpi->resz0));
+        cpi->dres = cpi->resx / cpi->resx0;
+        cpi->pinfres = __NaN();
+        if (cpi->hz + cpi->by < 0.0) {
+            cpi->pinfres = cpi->hresx / cpi->resx0 / (-cpi->hz - cpi->by);
         }
-        stats->dinfres = __NaN();
-        if (stats->cx < 0.0) {
-            stats->dinfres = MAXF((stats->hresy/stats->resy0),  (stats->hresz/stats->resz0)) / (-stats->cx);
+        cpi->dinfres = __NaN();
+        if (cpi->cx < 0.0) {
+            cpi->dinfres = MAXF((cpi->hresy/cpi->resy0),  (cpi->hresz/cpi->resz0)) / (-cpi->cx);
         }
 
         if (opts && opts->show_progress > 0) {
@@ -995,27 +995,27 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
                     "pcost", "dcost", "gap", "pres", "dres", "k/t");
             }
             fprintf(stderr, "%2d: %11.4e %11.4e %6.0e %7.0e %7.0e %7.0e\n",
-                    iter, stats->pcost, stats->dcost, stats->gap, stats->pres,
-                    stats->dres, cpi->kappa/cpi->tau);
+                    iter, cpi->pcost, cpi->dcost, cpi->gap, cpi->pres,
+                    cpi->dres, cpi->kappa/cpi->tau);
         }
         // ---------------------------------------------------------------------
         // test for stopping criteria
 
-        if (stats->pres <= feastol &&
-            stats->dres <= feastol &&
-            (stats->gap <= abstol ||
-             (!isnan(stats->relgap) && stats->relgap < reltol))) {
+        if (cpi->pres <= feastol &&
+            cpi->dres <= feastol &&
+            (cpi->gap <= abstol ||
+             (!isnan(cpi->relgap) && cpi->relgap < reltol))) {
 
-            return cvxc_conelp_ready(sol, cp, stats, iter, CVXC_STAT_OPTIMAL);
+            return cvxc_conelp_ready(sol, cp, iter, CVXC_STAT_OPTIMAL);
         }
         // TODO: Compiling with -O0 generates incorrect test and iteration stops
-        // on first pass of the loop (stats->pinfres == NaN and stats->dinfres == NaN)
+        // on first pass of the loop (cpi->pinfres == NaN and cpi->dinfres == NaN)
         // WORKAROUND: Compile with at least -O1.
-        if  (!isnan(stats->pinfres) && stats->pinfres < feastol) {
-            return cvxc_conelp_ready(sol, cp, stats, iter, CVXC_STAT_PRIMAL_INFEASIBLE);
+        if  (!isnan(cpi->pinfres) && cpi->pinfres < feastol) {
+            return cvxc_conelp_ready(sol, cp, iter, CVXC_STAT_PRIMAL_INFEASIBLE);
         }
-        if (!isnan(stats->dinfres) && stats->dinfres < feastol) {
-            return cvxc_conelp_ready(sol, cp, stats, iter, CVXC_STAT_DUAL_INFEASIBLE);
+        if (!isnan(cpi->dinfres) && cpi->dinfres < feastol) {
+            return cvxc_conelp_ready(sol, cp, iter, CVXC_STAT_DUAL_INFEASIBLE);
         }
 
         // -----------------------------------------------------------------------
@@ -1065,7 +1065,7 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
                 return -1;
             } else {
                 cp->error = CVXC_ERR_SINGULAR;
-                return cvxc_conelp_ready(sol, cp, stats, iter, CVXC_STAT_SINGULAR);
+                return cvxc_conelp_ready(sol, cp, iter, CVXC_STAT_SINGULAR);
             }
         }
 
@@ -1118,7 +1118,7 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
             cvxm_scale(&cpi->dy, 1.0 - sigma, CVXC_ALL);
             cvxm_copy(&cpi->dz, &cpi->rz, CVXC_ALL);
             cvxm_scale(&cpi->dz, 1.0 - sigma, CVXC_ALL);
-            cpi->dtau = (1.0 - sigma) * stats->rt;
+            cpi->dtau = (1.0 - sigma) * cpi->rt;
 
             f6(cp, &cpi->dx, &cpi->dy,
                &cpi->dz_g, &cpi->dtau, &cpi->ds_g, &cpi->dkappa, refinement);
@@ -1258,8 +1258,8 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
         cpi->tau   = cvxm_get(&cpi->lmbda, cp->cdim_diag, 0) * cpi->dgi;
         cvxm_map_data(&lk, cp->cdim_diag, 1, cvxm_data(&cpi->lmbda, 0));
         g = cvxm_nrm2(&lk) / cpi->tau;
-        stats->gap = g*g;
+        cpi->gap = g*g;
     }
 
-    return cvxc_conelp_ready(sol, cp, stats, maxiter, CVXC_STAT_UNKNOWN);
+    return cvxc_conelp_ready(sol, cp, maxiter, CVXC_STAT_UNKNOWN);
 }
