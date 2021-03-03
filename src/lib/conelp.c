@@ -6,7 +6,7 @@
  * any later version. See the COPYING file included in this archive.
  */
 #include <assert.h>
-#include "cvxc.h"
+#include "internal.h"
 
 #define EFRM "%8.5f"
 //#define EFRM "%9.2e"
@@ -25,6 +25,7 @@ void print_r_rti(cvxc_scaling_t *W, int k, const char *s)
     cvxm_printf(stdout, "%13.6e", &rti);
 }
 #endif
+
 
 static inline
 cvxc_size_t __WORKBYTES(cvxc_size_t n)
@@ -351,13 +352,6 @@ cvxc_size_t cvxc_conelp_make(cvxc_problem_t *cp,
 
     cp->cdim = cdim;
 
-#if 0
-    // allocate space for results TODO: always ??
-    cp->x = cvxm_new(n, 1);
-    cp->y = cvxm_new(m, 1);
-    cp->s = cvxm_new(cdim, 1);
-    cp->z = cvxm_new(cdim, 1);
-#endif
     // __INIT macro assumes variables offset and nbytes;
     // overlay index sets
     __INIT(used, cvxc_index_make(&cpi->index_full, dims, 0, bytes,  nbytes));
@@ -561,9 +555,8 @@ cvxc_size_t cvxc_conelp_setup(cvxc_problem_t *cp,
         cp->u.space = 0;
         return 0;
     }
-    cp->mlen = nbytes;
+    cp->nbytes = nbytes;
     cp->work = &cp->u.conelp->work;
-    // cp->memory = memory;
     // provide full index set
     cp->index_g = &cp->u.conelp->index_full;
 
@@ -707,7 +700,7 @@ int cvxc_conelp_compute_start(cvxc_problem_t *cp)
 }
 
 
-int cvxc_conelp_ready(cvxc_problem_t *cp, cvxc_stats_t *stats, int iter, int stat)
+int cvxc_conelp_ready(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_stats_t *stats, int iter, int stat)
 {
     cvxc_conelp_internal_t *cpi = cp->u.conelp;
 
@@ -741,23 +734,23 @@ int cvxc_conelp_ready(cvxc_problem_t *cp, cvxc_stats_t *stats, int iter, int sta
         stats->by = cvxm_dot(cp->b, &cpi->y);
         stats->hz = cvxc_sdot(&cpi->h_g, &cpi->z_g);
 
-        cp->solution.x = &cpi->x;
-        cp->solution.s = &cpi->s;
-        cp->solution.y = &cpi->y;
-        cp->solution.z = &cpi->z;
+        sol->x = &cpi->x;
+        sol->s = &cpi->s;
+        sol->y = &cpi->y;
+        sol->z = &cpi->z;
 
-        cp->solution.status = stat;
-        cp->solution.gap = stats->gap;
-        cp->solution.relative_gap = stats->relgap;
-        cp->solution.primal_objective = stats->cx;
-        cp->solution.dual_objective = - (stats->by + stats->hz);
-        cp->solution.primal_infeasibility = stats->pres;
-        cp->solution.dual_infeasibility = stats->dres;
-        cp->solution.primal_slack = - cpi->ts;
-        cp->solution.dual_slack = - cpi->tz;
-        cp->solution.primal_residual_cert = __NaN();
-        cp->solution.dual_residual_cert = __NaN();
-        cp->solution.iterations = 0;
+        sol->status = stat;
+        sol->gap = stats->gap;
+        sol->relative_gap = stats->relgap;
+        sol->primal_objective = stats->cx;
+        sol->dual_objective = - (stats->by + stats->hz);
+        sol->primal_infeasibility = stats->pres;
+        sol->dual_infeasibility = stats->dres;
+        sol->primal_slack = - cpi->ts;
+        sol->dual_slack = - cpi->tz;
+        sol->primal_residual_cert = __NaN();
+        sol->dual_residual_cert = __NaN();
+        sol->iterations = 0;
     }
     else if (stat == CVXC_STAT_UNKNOWN || stat == CVXC_STAT_OPTIMAL) {
         cvxm_scale(&cpi->x, 1.0/cpi->tau, CVXC_ALL);
@@ -770,86 +763,86 @@ int cvxc_conelp_ready(cvxc_problem_t *cp, cvxc_stats_t *stats, int iter, int sta
         cpi->tz = cvxc_max_step(&cpi->z_g, __nilgrp, &cpi->work);
 
         cp->error = stat == CVXC_STAT_UNKNOWN ? CVXC_ERR_MAXITER : 0;
-        cp->solution.x = &cpi->x;
-        cp->solution.s = &cpi->s;
-        cp->solution.y = &cpi->y;
-        cp->solution.z = &cpi->z;
+        sol->x = &cpi->x;
+        sol->s = &cpi->s;
+        sol->y = &cpi->y;
+        sol->z = &cpi->z;
 
-        cp->solution.status = stat;
+        sol->status = stat;
 
-        cp->solution.gap = stats->gap;
-        cp->solution.relative_gap = stats->relgap;
-        cp->solution.primal_objective = stats->cx;
-        cp->solution.dual_objective = - (stats->by + stats->hz);
-        cp->solution.primal_infeasibility = stats->pres;
-        cp->solution.dual_infeasibility = stats->dres;
-        cp->solution.primal_slack = - cpi->ts;
-        cp->solution.dual_slack = - cpi->tz;
+        sol->gap = stats->gap;
+        sol->relative_gap = stats->relgap;
+        sol->primal_objective = stats->cx;
+        sol->dual_objective = - (stats->by + stats->hz);
+        sol->primal_infeasibility = stats->pres;
+        sol->dual_infeasibility = stats->dres;
+        sol->primal_slack = - cpi->ts;
+        sol->dual_slack = - cpi->tz;
         if (stat == CVXC_STAT_OPTIMAL) {
-            cp->solution.primal_residual_cert = __NaN();
-            cp->solution.dual_residual_cert = __NaN();
+            sol->primal_residual_cert = __NaN();
+            sol->dual_residual_cert = __NaN();
         } else {
-            cp->solution.primal_residual_cert = stats->pinfres;
-            cp->solution.dual_residual_cert = stats->dinfres;
+            sol->primal_residual_cert = stats->pinfres;
+            sol->dual_residual_cert = stats->dinfres;
         }
-        cp->solution.iterations = iter;
+        sol->iterations = iter;
     }
     else if (stat == CVXC_STAT_PRIMAL_INFEASIBLE) {
-        cp->solution.status = stat;
+        sol->status = stat;
         cp->error = stat;
         cvxm_scale(&cpi->y, 1.0/(-stats->hz - stats->by), CVXC_ALL);
         cvxm_scale(&cpi->z, 1.0/(-stats->hz - stats->by), CVXC_ALL);
         cvxc_mksymm(&cpi->z_g);
 
-        cp->solution.x = __cvxnil;
-        cp->solution.s = __cvxnil;
-        cp->solution.y = __cvxnil;
-        cp->solution.z = __cvxnil;
+        sol->x = __cvxnil;
+        sol->s = __cvxnil;
+        sol->y = __cvxnil;
+        sol->z = __cvxnil;
 
-        cp->solution.status = stat;
+        sol->status = stat;
 
-        cp->solution.gap = __NaN();
-        cp->solution.relative_gap = __NaN();
-        cp->solution.primal_objective = __NaN();
-        cp->solution.dual_objective = 1.0;
-        cp->solution.primal_infeasibility = __NaN();
-        cp->solution.dual_infeasibility = __NaN();
-        cp->solution.primal_slack = __NaN();
-        cp->solution.dual_slack = - cpi->tz;
-        cp->solution.primal_residual_cert = stats->pinfres;
-        cp->solution.dual_residual_cert = __NaN();
-        cp->solution.iterations = iter;
+        sol->gap = __NaN();
+        sol->relative_gap = __NaN();
+        sol->primal_objective = __NaN();
+        sol->dual_objective = 1.0;
+        sol->primal_infeasibility = __NaN();
+        sol->dual_infeasibility = __NaN();
+        sol->primal_slack = __NaN();
+        sol->dual_slack = - cpi->tz;
+        sol->primal_residual_cert = stats->pinfres;
+        sol->dual_residual_cert = __NaN();
+        sol->iterations = iter;
     }
     else if (stat == CVXC_STAT_DUAL_INFEASIBLE) {
         cp->error = stat;
-        cp->solution.status = stat;
+        sol->status = stat;
         cvxm_scale(&cpi->x, 1.0/-stats->cx, CVXC_ALL);
         cvxm_scale(&cpi->s, 1.0/-stats->cx, CVXC_ALL);
         cvxc_mksymm(&cpi->s_g);
 
-        cp->solution.x = __cvxnil;
-        cp->solution.s = __cvxnil;
-        cp->solution.y = __cvxnil;
-        cp->solution.z = __cvxnil;
+        sol->x = __cvxnil;
+        sol->s = __cvxnil;
+        sol->y = __cvxnil;
+        sol->z = __cvxnil;
 
-        cp->solution.status = stat;
+        sol->status = stat;
 
-        cp->solution.gap = __NaN();
-        cp->solution.relative_gap = __NaN();
-        cp->solution.primal_objective = 1.0;
-        cp->solution.dual_objective = __NaN();
-        cp->solution.primal_infeasibility = __NaN();
-        cp->solution.dual_infeasibility = __NaN();
-        cp->solution.primal_slack = - cpi->ts;
-        cp->solution.dual_slack = __NaN();
-        cp->solution.primal_residual_cert = __NaN();
-        cp->solution.dual_residual_cert = stats->dinfres;
-        cp->solution.iterations = iter;
+        sol->gap = __NaN();
+        sol->relative_gap = __NaN();
+        sol->primal_objective = 1.0;
+        sol->dual_objective = __NaN();
+        sol->primal_infeasibility = __NaN();
+        sol->dual_infeasibility = __NaN();
+        sol->primal_slack = - cpi->ts;
+        sol->dual_slack = __NaN();
+        sol->primal_residual_cert = __NaN();
+        sol->dual_residual_cert = stats->dinfres;
+        sol->iterations = iter;
     }
     return -stat;
 }
 
-int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
+int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *opts)
 {
     cvxc_conelp_internal_t *cpi = cp->u.conelp;
     cvxc_stats_t *stats = &cp->stats;
@@ -867,9 +860,6 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
     if (cvxc_index_count(&cpi->index_full, CVXDIM_SOCP) > 0 ||
         cvxc_index_count(&cpi->index_full, CVXDIM_SDP) > 0)
         refinement = 1;
-
-    //int primalstart = ! (cp->primal_x && cp->primal_s);
-    // int dualstart = ! (cp->dual_y && cp->dual_z);
 
     cp->error = 0;
 
@@ -893,7 +883,7 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
              (!isnan(stats->relgap) && stats->relgap <= reltol))) {
 
             // initial point is feasible and optimal
-            return cvxc_conelp_ready(cp, stats, -1, CVXC_STAT_OPTIMAL);
+            return cvxc_conelp_ready(sol, cp, stats, -1, CVXC_STAT_OPTIMAL);
         }
 
         max_nrms = MAXF(1.0, cpi->nrms);
@@ -1016,16 +1006,16 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
             (stats->gap <= abstol ||
              (!isnan(stats->relgap) && stats->relgap < reltol))) {
 
-            return cvxc_conelp_ready(cp, stats, iter, CVXC_STAT_OPTIMAL);
+            return cvxc_conelp_ready(sol, cp, stats, iter, CVXC_STAT_OPTIMAL);
         }
         // TODO: Compiling with -O0 generates incorrect test and iteration stops
         // on first pass of the loop (stats->pinfres == NaN and stats->dinfres == NaN)
         // WORKAROUND: Compile with at least -O1.
         if  (!isnan(stats->pinfres) && stats->pinfres < feastol) {
-            return cvxc_conelp_ready(cp, stats, iter, CVXC_STAT_PRIMAL_INFEASIBLE);
+            return cvxc_conelp_ready(sol, cp, stats, iter, CVXC_STAT_PRIMAL_INFEASIBLE);
         }
         if (!isnan(stats->dinfres) && stats->dinfres < feastol) {
-            return cvxc_conelp_ready(cp, stats, iter, CVXC_STAT_DUAL_INFEASIBLE);
+            return cvxc_conelp_ready(sol, cp, stats, iter, CVXC_STAT_DUAL_INFEASIBLE);
         }
 
         // -----------------------------------------------------------------------
@@ -1075,7 +1065,7 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
                 return -1;
             } else {
                 cp->error = CVXC_ERR_SINGULAR;
-                return cvxc_conelp_ready(cp, stats, iter, CVXC_STAT_SINGULAR);
+                return cvxc_conelp_ready(sol, cp, stats, iter, CVXC_STAT_SINGULAR);
             }
         }
 
@@ -1271,5 +1261,5 @@ int cvxc_conelp_solve(cvxc_problem_t *cp, cvxc_solopts_t *opts)
         stats->gap = g*g;
     }
 
-    return cvxc_conelp_ready(cp, stats, maxiter, CVXC_STAT_UNKNOWN);
+    return cvxc_conelp_ready(sol, cp, stats, maxiter, CVXC_STAT_UNKNOWN);
 }
