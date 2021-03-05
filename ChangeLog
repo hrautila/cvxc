@@ -1,3 +1,8 @@
+2021-03-05  Harri Rautila  <hra@mnemonic>
+
+	* New memory layout for cvxc_problem_t structure.
+	* Bump up SO_VERSION number to 1.
+
 2021-02-23  Harri Rautila  <github.com/hrautila>
 
 	*  Working geometric program solver.
