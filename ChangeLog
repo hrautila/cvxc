@@ -1,4 +1,4 @@
-2021-03-05  Harri Rautila  <hra@mnemonic>
+2021-03-05  Harri Rautila  <github.com/hrautila>
 
 	* New memory layout for cvxc_problem_t structure.
 	* Bump up SO_VERSION number to 1.
