@@ -302,5 +302,10 @@ int main(int argc, char **argv)
     cvxc_cpl_setup(&cpl, &F, c, G, h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
     cvxc_cpl_compute_start(&cpl);
     cvxc_cpl_solve(&solution, &cpl, &opts);
-    return print_solution(&solution);
+    print_solution(&solution);
+
+    int ok = solution.status == CVXC_STAT_OPTIMAL && solution.iterations == 25;
+    printf("test_cpl: %s\n", ok ? "OK" : "FAILED");
+
+    exit(1 - ok);
 }

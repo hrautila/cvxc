@@ -81,20 +81,6 @@ int acenter_F(cvxc_matrix_t *f,
     return 0;
 }
 
-int read_mat(cvxc_matrix_t *m, const char *path)
-{
-    cvxc_stream_t ios;
-    FILE *fp = fopen(path, "r");
-    if (!fp) {
-        perror(path);
-        return -1;
-    }
-    cvxc_file_stream(&ios, fp);
-    int err = cvxc_json_matrix_read(&m, &ios);
-    fclose(fp);
-    return err;
-}
-
 int main(int argc, char **argv)
 {
     cvxc_matrix_t G, h, A, b, y, r, x;
@@ -102,9 +88,8 @@ int main(int argc, char **argv)
     cvxc_dimset_t dims;
     int opt;
     cvxc_size_t m, n;
-    char *Aname = 0, *bname = 0;
-    m = 15;
-    n = 30;
+    m = 30;
+    n = 20;
 
     cvxc_solopts_t opts = (cvxc_solopts_t){
         .abstol = 0.0,
@@ -123,46 +108,29 @@ int main(int argc, char **argv)
         case 'N':
             opts.max_iter = atoi(optarg);
             break;
-        case 'A':
-            Aname = optarg;
-            break;
-        case 'b':
-            bname = optarg;
-            break;
         default:
             break;
         }
     }
 
-    if (argc > 1)
-        m = atoi(argv[1]);
-    if (argc > 2)
-        n = atoi(argv[2]);
+    cvxm_init(&b, m, 1);
+    cvxm_init(&A, m, n);
+    cvxm_init(&y, m, 1);
+    cvxm_init(&r, n, 1);
+    cvxm_init(&x, n, 1);
 
-    if (Aname && bname) {
-        read_mat(&A, Aname);
-        read_mat(&b, bname);
-        cvxm_size(&m, &n, &A);
-    } else {
-        cvxm_init(&b, m, 1);
-        cvxm_init(&A, m, n);
-        cvxm_init(&y, m, 1);
-        cvxm_init(&r, n, 1);
-        cvxm_init(&x, n, 1);
+    cvxm_set_from(&y, armas_normal);
+    cvxm_set_from(&A, armas_normal);
+    cvxm_set_from(&r, armas_uniform);
 
-        cvxm_set_from(&y, armas_normal);
-        cvxm_set_from(&A, armas_normal);
-        cvxm_set_from(&r, armas_uniform);
+    // r = r - A^T * y
+    // A = A - (1/y^Ty) * y * r^T
+    cvxm_mvmult(1.0, &r, -1.0, &A, &y, CVXC_TRANS);
+    cvxc_float_t doty = cvxm_dot(&y, &y);
+    cvxm_mvupdate(&A, -(1.0 / doty), &y, &r);
 
-        // r = r - A^T * y
-        // A = A - (1/y^Ty) * y * r^T
-        cvxm_mvmult(1.0, &r, -1.0, &A, &y, CVXC_TRANS);
-        cvxc_float_t doty = cvxm_dot(&y, &y);
-        cvxm_mvupdate(&A, -(1.0 / doty), &y, &r);
-
-        cvxm_set_from(&x, armas_uniform);
-        cvxm_mvmult(0.0, &b, 1.0, &A, &x, 0);
-    }
+    cvxm_set_from(&x, armas_uniform);
+    cvxm_mvmult(0.0, &b, 1.0, &A, &x, 0);
 
     dims = (cvxc_dimset_t){0};
     dims.iscpt = 1;
@@ -179,5 +147,14 @@ int main(int argc, char **argv)
     cvxc_cp_setup(&cp, &F, &G, &h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
     cvxc_cp_compute_start(&cp);
     cvxc_cp_solve(&solution, &cp, &opts);
-    return print_solution(&solution);
+    print_solution(&solution);
+
+    /*
+     * Number of iteration depend on sizes of m, n and random initial values.
+     * Limit of 10 chosen rather arbitrarily after some test runs.
+     */
+    int ok = solution.status == CVXC_STAT_OPTIMAL && solution.iterations <= 10;
+    printf("test_cp2: %s\n", ok ? "OK" : "FAILED");
+
+    exit(1 - ok);
 }

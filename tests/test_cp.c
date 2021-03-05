@@ -120,5 +120,10 @@ int main(int argc, char **argv)
     cvxc_cp_setup(&cp, &F, &G, &h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
     cvxc_cp_compute_start(&cp);
     cvxc_cp_solve(&solution, &cp, &opts);
-    return print_solution(&solution);
+    print_solution(&solution);
+
+    int ok = solution.status == CVXC_STAT_OPTIMAL && solution.iterations == 28;
+    printf("test_cp: %s\n", ok ? "OK" : "FAILED");
+
+    exit(1 - ok);
 }

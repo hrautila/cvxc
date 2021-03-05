@@ -37,7 +37,7 @@ int main(int argc, char **argv)
         .abstol = 0.0,
         .reltol = 0.0,
         .feastol = 0.0,
-        .max_iter = 1,
+        .max_iter = 30,
         .debug = 0,
         .refinement = 0,
         .kkt_solver_name = 0,
@@ -80,4 +80,9 @@ int main(int argc, char **argv)
 
     print_solution(&solution);
     cvxc_gpi_release(&gpi);
+
+    int ok = solution.status == CVXC_STAT_OPTIMAL && solution.iterations == 13;
+    printf("test_gp: %s\n", ok ? "OK" : "FAILED");
+
+    exit(1 - ok);
 }

@@ -47,5 +47,10 @@ int main(int argc, char **argv)
 
     cvxc_conelp_compute_start(&cp);
     cvxc_conelp_solve(&solution, &cp, &opts);
-    return print_solution(&solution);
+    print_solution(&solution);
+
+    int ok = solution.status == CVXC_STAT_OPTIMAL && solution.iterations == 4;
+    printf("test_lp: %s\n", ok ? "OK" : "FAILED");
+
+    exit(1 - ok);
 }
