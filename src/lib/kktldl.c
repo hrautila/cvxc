@@ -161,7 +161,7 @@ cvxc_size_t ldl_bytes(int n, int m, const cvxc_dimset_t *dims)
     cvxc_size_t sz = n + m + neqn;
     cvxc_size_t need = sz*sz + 2*sz;  // dense matrix + 2 vectors;
     cvxc_size_t ipvlen = sz;
-    cvxc_size_t nwork = 2 * cvxm_ldl_worksize(neqn);
+    cvxc_size_t nwork = 2 * cvxm_ldl_worksize(sz);
 
     ipvlen *= sizeof(int);
     ipvlen += __aligned128(ipvlen);
