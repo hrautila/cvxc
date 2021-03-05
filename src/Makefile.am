@@ -2,7 +2,7 @@
 AUTOMAKE_OPTIONS = subdir-objects
 
 AM_CPPFLAGS = -I$(srcdir)/include -I$(top_srcdir)/src/include
-AM_CFLAGS = -O3 -march=native -ffast-math -fomit-frame-pointer -Wall
+AM_CFLAGS = -O2 -march=native -Wall
 
 LIBFILES = \
 	lib/conelp.c \
