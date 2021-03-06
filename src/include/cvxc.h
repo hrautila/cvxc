@@ -336,6 +336,7 @@ typedef struct cvxc_params
 } cvxc_params_t;
 
 struct cvxc_solution;
+extern void cvxc_params_release(cvxc_params_t *pars);
 
 extern int cvxc_json_matrix_read(cvxc_matrix_t **A, cvxc_stream_t *ios);
 extern int cvxc_json_matrix_write(cvxc_stream_t *ios, const cvxc_matrix_t *A);
@@ -406,25 +407,38 @@ typedef struct cvxc_kktsolver {
 extern void cvxc_kktldl_load(cvxc_kktsolver_t *);
 
 __CVXC_INLINE
-int cvxc_kktinit(cvxc_kktsolver_t *S,
+int cvxc_kktinit(cvxc_kktsolver_t *kkt,
                 cvxc_problem_t *cp,
                 int n, int m, const cvxc_dimset_t *dims)
 {
-    return (*S->vtable->init)(S, cp, n, m, dims);
+    if (kkt && kkt->vtable && kkt->vtable->init)
+        return (*kkt->vtable->init)(kkt, cp, n, m, dims);
+    return -1;
 }
 
 __CVXC_INLINE
-int cvxc_kktfactor(cvxc_kktsolver_t *S,
+int cvxc_kktfactor(cvxc_kktsolver_t *kkt,
                   cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_matrix_t *Df)
 {
-    return (*S->vtable->factor)(S, W, H, Df);
+    if (kkt && kkt->vtable && kkt->vtable->factor)
+        return (*kkt->vtable->factor)(kkt, W, H, Df);
+    return -1;
 }
 
 __CVXC_INLINE
-int cvxc_kktsolve(cvxc_kktsolver_t *S,
+int cvxc_kktsolve(cvxc_kktsolver_t *kkt,
                  cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g)
 {
-    return (*S->vtable->solve)(S, x, y, z_g);
+    if (kkt && kkt->vtable && kkt->vtable->solve)
+        return (*kkt->vtable->solve)(kkt, x, y, z_g);
+    return -1;
+}
+
+__CVXC_INLINE
+void cvxc_kktrelease(cvxc_kktsolver_t *kkt)
+{
+    if (kkt && kkt->vtable && kkt->vtable->release)
+         (*kkt->vtable->release)(kkt);
 }
 
 __CVXC_INLINE
@@ -527,11 +541,14 @@ cvxc_conelp_compute_start(cvxc_problem_t *prob);
 extern int
 cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *prob, cvxc_solopts_t *opts);
 
-extern int
-cvxc_cpl_compute_start(cvxc_problem_t *cp);
+extern void cvxc_conelp_release(cvxc_problem_t *prob);
+
+extern int cvxc_cpl_compute_start(cvxc_problem_t *cp);
 
 extern int
 cvxc_cpl_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *opts);
+
+extern void cvxc_cpl_release(cvxc_problem_t *cp);
 
 extern cvxc_size_t
 cvxc_cpl_setup(cvxc_problem_t *cp, cvxc_convex_program_t *F,
@@ -588,6 +605,8 @@ cvxc_cp_compute_start(cvxc_problem_t *cp);
 extern int
 cvxc_cp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *opts);
 
+extern void cvxc_cp_release(cvxc_problem_t *cp);
+
 extern cvxc_size_t
 cvxc_cp_setup(cvxc_problem_t *cp, cvxc_convex_program_t *F,
              cvxc_matrix_t *G, cvxc_matrix_t *h, cvxc_matrix_t *A,
@@ -619,6 +638,7 @@ cvxc_gp_compute_start(cvxc_problem_t *cp);
 extern int
 cvxc_gp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *opts);
 
+extern void cvxc_gp_release(cvxc_problem_t *cp);
 
 
 #endif // __CVXC_CONVEX_H
