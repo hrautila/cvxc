@@ -1061,6 +1061,30 @@ int cvxc_json_read_params(cvxc_params_t **pars, cvxc_stream_t *ios)
     return -1;
 }
 
+void cvxc_params_release(cvxc_params_t *pars)
+{
+    if (pars->c)
+        cvxm_free(pars->c);
+    if (pars->G)
+        cvxm_free(pars->G);
+    if (pars->h)
+        cvxm_free(pars->h);
+    if (pars->A)
+        cvxm_free(pars->A);
+    if (pars->b)
+        cvxm_free(pars->b);
+    if (pars->F)
+        cvxm_free(pars->F);
+    if (pars->dims)
+        cvxc_dimset_free(pars->dims);
+    if (pars->opts)
+        free(pars->opts);
+    if (pars->module)
+        free(pars->module);
+    if (pars->args)
+        free(pars->args);
+}
+
 int cvxc_json_write_result(cvxc_stream_t *ios, const cvxc_solution_t *sol)
 {
     // write result fields from solution
