@@ -389,3 +389,22 @@ void cvxm_mksymm(cvxc_matrix_t *x, int n)
     }
 }
 
+/**
+ * @brief Run any linear algebra library releated initialization routines.
+ */
+
+void cvxm_libstart()
+{
+}
+
+/**
+ * @brief Run any linear algebra library releated exit routines.
+ */
+void cvxm_libstop()
+{
+    /*
+     * The libarmas allocates automatically thread global intermediate buffer
+     * for BLAS3 routines. Release it.
+     */
+    armas_cbuf_release_thread_global();
+}

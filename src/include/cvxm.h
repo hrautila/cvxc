@@ -492,4 +492,7 @@ extern int cvxm_qrmult(cvxc_matrix_t *C, const cvxc_matrix_t *A, const cvxc_matr
 // compute workspace needed for SVD factorization of matrix [r, c]
 extern cvxc_size_t cvxm_svd_workspace(cvxc_size_t r, cvxc_size_t c);
 
+extern void cvxm_libstart();
+extern void cvxm_libstop();
+
 #endif // __CVXC_CVXM_H
