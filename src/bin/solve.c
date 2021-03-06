@@ -76,7 +76,7 @@ int solve_cpl(cvxc_params_t *params, cvxc_solopts_t *opts, struct solver_args *a
     solver_write_solution(args->output, &solution);
 
     dlclose(handle);
-    cvxc_cpl_release(&cp);
+    cvxc_cpl_release(&cpl);
     return 0;
 }
 
