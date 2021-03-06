@@ -212,6 +212,8 @@ int main(int argc, char **argv)
     }
     int err;
 
+    cvxm_libstart();
+
     if (solver_read_args(&args, &pptr, &opts) < 0) {
         fprintf(stderr, "error: failed to read data files\n");
         return -1;
@@ -254,6 +256,8 @@ int main(int argc, char **argv)
         /* This is CONELP problem. */
         err = solve_conelp(&params, &opts, &args);
     }
-    // TODO: release all allocated resources
+
+    cvxc_params_release(&params);
+    cvxm_libstop();
     return err;
 }

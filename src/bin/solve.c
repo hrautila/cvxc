@@ -27,7 +27,8 @@ int solve_conelp(cvxc_params_t *params, cvxc_solopts_t *opts, struct solver_args
     cvxc_conelp_solve(&solution, &cp, params->opts ? params->opts : opts);
 
     solver_write_solution(args->output, &solution);
-    // TODO: release all allocated resources
+
+    cvxc_conelp_release(&cp);
     return 0;
 }
 
@@ -75,7 +76,7 @@ int solve_cpl(cvxc_params_t *params, cvxc_solopts_t *opts, struct solver_args *a
     solver_write_solution(args->output, &solution);
 
     dlclose(handle);
-    // TODO: release all allocated resources
+    cvxc_cpl_release(&cp);
     return 0;
 }
 
@@ -108,7 +109,7 @@ int solve_cp(cvxc_params_t *params, cvxc_solopts_t *opts, struct solver_args *ar
     solver_write_solution(args->output, &solution);
 
     dlclose(handle);
-    // TODO: release all allocated resources
+    cvxc_cp_release(&cp);
 
     return 0;
 }
@@ -129,6 +130,6 @@ int solve_gp(cvxc_params_t *params, cvxc_solopts_t *opts, struct solver_args *ar
     cvxc_gp_solve(&solution, &cp, params->opts ? params->opts : opts);
 
     solver_write_solution(args->output, &solution);
-    // TODO: release all allocated resources
+    cvxc_gp_release(&cp);
     return 0;
 }
