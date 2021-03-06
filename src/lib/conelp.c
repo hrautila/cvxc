@@ -571,16 +571,23 @@ cvxc_size_t cvxc_conelp_setup(cvxc_problem_t *cp,
     return nbytes;
 }
 
-void cvxc_conelp_set_start(cvxc_problem_t *prob,
-                          cvxc_matrix_t *primal_x,
-                          cvxc_matrix_t *primal_s,
-                          cvxc_matrix_t *dual_y,
-                          cvxc_matrix_t *dual_z)
+/**
+ * @brief Release resources reserved to program.
+ */
+void cvxc_conelp_release(cvxc_problem_t *cp)
 {
-    if (! prob)
+    if (!cp)
         return;
+    if (cp->u.space)
+        free(cp->u.space);
+    cp->u.space = 0;
+    cp->nbytes = 0;
+    cp->work = 0;
+
+    cvxc_kktrelease(cp->solver);
 }
 
+static
 void cvxc_conelp_init_scaling(cvxc_scaling_t *W)
 {
     cvxc_matrix_t x;

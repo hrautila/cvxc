@@ -194,6 +194,22 @@ cvxc_size_t cvxc_cp_setup(cvxc_problem_t *cp,
 }
 
 /**
+ * @brief Release resources reserved to program.
+ */
+void cvxc_cp_release(cvxc_problem_t *cp)
+{
+    if (!cp || !cp->u.cpl)
+        return;
+
+    cvxc_kktrelease(cp->solver);
+
+    free(cp->u.space);
+    cp->u.space = 0;
+    cp->nbytes = 0;
+    cp->work = 0;
+}
+
+/**
  * @brief Compute starting point for solver.
  */
 int cvxc_cp_compute_start(cvxc_problem_t *cp)

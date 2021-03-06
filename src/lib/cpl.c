@@ -667,6 +667,22 @@ cvxc_size_t cvxc_cpl_setup(cvxc_problem_t *cp,
     return used;
 }
 
+/**
+ * @brief Release resources reserved to program.
+ */
+void cvxc_cpl_release(cvxc_problem_t *cp)
+{
+    if (!cp)
+        return;
+    if (cp->u.space)
+        free(cp->u.space);
+    cp->u.space = 0;
+    cp->nbytes = 0;
+    cp->work = 0;
+
+    cvxc_kktrelease(cp->solver);
+}
+
 int cvxc_cpl_ready(cvxc_solution_t *sol, cvxc_problem_t *cp, int iter, int stat)
 {
     cvxc_cpl_internal_t *cpi = cp->u.cpl;

@@ -196,7 +196,7 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
     cp->F = (cvxc_convex_program_t *)&memory[offset];
     offset += sizeof(cvxc_convex_program_t);
 
-    /* Append cvxc_gp_program structure. */
+    /* Append cvxc_gp_params structure. */
     cvxc_gp_params_t *gp = (cvxc_gp_params_t *)&memory[offset];
     offset += sizeof(cvxc_gp_params_t);
 
@@ -219,6 +219,21 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
     return offset;
 }
 
+/**
+ * @brief Release resources reserved to program.
+ */
+void cvxc_gp_release(cvxc_problem_t *cp)
+{
+    if (!cp || !cp->u.cpl)
+        return;
+
+    cvxc_kktrelease(cp->solver);
+
+    free(cp->u.space);
+    cp->u.space = 0;
+    cp->nbytes = 0;
+    cp->work = 0;
+}
 
 int cvxc_gp_compute_start(cvxc_problem_t *cp)
 {
