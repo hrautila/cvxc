@@ -28,4 +28,6 @@ int cvxc_kktinit(cvxc_kktsolver_t *S,
 int cvxc_kktfactor(cvxc_kktsolver_t *S,
                   cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_matrix_t *Df);
 int cvxc_kktsolve(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g);
+void cvxc_kktrelease(cvxc_kktsolver_t *kkt);
+
 #endif
