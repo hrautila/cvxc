@@ -27,8 +27,8 @@ int print_solution(cvxc_solution_t *sol)
     if (sol->status != CVXC_STAT_OPTIMAL)
         return -1;
     cvxc_mat_printf(stdout, "%13.6e", sol->x, "x");
-    cvxc_mat_printf(stdout, "%13.6e", sol->s, "s");
-    cvxc_mat_printf(stdout, "%13.6e", sol->y, "y");
-    cvxc_mat_printf(stdout, "%13.6e", sol->z, "z");
+    // cvxc_mat_printf(stdout, "%13.6e", sol->s, "s");
+    // cvxc_mat_printf(stdout, "%13.6e", sol->y, "y");
+    // cvxc_mat_printf(stdout, "%13.6e", sol->z, "z");
     return 0;
 }
