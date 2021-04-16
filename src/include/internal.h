@@ -92,12 +92,6 @@ typedef struct cvxc_gp_params {
     cvxc_matrix_t Fs;
 } cvxc_gp_params_t;
 
-#if 0
-typedef struct cvxc_gp_program {
-    cvxc_convex_program_t gp;
-    cvxc_gp_params_t gp_params;
-} cvxc_gp_program_t;
-#endif
 
 typedef struct cvxc_cpl_internal {
     cvxc_float_t tau, kappa;
