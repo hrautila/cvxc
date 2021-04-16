@@ -25,7 +25,8 @@ LIBFILES = \
 	lib/scale.c \
 	lib/scaling.c \
 	lib/sfunc.c \
-	lib/step.c
+	lib/step.c \
+	lib/umat.c
 
 lib_LTLIBRARIES = libcvxc.la
 
