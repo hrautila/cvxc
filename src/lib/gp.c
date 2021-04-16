@@ -122,43 +122,19 @@ int cvxc_gp_f(cvxc_matrix_t *f, cvxc_matrix_t *Df, cvxc_matrix_t *H,
  *  +----------------------+
  */
 
-/**
- * @brief Setup geometric program.
- *
- *   minimize    \f$ \log \sum \exp(F_0*x + g_0) \f$
- *   subject to  \f$ \log \sum \exp(F_i*x + g_i) <= 0, i = 1, ..., m \f$
- *               \f$ G \times x <= h \f$
- *               \f$ A \times x = b \f$
- *
- * @param[in] K
- *   Array of positive integers terminated with zero value [K0, K1, ..., Km, 0]
- * @param[in] F
- *   Matrix with submatrices [F0, F1, ..., Fm] where each submatrix is \$f K_i x n \f$.
- * @param[in] g
- *   Column vector with subvectors [g0, g1, ..., gm] where each subvector is \$f K_i x 1 \f$.
- * @param[in] G
- * @param[in] h
- * @param[in] A
- * @param[in] b
- */
-int cvxc_gp_setup(cvxc_problem_t *cp,
-                  cvxc_gpindex_t *K,
-                  cvxc_matrix_t *F,
-                  cvxc_matrix_t *g,
-                  cvxc_matrix_t *G,
-                  cvxc_matrix_t *h,
-                  cvxc_matrix_t *A,
-                  cvxc_matrix_t *b,
-                  cvxc_kktsolver_t *kktsolver)
+static
+int cvxc_gp_create(
+    cvxc_problem_t *cp, cvxc_size_t nvars,  cvxc_gpindex_t *K, cvxc_matrix_t *F,
+    cvxc_matrix_t *g, cvxc_umatrix_t *Gf, cvxc_matrix_t *h,
+    cvxc_umatrix_t *Af, cvxc_matrix_t *b, cvxc_kktsolver_t *kktsolver)
 {
-    cvxc_size_t mG, nG, mF, nF, mg, ng, p, mA, nA, maxK, offset, gpbytes;
+    cvxc_size_t mh, nh, mF, nF, mg, ng, p, mb, nb, maxK, offset, gpbytes;
     cvxc_dimset_t ldims;
 
     if (!cp)
         return 0;
 
-    mA = nA = maxK = 0;
-    mG = nG = 0;
+    mh = nh = mb = nb = maxK = 0;
 
     cvxm_size(&mF, &nF, F);
     cvxm_size(&mg, &ng, g);
@@ -169,10 +145,10 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
     if (K->index[K->p] != mF || mg != mF) {
         return 0;
     }
-    if (A)
-        cvxm_size(&mA, &nA, A);
-    if (G)
-        cvxm_size(&mG, &nG, G);
+    if (b)
+        cvxm_size(&mb, &nb, b);
+    if (h)
+        cvxm_size(&mh, &nh, h);
 
     gpbytes = cvxc_gp_program_bytes(K->p, mg, maxK*nF);
     gpbytes += sizeof(cvxc_convex_program_t) + sizeof(cvxc_gp_params_t);
@@ -180,16 +156,19 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
     ldims = (cvxc_dimset_t){0};
     ldims.mnl = K->p - 1;
     ldims.iscpt = 1;
-    ldims.ldim = mG;
+    ldims.ldim = mh;
 
-    offset = cvxc_cpl_allocate(cp, 1, nG, mA, gpbytes, &ldims);
+    /* Layout CPL internal memory */
+    offset = cvxc_cpl_allocate(cp, 1, nvars, mb, gpbytes, &ldims);
     if (offset == 0)
         return 0;
 
-    cvxc_size_t used;
-
-    /* Layout CPL internal memory */
-    cvxc_cp_setvars(cp, 0, nG, mA, G, h, A, b, &ldims, kktsolver);
+    cp->F = 0;
+    cp->Gf = Gf;
+    cp->h = h;
+    cp->Af = Af;
+    cp->b = b;
+    cvxc_cp_finalize_setup(cp, nvars, mb, &ldims, kktsolver);
 
     /* Append cvxc_convex_program structure. */
     unsigned char *memory = cp->u.space;
@@ -205,18 +184,74 @@ int cvxc_gp_setup(cvxc_problem_t *cp,
     gp->g = g;
     gp->gpi = K;
 
+    cvxc_size_t used;
     /* Append GP internal variables. */
     used = cvxm_make(&gp->y, mg, 1, &memory[offset], cp->nbytes-offset);
     if (used == 0)
         return 0;
     offset += used;
 
-    used = cvxm_make(&gp->Fs, maxK, nG, &memory[offset], cp->nbytes-offset);
+    used = cvxm_make(&gp->Fs, maxK, nvars, &memory[offset], cp->nbytes-offset);
     if (used == 0)
         return 0;
     offset += used;
 
     return offset;
+}
+
+int cvxc_gp_setup_user(
+    cvxc_problem_t *cp, cvxc_gpindex_t *K, cvxc_matrix_t *F,
+    cvxc_matrix_t *g, cvxc_umatrix_t *Gf, cvxc_matrix_t *h,
+    cvxc_umatrix_t *Af, cvxc_matrix_t *b, cvxc_kktsolver_t *kktsolver)
+{
+    if (!cp || !F || !g)
+        return 0;
+
+    cvxc_size_t mF = 0, nF = 0;
+    cvxm_size(&mF, &nF, F);
+    return cvxc_gp_create(cp, nF, K, F, g, Gf, h, Af, b, kktsolver);
+}
+
+/**
+ * @brief Setup geometric program.
+ *
+ *   minimize    \f$ \log \sum \exp(F_0*x + g_0) \f$
+ *   subject to  \f$ \log \sum \exp(F_i*x + g_i) <= 0, i = 1, ..., m \f$
+ *               \f$ G \times x <= h \f$
+ *               \f$ A \times x = b \f$
+ *
+ * @param[in] K
+ *   Submatrix index set.
+ * @param[in] F
+ *   Matrix with submatrices [F0, F1, ..., Fm] where each submatrix is \$f K_i x n \f$.
+ * @param[in] g
+ *   Column vector with subvectors [g0, g1, ..., gm] where each subvector is \$f K_i x 1 \f$.
+ * @param[in] G
+ * @param[in] h
+ * @param[in] A
+ * @param[in] b
+ */
+int cvxc_gp_setup(
+    cvxc_problem_t *cp, cvxc_gpindex_t *K, cvxc_matrix_t *F,
+    cvxc_matrix_t *g, cvxc_matrix_t *G, cvxc_matrix_t *h,
+    cvxc_matrix_t *A, cvxc_matrix_t *b, cvxc_kktsolver_t *kktsolver)
+{
+    if (!cp || !F || !g)
+        return 0;
+
+    cvxc_size_t mF = 0, nF = 0;
+    cvxm_size(&mF, &nF, F);
+    cvxc_umat_make(&cp->Au, A);
+    cvxc_umat_make(&cp->Gu, G);
+    cp->A = A;
+    cp->G = G;
+
+    int stat = cvxc_gp_create(cp, nF, K, F, g, &cp->Gu, h, &cp->Au, b, kktsolver);
+    if (stat <= 0) {
+        cvxc_umat_clear(&cp->Au);
+        cvxc_umat_clear(&cp->Gu);
+    }
+    return stat;
 }
 
 /**

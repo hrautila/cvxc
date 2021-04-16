@@ -62,18 +62,20 @@ int cvxc_res(cvxc_problem_t *cp,
     int err = 0;
 
     // vx = vx - A^T*uy - G^T*W^-1*uz - c*utau/dg
-    cvxm_mult(1.0, vx, -1.0, cp->A, uy, CVXC_TRANSA);
+    // cvxm_mvmult(1.0, vx, -1.0, cp->A, uy, CVXC_TRANSA);
+    cvxc_umat_mvmult(1.0, vx, -1.0, cp->Af, uy, CVXC_TRANSA);
     cvxm_copy(&cpi->wz3, uz, CVXC_ALL);
     cvxc_scale(&cpi->wz3_g, &cpi->W, CVXC_INV, &cpi->work);
-    cvxc_sgemv(1.0, vx, -1.0, cp->G, &cpi->wz3_g, CVXC_TRANS);
+    cvxc_umat_sgemv(1.0, vx, -1.0, cp->Gf, &cpi->wz3_g, CVXC_TRANS);
     cvxm_axpy(vx, -utau/dg, cp->c);
 
     // vy = vy + A*ux - b*utau/dg
-    cvxm_mult(1.0, vy, 1.0, cp->A, ux, 0);
+    // cvxm_mvmult(1.0, vy, 1.0, cp->A, ux, 0);
+    cvxc_umat_mvmult(1.0, vy, 1.0, cp->Af, ux, 0);
     cvxm_axpy(vy, -utau/dg, cp->b);
 
     // vz = vz + G*ux - h*utau/dg + W^T*us
-    cvxc_sgemv(1.0, vz, 1.0, cp->G, &ux_g, 0);
+    cvxc_umat_sgemv(1.0, vz, 1.0, cp->Gf, &ux_g, 0);
     cvxm_axpy(vz, -utau/dg, cp->h);
     cvxm_copy(&cpi->ws3, us, 0);
     cvxc_scale(&cpi->ws3_g, &cpi->W, CVXC_TRANS, &cpi->work);
@@ -361,50 +363,50 @@ cvxc_size_t cvxc_conelp_make(cvxc_problem_t *cp,
 
     // map result matrix; allocate realy
     __INIT(used, cvxm_make(&cpi->x, n, 1, &bytes[offset], nbytes));
-    __INITC(used, m, &cpi->y, cvxm_make(&cpi->y, m, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->s, cdim, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->z, cdim, 1, &bytes[offset], nbytes));
+    __INITC(used, m,    &cpi->y, cvxm_make(&cpi->y, m, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->s, cvxm_make(&cpi->s, cdim, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->z, cvxm_make(&cpi->z, cdim, 1, &bytes[offset], nbytes));
 
     // dx, dy, ds, dz
     __INIT(used, cvxm_make(&cpi->dx, n, 1, &bytes[offset], nbytes));
-    __INITC(used, m, &cpi->dy, cvxm_make(&cpi->dy, m, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->ds, cdim, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->dz, cdim, 1, &bytes[offset], nbytes));
+    __INITC(used, m,    &cpi->dy, cvxm_make(&cpi->dy, m, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->ds, cvxm_make(&cpi->ds, cdim, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->dz, cvxm_make(&cpi->dz, cdim, 1, &bytes[offset], nbytes));
 
     // rx, ry, rz
     __INIT(used, cvxm_make(&cpi->rx, n, 1, &bytes[offset], nbytes));
-    __INITC(used, m, &cpi->ry, cvxm_make(&cpi->ry, m, 1, &bytes[offset], nbytes));
+    __INITC(used, m,    &cpi->ry, cvxm_make(&cpi->ry, m, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->rz, cvxm_make(&cpi->rz, cdim, 1, &bytes[offset], nbytes));
     //__INIT(used, cvxm_make(&cp->rs, cdim, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->rz, cdim, 1, &bytes[offset], nbytes));
 
     // x1, y1, z1
     __INIT(used, cvxm_make(&cpi->x1, n, 1, &bytes[offset], nbytes));
-    __INITC(used, m, &cpi->y1, cvxm_make(&cpi->y1, m, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->z1, cdim, 1, &bytes[offset], nbytes));
+    __INITC(used, m,    &cpi->y1, cvxm_make(&cpi->y1, m, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->z1, cvxm_make(&cpi->z1, cdim, 1, &bytes[offset], nbytes));
 
     // hrx, hry, hrz
     __INIT(used, cvxm_make(&cpi->hrx, n, 1, &bytes[offset], nbytes));
-    __INITC(used, m, &cpi->hry, cvxm_make(&cpi->hry, m, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->hrz, cdim, 1, &bytes[offset], nbytes));
+    __INITC(used, m,    &cpi->hry, cvxm_make(&cpi->hry, m, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->hrz, cvxm_make(&cpi->hrz, cdim, 1, &bytes[offset], nbytes));
 
     // wx, wy, ws, wz
     __INIT(used, cvxm_make(&cpi->wx, n, 1, &bytes[offset], nbytes));
-    __INITC(used, m, &cpi->wy, cvxm_make(&cpi->wy, m, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->ws, cdim, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->wz, cdim, 1, &bytes[offset], nbytes));
+    __INITC(used, m,    &cpi->wy, cvxm_make(&cpi->wy, m, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->ws, cvxm_make(&cpi->ws, cdim, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->wz, cvxm_make(&cpi->wz, cdim, 1, &bytes[offset], nbytes));
 
     // wx2, wy2, ws2, wz2
     __INIT(used, cvxm_make(&cpi->wx2, n, 1, &bytes[offset], nbytes));
-    __INITC(used, m, &cpi->wy2, cvxm_make(&cpi->wy2, m, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->ws2, cdim, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->wz2, cdim, 1, &bytes[offset], nbytes));
+    __INITC(used, m,    &cpi->wy2, cvxm_make(&cpi->wy2, m, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->ws2, cvxm_make(&cpi->ws2, cdim, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->wz2, cvxm_make(&cpi->wz2, cdim, 1, &bytes[offset], nbytes));
 
     // ws3, wz3
-    __INIT(used, cvxm_make(&cpi->ws3, cdim, 1, &bytes[offset], nbytes));
-    __INIT(used, cvxm_make(&cpi->wz3, cdim, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->ws3, cvxm_make(&cpi->ws3, cdim, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->wz3, cvxm_make(&cpi->wz3, cdim, 1, &bytes[offset], nbytes));
 
     // th
-    __INIT(used, cvxm_make(&cpi->th, cdim, 1, &bytes[offset], nbytes));
+    __INITC(used, cdim, &cpi->th, cvxm_make(&cpi->th, cdim, 1, &bytes[offset], nbytes));
 
     cvxc_size_t cdim_diag =
         cvxc_dimset_sum(dims, CVXDIM_CONELP);
@@ -489,46 +491,40 @@ int cvxc_conelp_isok(const cvxc_matrix_t *c,
     cvxc_size_t cdim      = cvxc_dimset_sum_squared(dims, CVXDIM_CONELP);
     cvxc_size_t cdim_pckd = cvxc_dimset_sum_packed(dims, CVXDIM_CONELP);
 
-    if (nh > 1 || mh != cdim) {
+    if (h && (nh > 1 || mh != cdim)) {
         return CVXC_ERR_DIMH;
     }
 
-    if (mG != cdim || nG != mc) {
+    if (G && (mG != cdim || nG != mc)) {
         return CVXC_ERR_DIMG;
     }
-    if (nA != mc || mA != mb) {
+    if (A && (nA != mc || mA != mb)) {
         return CVXC_ERR_DIMA;
     }
-    if (nb != 1) {
+    if (b && (nb != 1)) {
         return CVXC_ERR_DIMB;
     }
-    if ( mb > mc || mb + cdim_pckd < mc) {
+    if (mb > mc || mb + cdim_pckd < mc) {
         return CVXC_ERR_RANK;
     }
     return 0;
 }
 
-/**
- * @brief Setup ConeLP program structre
- */
-cvxc_size_t cvxc_conelp_setup(cvxc_problem_t *cp,
-                            cvxc_matrix_t *c,
-                            cvxc_matrix_t *G,
-                            cvxc_matrix_t *h,
-                            cvxc_matrix_t *A,
-                            cvxc_matrix_t *b,
-                            cvxc_dimset_t *dims,
-                            cvxc_kktsolver_t *kktsolver)
+static
+cvxc_size_t cvxc_conelp_create(
+    cvxc_problem_t *cp,
+    cvxc_matrix_t *c,
+    cvxc_umatrix_t *Gf,
+    cvxc_matrix_t *h,
+    cvxc_umatrix_t *Af,
+    cvxc_matrix_t *b,
+    cvxc_dimset_t *dims,
+    cvxc_kktsolver_t *kktsolver)
 {
     if (! cp)
         return 0;
 
     cvxc_size_t mc, nc, mb, nb;
-    int err;
-    if ((err = cvxc_conelp_isok(c, G, h, A, b, dims)) != 0) {
-        cp->error = err;
-        return 0;
-    }
 
     mc = nc = mb = nb = 0;
     cvxm_size(&mc, &nc, c);
@@ -542,11 +538,11 @@ cvxc_size_t cvxc_conelp_setup(cvxc_problem_t *cp,
         return 0;
     }
 
-    cp->c = c;
-    cp->G = G;
-    cp->h = h;
-    cp->A = A;
-    cp->b = b;
+    cp->c  = c;
+    cp->Gf = Gf;
+    cp->h  = h;
+    cp->Af = Af;
+    cp->b  = b;
 
     unsigned char *memory = &cp->u.space[sizeof(cvxc_conelp_internal_t)];
     if (cvxc_conelp_make(cp, mc, mb, dims, memory, nbytes) == 0) {
@@ -572,7 +568,62 @@ cvxc_size_t cvxc_conelp_setup(cvxc_problem_t *cp,
 }
 
 /**
- * @brief Release resources reserved to program.
+ * @brief Setup ConeLP program with user defined coefficients matrices.
+ */
+cvxc_size_t cvxc_conelp_setup_user(
+    cvxc_problem_t *cp,
+    cvxc_matrix_t *c,
+    cvxc_umatrix_t *Gf,
+    cvxc_matrix_t *h,
+    cvxc_umatrix_t *Af,
+    cvxc_matrix_t *b,
+    cvxc_dimset_t *dims,
+    cvxc_kktsolver_t *kktsolver)
+{
+    if (! cp)
+        return 0;
+
+    int err;
+    if ((err = cvxc_conelp_isok(c, __cvxnil, h, __cvxnil, b, dims)) != 0) {
+        cp->error = err;
+        return 0;
+    }
+    return cvxc_conelp_create(cp, c, Gf, h, Af, b, dims, kktsolver);
+}
+
+/**
+ * @brief Setup convex problem structure
+ */
+cvxc_size_t cvxc_conelp_setup(
+    cvxc_problem_t *cp,
+    cvxc_matrix_t *c,
+    cvxc_matrix_t *G,
+    cvxc_matrix_t *h,
+    cvxc_matrix_t *A,
+    cvxc_matrix_t *b,
+    cvxc_dimset_t *dims,
+    cvxc_kktsolver_t *kktsolver)
+{
+    int err;
+    if ((err = cvxc_conelp_isok(c, G, h, A, b, dims)) != 0) {
+        cp->error = err;
+        return 0;
+    }
+
+    cvxc_umat_make(&cp->Au, A);
+    cvxc_umat_make(&cp->Gu, G);
+    cp->A = A;
+    cp->G = G;
+    int stat = cvxc_conelp_create(cp, c, &cp->Gu, h, &cp->Au, b, dims, kktsolver);
+    if (stat <= 0) {
+        cvxc_umat_clear(&cp->Au);
+        cvxc_umat_clear(&cp->Gu);
+    }
+    return stat;
+}
+
+/**
+ * @brief Release reserved resources.
  */
 void cvxc_conelp_release(cvxc_problem_t *cp)
 {
@@ -718,18 +769,22 @@ int cvxc_conelp_ready(cvxc_solution_t *sol, cvxc_problem_t *cp, int iter, int st
 
         // rx = A'*y + G'z + c
         cvxm_copy(&cpi->rx, cp->c, CVXC_ALL);
-        cvxm_mvmult(1.0, &cpi->rx, 1.0, cp->A, &cpi->y, CVXC_TRANS);
-        cvxm_mvmult(1.0, &cpi->rx, 1.0, cp->G, &cpi->z, CVXC_TRANS);
+        //cvxm_mvmult(1.0, &cpi->rx, 1.0, cp->A, &cpi->y, CVXC_TRANS);
+        cvxc_umat_mvmult(1.0, &cpi->rx, 1.0, cp->Af, &cpi->y, CVXC_TRANS);
+        //cvxm_mvmult(1.0, &cpi->rx, 1.0, cp->G, &cpi->z, CVXC_TRANS);
+        cvxc_umat_mvmult(1.0, &cpi->rx, 1.0, cp->Gf,&cpi->z, CVXC_TRANS);
         cpi->resx = cvxm_nrm2(&cpi->rx);
 
         // ry = b - A*x  ; TODO - computes -b - A*x ;; check
         cvxm_copy(&cpi->ry, cp->b, CVXC_ALL);
-        cvxm_mvmult(-1.0, &cpi->ry, -1.0, cp->A, &cpi->x, CVXC_TRANS);
+        //cvxm_mvmult(-1.0, &cpi->ry, -1.0, cp->A, &cpi->x, CVXC_TRANS);
+        cvxc_umat_mvmult(-1.0, &cpi->ry, -1.0, cp->Af, &cpi->x, CVXC_TRANS);
         cpi->resy = cvxm_nrm2(&cpi->ry);
 
         // rz = s + G*x - h
         cvxm_copy(&cpi->rz, &cpi->s, CVXC_ALL);
-        cvxm_mvmult(1.0, &cpi->rz, 1.0, cp->G, &cpi->x, 0);
+        //cvxm_mvmult(1.0, &cpi->rz, 1.0, cp->G, &cpi->x, 0);
+        cvxc_umat_mvmult(1.0, &cpi->rz, 1.0, cp->Gf, &cpi->x, 0);
         cvxm_axpy(&cpi->rz, 1.0, cp->h);
         cpi->resz = cvxc_snrm2(&cpi->rz_g);
 
@@ -931,8 +986,9 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
 
         // hrx = -A'*y - G'*z
         cvxm_scale(&cpi->hrx, 0.0, CVXC_ALL);
-        cvxm_mvmult(0.0, &cpi->hrx, -1.0, cp->A, &cpi->y, CVXC_TRANS);
-        cvxc_sgemv(1.0, &cpi->hrx, -1.0, cp->G, &cpi->z_g, CVXC_TRANS);
+        // cvxm_mvmult(0.0, &cpi->hrx, -1.0, cp->A, &cpi->y, CVXC_TRANS);
+        cvxc_umat_mvmult(0.0, &cpi->hrx, -1.0, cp->Af, &cpi->y, CVXC_TRANS);
+        cvxc_umat_sgemv(1.0, &cpi->hrx, -1.0, cp->Gf, &cpi->z_g, CVXC_TRANS);
         cpi->hresx = SQRT(cvxm_dot(&cpi->hrx, &cpi->hrx));
 
         // rx  = hrx - c*tau
@@ -943,7 +999,8 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
 
         // hry = A*x
         cvxm_scale(&cpi->hry, 0.0, CVXC_ALL);
-        cvxm_mvmult(0.0, &cpi->hry, 1.0, cp->A, &cpi->x, 0);
+        // cvxm_mvmult(0.0, &cpi->hry, 1.0, cp->A, &cpi->x, 0);
+        cvxc_umat_mvmult(0.0, &cpi->hry, 1.0, cp->Af, &cpi->x, 0);
         cpi->hresy = cvxm_nrm2(&cpi->hry);
 
         // ry  = hry - b*tau
@@ -954,7 +1011,8 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
 
         // hrz = s + G*x
         cvxm_scale(&cpi->hrz, 0.0, CVXC_ALL);
-        cvxm_mvmult(0.0, &cpi->hrz, 1.0, cp->G, &cpi->x, 0);
+        // cvxm_mvmult(0.0, &cpi->hrz, 1.0, cp->G, &cpi->x, 0);
+        cvxc_umat_mvmult(0.0, &cpi->hrz, 1.0, cp->Gf, &cpi->x, 0);
         cvxm_axpy(&cpi->hrz, 1.0, &cpi->s);
         cpi->hresz = cvxc_snrm2(&cpi->hrz_g);
 

@@ -59,8 +59,8 @@ int cpl_res(cvxc_problem_t *cp,
     cvxc_matgrp_t ux_g = (cvxc_matgrp_t){ .mat = ux, .index = (cvxc_index_t *)0 };
 
     // vx = vx - H*ux - A^T*uy - G^T*W^-1*uz
-    cvxm_mult(1.0, vx, -1.0, &cpi->H, ux, 0);
-    cvxm_mult(1.0, vx, -1.0, cp->A, uy, CVXC_TRANSA);
+    cvxm_mvmult(1.0, vx, -1.0, &cpi->H, ux, 0);
+    cvxm_mvmult(1.0, vx, -1.0, cp->A, uy, CVXC_TRANSA);
     cvxm_copy(&cpi->wz3, uz, CVXC_ALL);
     cvxc_scale(&cpi->wz3_g, &cpi->W, CVXC_INV, &cpi->work);
     cvxc_sgemv2(1.0, vx, -1.0, &cpi->Df, cp->G, &cpi->wz3_g, CVXC_TRANS);
@@ -617,27 +617,20 @@ cvxc_size_t cvxc_cpl_allocate(cvxc_problem_t *cp,
  * @retval 0  Failure
  * @retval >0 Number of bytes used for internal variables.
  */
-cvxc_size_t cvxc_cpl_setup(cvxc_problem_t *cp,
-                         cvxc_convex_program_t *F,
-                         cvxc_matrix_t *c,
-                         cvxc_matrix_t *G,
-                         cvxc_matrix_t *h,
-                         cvxc_matrix_t *A,
-                         cvxc_matrix_t *b,
-                         const cvxc_dimset_t *dims,
-                         cvxc_kktsolver_t *kktsolver)
+static
+cvxc_size_t cvxc_cpl_create(
+    cvxc_problem_t *cp,
+    cvxc_convex_program_t *F,
+    cvxc_matrix_t *c,
+    cvxc_umatrix_t *Gf,
+    cvxc_matrix_t *h,
+    cvxc_umatrix_t *Af,
+    cvxc_matrix_t *b,
+    const cvxc_dimset_t *dims,
+    cvxc_kktsolver_t *kktsolver)
 {
     cvxc_size_t mc, nc, mb, nb;
     cvxc_size_t used;
-    int err;
-
-    if (! cp)
-        return 0;
-
-    if ((err = cvxc_cpl_isok(c, F, G, h, A, b, dims)) != 0) {
-        cp->error = err;
-        return 0;
-    }
 
     mc = nc = mb = nb = 0;
     cvxm_size(&mc, &nc, c);
@@ -647,7 +640,13 @@ cvxc_size_t cvxc_cpl_setup(cvxc_problem_t *cp,
     if ((used = cvxc_cpl_allocate(cp, 0, mc, mb, 0, dims)) == 0) {
         return 0;
     }
-    cvxc_cpl_setvars(cp, F, mc, mb, c, G, h, A, b, dims, kktsolver);
+    // cvxc_cpl_setvars(cp, F, mc, mb, c, G, h, A, b, dims, kktsolver);
+    cp->c = c;
+    cp->F = F;
+    cp->Gf = Gf;
+    cp->h = h;
+    cp->Af = Af;
+    cp->b = b;
 
     cvxc_cpl_internal_t *cpi = cp->u.cpl;
     // provide full index set
@@ -665,6 +664,64 @@ cvxc_size_t cvxc_cpl_setup(cvxc_problem_t *cp,
     cp->solver = (cvxc_kktsolver_t *)&cpi->cp_solver;
 
     return used;
+}
+
+cvxc_size_t cvxc_cpl_setup_user(
+    cvxc_problem_t *cp,
+    cvxc_convex_program_t *F,
+    cvxc_matrix_t *c,
+    cvxc_umatrix_t *Gf,
+    cvxc_matrix_t *h,
+    cvxc_umatrix_t *Af,
+    cvxc_matrix_t *b,
+    const cvxc_dimset_t *dims,
+    cvxc_kktsolver_t *kktsolver)
+{
+    int err;
+    if (! cp)
+        return 0;
+
+    if ((err = cvxc_cpl_isok(c, F, __cvxnil, h, __cvxnil, b, dims)) != 0) {
+        cp->error = err;
+        return 0;
+    }
+
+    cp->A = __cvxnil;
+    cp->G = __cvxnil;
+    int stat = cvxc_cpl_create(cp, F, c, &cp->Gu, h, &cp->Au, b, dims, kktsolver);
+    return stat;
+}
+
+cvxc_size_t cvxc_cpl_setup(
+    cvxc_problem_t *cp,
+    cvxc_convex_program_t *F,
+    cvxc_matrix_t *c,
+    cvxc_matrix_t *G,
+    cvxc_matrix_t *h,
+    cvxc_matrix_t *A,
+    cvxc_matrix_t *b,
+    const cvxc_dimset_t *dims,
+    cvxc_kktsolver_t *kktsolver)
+{
+    int err;
+    if (! cp)
+        return 0;
+
+    if ((err = cvxc_cpl_isok(c, F, G, h, A, b, dims)) != 0) {
+        cp->error = err;
+        return 0;
+    }
+
+    cvxc_umat_make(&cp->Au, A);
+    cvxc_umat_make(&cp->Gu, G);
+    cp->A = A;
+    cp->G = G;
+    int stat = cvxc_cpl_create(cp, F, c, &cp->Gu, h, &cp->Au, b, dims, kktsolver);
+    if (stat <= 0) {
+        cvxc_umat_clear(&cp->Au);
+        cvxc_umat_clear(&cp->Gu);
+    }
+    return stat;
 }
 
 /**

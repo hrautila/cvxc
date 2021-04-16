@@ -71,26 +71,47 @@ int cvxc_triusc(cvxc_matgrp_t *x_g)
 /*
  *   Matrix-vector multiplication.
  *
- *   A is a matrix of size (m, n) where 
+ *   A is a matrix of size (m, n) where
  *
- *       m = dims['l'] + sum(dims['q']) + sum( k**2 for k in dims['s'] ) 
+ *       m = dims['l'] + sum(dims['q']) + sum( k**2 for k in dims['s'] )
  *
- *   representing a mapping from R^n to S.  
+ *   representing a mapping from R^n to S.
  *
  *   If no transpose defined, computes
  *
- *       y := alpha*A*x + beta * y   
+ *       y := alpha*A*x + beta * y
  *
  *   x is a vector of length n.  y is a vector of length m.
  *
  *   If transpose flag CVXC_TRANS defined, computes
  *
- *       y := alpha*A^T*x + beta * y 
+ *       y := alpha*A^T*x + beta * y
  *
  *   x is a vector of length m.  y is a vector of length n.
  *
  *   The 's' components in S are stored in unpacked lower triangular storage.
  */
+int cvxc_umat_sgemv(
+    cvxc_float_t beta,
+    cvxc_matrix_t *y,
+    cvxc_float_t alpha,
+    const cvxc_umatrix_t *A,
+    cvxc_matgrp_t *x_g,
+    int flags)
+{
+    if (flags & CVXC_TRANS) {
+        //cvxc_mat_printf(stdout, "%e", x_g->mat, "sgemv x");
+        cvxc_trisc(x_g);
+    }
+
+    int err = cvxc_umat_mvmult(beta, y, alpha, A, x_g->mat, flags);
+
+    if (flags & CVXC_TRANS) {
+        cvxc_triusc(x_g);
+    }
+    return err;
+}
+
 int cvxc_sgemv(cvxc_float_t beta,
               cvxc_matrix_t *y,
               cvxc_float_t alpha,
@@ -98,17 +119,9 @@ int cvxc_sgemv(cvxc_float_t beta,
               cvxc_matgrp_t *x_g,
               int flags)
 {
-    if (flags & CVXC_TRANS) {
-        //cvxc_mat_printf(stdout, "%e", x_g->mat, "sgemv x");
-        cvxc_trisc(x_g);
-    }
-
-    int err = cvxm_mvmult(beta, y, alpha, A, x_g->mat, flags);
-
-    if (flags & CVXC_TRANS) {
-        cvxc_triusc(x_g);
-    }
-    return err;
+    cvxc_umatrix_t Au;
+    cvxc_umat_make(&Au, A);
+    return cvxc_umat_sgemv(beta, y, alpha, &Au, x_g, flags);
 }
 
 /*
@@ -133,13 +146,14 @@ int cvxc_sgemv(cvxc_float_t beta,
  *        v  = beta * v  + alpha * Df * epi(u)    if NOTRANS
  *    epi(v) = beta * epi(v) + alpha * Df^T * u   if TRANS
  */
-int cvxc_sgemv2(cvxc_float_t beta,
-               cvxc_matrix_t *y,
-               cvxc_float_t alpha,
-               const cvxc_matrix_t *A,
-               const cvxc_matrix_t *B,
-               cvxc_matgrp_t *x_g,
-               int flags)
+int cvxc_umat_sgemv2(
+    cvxc_float_t beta,
+    cvxc_matrix_t *y,
+    cvxc_float_t alpha,
+    const cvxc_matrix_t *A,
+    const cvxc_umatrix_t *B,
+    cvxc_matgrp_t *x_g,
+    int flags)
 {
     cvxc_matrix_t t0, t1;
     int err = 0;
@@ -152,8 +166,6 @@ int cvxc_sgemv2(cvxc_float_t beta,
 
     if (flags & CVXC_TRANS) {
         cvxc_trisc(x_g);
-        cvxc_size_t br, bc;
-        cvxm_size(&br, &bc, B);
         cvxm_view_map(&t0, x_g->mat, 0,  0, ar, 1);
         cvxm_view_map(&t1, x_g->mat, ar, 0, xr-ar, 1);
         if (A) {
@@ -165,7 +177,7 @@ int cvxc_sgemv2(cvxc_float_t beta,
         }
         //cvxc_mat_printf(stderr, "%e", y, "y.0");
         if (err == 0 && B)  {
-            err = cvxm_mvmult(beta, y, alpha, B, &t1, flags);
+            err = cvxc_umat_mvmult(beta, y, alpha, B, &t1, flags);
             if (cvxm_isepi(y)) {
                 cvxm_set_epi(y, beta*cvxm_get_epi(y));
             }
@@ -183,9 +195,22 @@ int cvxc_sgemv2(cvxc_float_t beta,
         v = cvxm_get(y, 0, 0) - alpha * cvxm_get_epi(x_g->mat);
         cvxm_set(y, 0, 0, v);
     }
-    err = cvxm_mvmult(beta, &t1, alpha, B, x_g->mat, 0);
+    err = cvxc_umat_mvmult(beta, &t1, alpha, B, x_g->mat, 0);
 
     return err;
+}
+
+int cvxc_sgemv2(cvxc_float_t beta,
+               cvxc_matrix_t *y,
+               cvxc_float_t alpha,
+               const cvxc_matrix_t *A,
+               const cvxc_matrix_t *B,
+               cvxc_matgrp_t *x_g,
+               int flags)
+{
+    cvxc_umatrix_t Bu;
+    cvxc_umat_make(&Bu, B);
+    return cvxc_umat_sgemv2(beta, y, alpha, A, &Bu, x_g, flags);
 }
 
 /*
