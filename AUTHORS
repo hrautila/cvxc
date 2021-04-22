@@ -1,1 +1,5 @@
-Harri Rautila <harri.rautila@gmail.com>
+The original CONELP/CPL solver algorithms.
+- Python CVXOPT authors <github.com/cvxopt>
+
+This implememtation with errors and omissions:
+- Harri Rautila <harri.rautila@gmail.com>
