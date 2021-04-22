@@ -25,8 +25,12 @@ void cvxm_free(cvxc_matrix_t *X);
 size_t cvxm_sizeof();
 
 int cvxm_isepi(const cvxc_matrix_t *m);
+int cvxm_is_epigraph(const cvxc_epigraph_t *m);
+
 cvxc_float_t cvxm_get_epi(const cvxc_matrix_t *m);
 void cvxm_set_epi(cvxc_matrix_t *m, cvxc_float_t v);
+void cvxm_epi_make(cvxc_epigraph_t *x_e, cvxc_matrix_t *x, int epi);
+void cvxm_epi_make(cvxc_epigraph_t *x_e, cvxc_matrix_t *x, int epi);
 
 cvxc_matrix_t *cvxm_new(cvxc_size_t r, cvxc_size_t c);
 cvxc_matrix_t *cvxm_newcopy(const cvxc_matrix_t *A);
@@ -43,8 +47,12 @@ void cvxm_size(size_t *r, size_t *c, const cvxc_matrix_t *A);
 cvxc_float_t cvxm_get(const cvxc_matrix_t *A, cvxc_size_t r, cvxc_size_t c);
 void cvxm_set(cvxc_matrix_t *A, cvxc_size_t r, cvxc_size_t c, cvxc_float_t val);
 void cvxm_apply(cvxc_matrix_t *A, cvxm_oper_t f, int flags);
+cvxc_float_t cvxm_get_epival(const cvxc_epigraph_t *y);
+void cvxm_set_epival(cvxc_epigraph_t *y, cvxc_float_t v);
 
 cvxc_float_t cvxm_dot(const cvxc_matrix_t *X, const cvxc_matrix_t *Y);
+cvxc_float_t cvxm_epi_dot(const cvxc_epigraph_t *x, const cvxc_epigraph_t *y);
+
 cvxc_float_t cvxm_nrm2(const cvxc_matrix_t *X);
 cvxc_float_t cvxm_amax(const cvxc_matrix_t *X);
 cvxc_float_t cvxm_asum(const cvxc_matrix_t *X);
@@ -52,9 +60,14 @@ int cvxm_scale(cvxc_matrix_t *X, cvxc_float_t alpha, int flags);
 int cvxm_add(cvxc_matrix_t *X, cvxc_float_t alpha, int flags);
 void cvxm_make_trm(cvxc_matrix_t *X, int flags);
 void cvxm_copy(cvxc_matrix_t *X, const cvxc_matrix_t *Y, int flags);
+void cvxm_epi_copy(cvxc_epigraph_t *X, const cvxc_epigraph_t *Y, int flags);
 
 int cvxm_axpy(cvxc_matrix_t *Y, cvxc_float_t alpha, const cvxc_matrix_t *X);
+int cvxm_epi_axpy(cvxc_epigraph_t *y, cvxc_float_t alpha, const cvxc_epigraph_t *x);
+
 int cvxm_axpby(cvxc_float_t beta, cvxc_matrix_t *Y, cvxc_float_t alpha, const cvxc_matrix_t *X);
+int cvxm_epi_axpby(cvxc_float_t beta, cvxc_epigraph_t *y, cvxc_float_t alpha, const cvxc_epigraph_t *x);
+
 cvxc_float_t cvxc_get(cvxc_matrix_t *A, cvxc_size_t r, cvxc_size_t c);
 cvxc_float_t cvxc_set(cvxc_matrix_t *A, cvxc_size_t r, cvxc_size_t c, cvxc_float_t val);
 int cvxm_mvsolve_trm(cvxc_matrix_t *X, cvxc_float_t alpha, const cvxc_matrix_t *A, int flags);
@@ -100,17 +113,30 @@ cvxc_float_t cvxm_max(const cvxc_matrix_t *x)
 }
 
 //  \brief matrix-vector multiply; Y = beta*Y + alpha*A*X
-int cvxm_mvmult(cvxc_float_t beta, cvxc_matrix_t *Y, cvxc_float_t alpha, const cvxc_matrix_t *A,
-                const cvxc_matrix_t *X, int flags)
+int cvxm_epi_mvmult(
+    cvxc_float_t beta, cvxc_epigraph_t *y, cvxc_float_t alpha, const cvxc_matrix_t *A,
+    const cvxc_epigraph_t *x, int flags)
 {
     armas_conf_t cf = *armas_conf_default();
-    int err = armas_mvmult(beta, &Y->data, alpha, &A->data, &X->data, flags, &cf);
-    if (cvxm_isepi(Y) && cvxm_isepi(X)) {
+    int err = armas_mvmult(beta, &y->m->data, alpha, &A->data, &x->m->data, flags, &cf);
+    if (cvxm_is_epigraph(y) && cvxm_is_epigraph(x)) {
         if ((flags & CVXC_TRANS) != 0) {
-            Y->t *= beta;
+            y->t *= beta;
         }
     }
     return err;
+}
+
+//  \brief matrix-vector multiply; Y = beta*Y + alpha*A*X
+int cvxm_mvmult(
+    cvxc_float_t beta, cvxc_matrix_t *y, cvxc_float_t alpha, const cvxc_matrix_t *A,
+    const cvxc_matrix_t *x, int flags)
+{
+    cvxc_epigraph_t y_e, x_e;
+
+    cvxm_epi_make(&y_e, y, 0);
+    cvxm_epi_make(&x_e, (cvxc_matrix_t *)x, 0);
+    return cvxm_epi_mvmult(beta, &y_e, alpha, A, &x_e, flags);
 }
 
 //  \brief symmetric matrix-vector multiply; Y = beta*Y + alpha*A*X

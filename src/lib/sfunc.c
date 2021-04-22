@@ -148,11 +148,11 @@ int cvxc_sgemv(cvxc_float_t beta,
  */
 int cvxc_umat_sgemv2(
     cvxc_float_t beta,
-    cvxc_matrix_t *y,
+    cvxc_epigraph_t *y_e,
     cvxc_float_t alpha,
     const cvxc_matrix_t *A,
     const cvxc_umatrix_t *B,
-    cvxc_matgrp_t *x_g,
+    cvxc_epigraph_t *x_e,
     int flags)
 {
     cvxc_matrix_t t0, t1;
@@ -161,45 +161,46 @@ int cvxc_umat_sgemv2(
     cvxc_size_t ar, ac, yr, yc, xr, xc;
 
     cvxm_size(&ar, &ac, A);
-    cvxm_size(&yr, &yc, y);
-    cvxm_size(&xr, &xc, x_g->mat);
+    cvxm_size(&yr, &yc, y_e->m);
+    cvxm_size(&xr, &xc, x_e->m);
 
     if (flags & CVXC_TRANS) {
-        cvxc_trisc(x_g);
-        cvxm_view_map(&t0, x_g->mat, 0,  0, ar, 1);
-        cvxm_view_map(&t1, x_g->mat, ar, 0, xr-ar, 1);
+        //cvxc_trisc(&x_g);
+        cvxm_view_map(&t0, x_e->m, 0,  0, ar, 1);
+        cvxm_view_map(&t1, x_e->m, ar, 0, xr-ar, 1);
         if (A) {
-            err = cvxm_mvmult(beta, y, alpha, A, &t0, flags);
-            if (cvxm_isepi(y)) {
-                v = beta*cvxm_get_epi(y) - alpha*cvxm_get(x_g->mat, 0, 0);
-                cvxm_set_epi(y, v);
+            err = cvxm_mvmult(beta, y_e->m, alpha, A, &t0, flags);
+            if (cvxm_is_epigraph(y_e)) {
+                v = beta*cvxm_get_epival(y_e) - alpha*cvxm_get(x_e->m, 0, 0);
+                cvxm_set_epival(y_e, v);
             }
         }
         //cvxc_mat_printf(stderr, "%e", y, "y.0");
         if (err == 0 && B)  {
-            err = cvxc_umat_mvmult(beta, y, alpha, B, &t1, flags);
-            if (cvxm_isepi(y)) {
-                cvxm_set_epi(y, beta*cvxm_get_epi(y));
+            err = cvxc_umat_mvmult(beta, y_e->m, alpha, B, &t1, flags);
+            if (cvxm_is_epigraph(y_e)) {
+                cvxm_set_epival(y_e, beta*cvxm_get_epival(y_e));
             }
         }
-        cvxc_triusc(x_g);
+        //cvxc_triusc(&x_g);
         return err;
     }
 
-    cvxm_view_map(&t0, y, 0,  0, ar, 1);
-    cvxm_view_map(&t1, y, ar, 0, yr-ar, 1);
-    err = cvxm_mvmult(beta, &t0, alpha, A, x_g->mat, 0);
+    cvxm_view_map(&t0, y_e->m, 0,  0, ar, 1);
+    cvxm_view_map(&t1, y_e->m, ar, 0, yr-ar, 1);
+    err = cvxm_mvmult(beta, &t0, alpha, A, x_e->m, 0);
     if (err != 0)
         return err;
-    if (cvxm_isepi(x_g->mat)) {
-        v = cvxm_get(y, 0, 0) - alpha * cvxm_get_epi(x_g->mat);
-        cvxm_set(y, 0, 0, v);
+    if (cvxm_is_epigraph(x_e)) {
+        v = cvxm_get(y_e->m, 0, 0) - alpha * cvxm_get_epival(x_e);
+        cvxm_set(y_e->m, 0, 0, v);
     }
-    err = cvxc_umat_mvmult(beta, &t1, alpha, B, x_g->mat, 0);
+    err = cvxc_umat_mvmult(beta, &t1, alpha, B, x_e->m, 0);
 
     return err;
 }
 
+#if 0
 int cvxc_sgemv2(cvxc_float_t beta,
                cvxc_matrix_t *y,
                cvxc_float_t alpha,
@@ -212,6 +213,7 @@ int cvxc_sgemv2(cvxc_float_t beta,
     cvxc_umat_make(&Bu, B);
     return cvxc_umat_sgemv2(beta, y, alpha, A, &Bu, x_g, flags);
 }
+#endif
 
 /*
  * The inverse product x := y o\ x, when 'S' components of y are diagonal.
