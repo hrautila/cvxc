@@ -340,8 +340,8 @@ extern int cvxc_umat_sgemv(cvxc_float_t beta, cvxc_matrix_t *y,
                      cvxc_float_t alpha, const cvxc_umatrix_t *A, cvxc_matgrp_t *x, int flags);
 extern int cvxc_sgemv2(cvxc_float_t beta, cvxc_matrix_t *y, cvxc_float_t alpha,
                       const cvxc_matrix_t *A, const cvxc_matrix_t *B, cvxc_matgrp_t *x, int flags);
-extern int cvxc_umat_sgemv2(cvxc_float_t beta, cvxc_matrix_t *y, cvxc_float_t alpha,
-                      const cvxc_matrix_t *A, const cvxc_umatrix_t *B, cvxc_matgrp_t *x, int flags);
+extern int cvxc_umat_sgemv2(cvxc_float_t beta, cvxc_epigraph_t *y, cvxc_float_t alpha,
+                      const cvxc_matrix_t *A, const cvxc_umatrix_t *B, cvxc_epigraph_t *x, int flags);
 extern int cvxc_triusc(cvxc_matgrp_t *x);
 extern int cvxc_trisc(cvxc_matgrp_t *x);
 extern int cvxc_mksymm(cvxc_matgrp_t *x);
@@ -449,52 +449,6 @@ typedef struct cvxc_kktsolver {
     cvxc_kktsolver_t *next;
 } cvxc_kktsolver_t;
 
-
-extern void cvxc_kktldl_load(cvxc_kktsolver_t *);
-
-__CVXC_INLINE
-int cvxc_kktinit(cvxc_kktsolver_t *kkt,
-                cvxc_problem_t *cp,
-                int n, int m, const cvxc_dimset_t *dims)
-{
-    if (kkt && kkt->vtable && kkt->vtable->init)
-        return (*kkt->vtable->init)(kkt, cp, n, m, dims);
-    return -1;
-}
-
-__CVXC_INLINE
-int cvxc_kktfactor(cvxc_kktsolver_t *kkt,
-                  cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_matrix_t *Df)
-{
-    if (kkt && kkt->vtable && kkt->vtable->factor)
-        return (*kkt->vtable->factor)(kkt, W, H, Df);
-    return -1;
-}
-
-__CVXC_INLINE
-int cvxc_kktsolve(cvxc_kktsolver_t *kkt,
-                 cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g)
-{
-    if (kkt && kkt->vtable && kkt->vtable->solve)
-        return (*kkt->vtable->solve)(kkt, x, y, z_g);
-    return -1;
-}
-
-__CVXC_INLINE
-void cvxc_kktrelease(cvxc_kktsolver_t *kkt)
-{
-    if (kkt && kkt->vtable && kkt->vtable->release)
-         (*kkt->vtable->release)(kkt);
-}
-
-__CVXC_INLINE
-void cvxc_ldlsolver_init(cvxc_kktsolver_t *kkt,
-                        cvxc_problem_t *cp,
-                        int n, int m, const cvxc_dimset_t *dims)
-{
-    cvxc_kktldl_load(kkt);
-    cvxc_kktinit(kkt, cp, n, m, dims);
-}
 
 
 /**

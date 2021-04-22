@@ -11,6 +11,101 @@
 
 #include "cvxc.h"
 
+struct cvxc_cp_kktfuncs;
+
+typedef struct cvxc_cp_kktsolver {
+    struct cvxc_cp_kktfuncs *vtable;
+    void *private;
+    cvxc_kktsolver_t *next;
+} cvxc_cp_kktsolver_t;
+
+typedef struct cvxc_cp_kktfuncs {
+    int (*init)(cvxc_cp_kktsolver_t *S, cvxc_problem_t *cp, int n, int m, const cvxc_dimset_t *dims);
+    int (*factor)(cvxc_cp_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_matrix_t *Df);
+    int (*solve)(cvxc_cp_kktsolver_t *S, cvxc_epigraph_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g);
+    void (*release)(cvxc_cp_kktsolver_t *S);
+} cvxc_cp_kktfuncs_t;
+
+/* Base KKT solver convenience function. */
+
+static inline
+int cvxc_cp_kktfactor(cvxc_cp_kktsolver_t *kkt,
+                  cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_matrix_t *Df)
+{
+    if (kkt && kkt->vtable && kkt->vtable->factor)
+        return (*kkt->vtable->factor)(kkt, W, H, Df);
+    return -1;
+}
+
+static inline
+int cvxc_cp_kktsolve(cvxc_cp_kktsolver_t *kkt,
+                 cvxc_epigraph_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g)
+{
+    if (kkt && kkt->vtable && kkt->vtable->solve)
+        return (*kkt->vtable->solve)(kkt, x, y, z_g);
+    return -1;
+}
+
+static inline
+void cvxc_cp_kktrelease(cvxc_cp_kktsolver_t *kkt)
+{
+    if (kkt && kkt->vtable && kkt->vtable->release)
+         (*kkt->vtable->release)(kkt);
+}
+
+/* Base KKT solver convenience function. */
+
+static inline
+int cvxc_kktinit(cvxc_kktsolver_t *kkt,
+                cvxc_problem_t *cp,
+                int n, int m, const cvxc_dimset_t *dims)
+{
+    if (kkt && kkt->vtable && kkt->vtable->init)
+        return (*kkt->vtable->init)(kkt, cp, n, m, dims);
+    return -1;
+}
+
+static inline
+int cvxc_kktfactor(cvxc_kktsolver_t *kkt,
+                  cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_matrix_t *Df)
+{
+    if (kkt && kkt->vtable && kkt->vtable->factor)
+        return (*kkt->vtable->factor)(kkt, W, H, Df);
+    return -1;
+}
+
+static inline
+int cvxc_kktsolve(cvxc_kktsolver_t *kkt,
+                 cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g)
+{
+    if (kkt && kkt->vtable && kkt->vtable->solve)
+        return (*kkt->vtable->solve)(kkt, x, y, z_g);
+    return -1;
+}
+
+static inline
+void cvxc_kktrelease(cvxc_kktsolver_t *kkt)
+{
+    if (kkt && kkt->vtable && kkt->vtable->release)
+         (*kkt->vtable->release)(kkt);
+}
+
+extern void cvxc_kktldl_load(cvxc_kktsolver_t *);
+
+
+static inline
+void cvxc_ldlsolver_init(cvxc_kktsolver_t *kkt,
+                        cvxc_problem_t *cp,
+                        int n, int m, const cvxc_dimset_t *dims)
+{
+    cvxc_kktldl_load(kkt);
+    cvxc_kktinit(kkt, cp, n, m, dims);
+}
+
+
+/*
+ * @brief ConeLP solver internal variables.
+ */
 typedef struct cvxc_conelp_internal {
     int primalstart;
     int dualstart;
@@ -83,6 +178,9 @@ typedef struct cvxc_conelp_internal {
 
 } cvxc_conelp_internal_t;
 
+/*
+ * @brief GP solver internal extra variables..
+ */
 typedef struct cvxc_gp_params {
     cvxc_matrix_t *F;
     cvxc_matrix_t *g;
@@ -92,6 +190,9 @@ typedef struct cvxc_gp_params {
     cvxc_matrix_t Fs;
 } cvxc_gp_params_t;
 
+/*
+ * @brief CLP/CP/GP solver internal variables.
+ */
 
 typedef struct cvxc_cpl_internal {
     cvxc_float_t tau, kappa;
@@ -153,7 +254,7 @@ typedef struct cvxc_cpl_internal {
     cvxc_float_t pres0;
 
     // KKT solver for CPL and CP problems; chaning to proper KKT solver
-    cvxc_kktsolver_t cp_solver;
+    cvxc_cp_kktsolver_t cp_solver;
 
     // solution matrix
     cvxc_matrix_t x, y, s, z;  // ok
@@ -167,17 +268,14 @@ typedef struct cvxc_cpl_internal {
     cvxc_matrix_t newf, newDf; //, H;
 
     cvxc_matrix_t dx, dy, ds, dz;
-    cvxc_matrix_t dx0, dy0, ds0, dz0;
     cvxc_matrix_t ds2, dz2, ds20, dz20;
 
     cvxc_matrix_t x0, y0, s0, z0;
-    cvxc_matrix_t x1, y1, s1, z1;
 
     cvxc_matrix_t rx, ry, rz;
     cvxc_matrix_t rx0, ry0, rz0;
     cvxc_matrix_t newx, newy, newz, news, newrx;
     cvxc_matrix_t newrz0;
-    cvxc_matrix_t hrx, hry, hrz;
     cvxc_matrix_t sigs, sigz;
     cvxc_matrix_t lmbda, lmbdasq;
     cvxc_matrix_t lmbda0;
@@ -186,6 +284,10 @@ typedef struct cvxc_cpl_internal {
     cvxc_matrix_t wx, wy, ws, wz;
     cvxc_matrix_t wx2, wy2, ws2, wz2;
     cvxc_matrix_t ws3, wz3;
+
+    // epigraph structure for convex targets.
+    cvxc_epigraph_t x_e, x0_e, dx_e, dx0_e, rx_e, rx0_e;
+    cvxc_epigraph_t newx_e, newrx_e, wx_e, wx2_e, c_e;
 
     // matrix groups with correct indexing
     cvxc_matgrp_t h_g;
@@ -220,16 +322,16 @@ typedef struct cvxc_cpl_internal {
 
 
 static inline
-int F0(cvxc_convex_program_t *cp, cvxc_matrix_t *x0)
+int F0(cvxc_convex_program_t *cp, cvxc_epigraph_t *x0)
 {
-    return cp->F(x0, __cvxnil, __cvxnil, __cvxnil, __cvxnil, cp->user);
+    return cp->F(x0->m, __cvxnil, __cvxnil, __cvxnil, __cvxnil, cp->user);
 }
 
 static inline
-int F1(cvxc_convex_program_t *cp, cvxc_matrix_t *f, cvxc_matrix_t *Df, const cvxc_matrix_t *x)
+int F1(cvxc_convex_program_t *cp, cvxc_matrix_t *f, cvxc_matrix_t *Df, const cvxc_epigraph_t *x)
 {
-    int e = cp->F(f, Df, __cvxnil, x, __cvxnil, cp->user);
-    if (e == 0 && cvxm_isepi(x) && f) {
+    int e = cp->F(f, Df, __cvxnil, x->m, __cvxnil, cp->user);
+    if (e == 0 && cvxm_is_epigraph(x) && f) {
         cvxm_set(f, 0, 0, cvxm_get(f, 0, 0) - x->t);
     }
     return e;
@@ -237,10 +339,10 @@ int F1(cvxc_convex_program_t *cp, cvxc_matrix_t *f, cvxc_matrix_t *Df, const cvx
 
 static inline
 int F2(cvxc_convex_program_t *cp, cvxc_matrix_t *f, cvxc_matrix_t *Df, cvxc_matrix_t *H,
-       const cvxc_matrix_t *x, const cvxc_matrix_t *z)
+       const cvxc_epigraph_t *x, const cvxc_matrix_t *z)
 {
-    int e = cp->F(f, Df, H, x, z, cp->user);
-    if (e == 0 && cvxm_isepi(x) && f) {
+    int e = cp->F(f, Df, H, x->m, z, cp->user);
+    if (e == 0 && cvxm_is_epigraph(x) && f) {
         cvxm_set(f, 0, 0, cvxm_get(f, 0, 0) - x->t);
     }
     return e;
