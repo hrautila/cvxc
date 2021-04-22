@@ -44,6 +44,11 @@ typedef struct cvxc_matrix {
     cvxc_float_t t;
 } cvxc_matrix_t;
 
+typedef struct cvxc_epigraph {
+    cvxc_matrix_t *m;
+    int bits;
+    cvxc_float_t t;
+} cvxc_epigraph_t;
 
 typedef armas_operator_t cvxm_oper_t;
 typedef armas_generator_t cvxm_generator_t;
@@ -80,7 +85,14 @@ enum cvxm_types {
 };
 
 __CVXC_INLINE
-int cvxm_isepi(const cvxc_matrix_t *m) {
+int cvxm_isepi(const cvxc_matrix_t *m)
+{
+    return (m->bits & CVXM_EPIGRAPH ) != 0;
+}
+
+__CVXC_INLINE
+int cvxm_is_epigraph(const cvxc_epigraph_t *m)
+{
     return (m->bits & CVXM_EPIGRAPH ) != 0;
 }
 
@@ -91,6 +103,16 @@ void cvxm_init(cvxc_matrix_t *m, cvxc_size_t r, cvxc_size_t c)
     m->bits = 0;
     m->t  = 0.0;
 }
+
+__CVXC_INLINE
+void cvxm_epi_make(cvxc_epigraph_t *x_e, cvxc_matrix_t *x, int epi)
+{
+    x_e->m = x;
+    x_e->t = 0.0;
+    x_e->bits = epi ? CVXM_EPIGRAPH : 0;
+}
+
+// __CVXC_INLINE
 
 __CVXC_INLINE
 size_t cvxm_sizeof()
@@ -230,6 +252,12 @@ cvxc_float_t cvxm_get_epi(const cvxc_matrix_t *A)
 }
 
 __CVXC_INLINE
+cvxc_float_t cvxm_get_epival(const cvxc_epigraph_t *y)
+{
+    return y->t;
+}
+
+__CVXC_INLINE
 void cvxm_set(cvxc_matrix_t *A, cvxc_size_t r, cvxc_size_t c, cvxc_float_t val)
 {
     armas_set_unsafe(&A->data, r, c, val);
@@ -239,6 +267,12 @@ __CVXC_INLINE
 void cvxm_set_epi(cvxc_matrix_t *A, cvxc_float_t v)
 {
     A->t = v;
+}
+
+__CVXC_INLINE
+void cvxm_set_epival(cvxc_epigraph_t *y, cvxc_float_t v)
+{
+    y->t = v;
 }
 
 // elementwise
@@ -259,6 +293,21 @@ cvxc_float_t cvxm_dot(const cvxc_matrix_t *X, const cvxc_matrix_t *Y)
     cvxc_float_t val = armas_dot(&X->data, &Y->data, &cf);
     if (cvxm_isepi(X) && cvxm_isepi(Y)) {
         val += X->t * Y->t;
+    }
+    return  val;
+}
+
+// vector-vector dot product
+__CVXC_INLINE
+cvxc_float_t cvxm_epi_dot(const cvxc_epigraph_t *x, const cvxc_epigraph_t *y)
+{
+    if (!x || !y)
+        return 0;
+
+    armas_conf_t cf = *armas_conf_default();
+    cvxc_float_t val = armas_dot(&x->m->data, &y->m->data, &cf);
+    if (cvxm_is_epigraph(x) && cvxm_is_epigraph(y)) {
+        val += x->t * y->t;
     }
     return  val;
 }
@@ -305,6 +354,17 @@ int cvxm_scale(cvxc_matrix_t *X, cvxc_float_t alpha, int flags)
     return err;
 }
 
+__CVXC_INLINE
+int cvxm_epi_scale(cvxc_epigraph_t *X, cvxc_float_t alpha, int flags)
+{
+    armas_conf_t cf = *armas_conf_default();
+    int err = armas_mscale(&X->m->data, alpha, flags, &cf);
+    if (cvxm_is_epigraph(X)) {
+        X->t *= alpha;
+    }
+    return err;
+}
+
 // \brief Element-wise add constant
 __CVXC_INLINE
 int cvxm_add(cvxc_matrix_t *X, cvxc_float_t alpha, int flags)
@@ -330,6 +390,17 @@ void cvxm_copy(cvxc_matrix_t *X, const cvxc_matrix_t *Y, int flags)
     }
 }
 
+// \brief copy
+__CVXC_INLINE
+void cvxm_epi_copy(cvxc_epigraph_t *X, const cvxc_epigraph_t *Y, int flags)
+{
+    armas_conf_t cf = *armas_conf_default();
+    if (X && Y) {
+        armas_mcopy(&X->m->data, (armas_dense_t *)&Y->m->data, flags, &cf);
+        X->t = Y->t;
+    }
+}
+
 // \brief axpy; y = y + alpha*x
 __CVXC_INLINE
 int cvxm_axpy(cvxc_matrix_t *Y, cvxc_float_t alpha, const cvxc_matrix_t *X)
@@ -340,6 +411,21 @@ int cvxm_axpy(cvxc_matrix_t *Y, cvxc_float_t alpha, const cvxc_matrix_t *X)
         err = armas_axpy(&Y->data, alpha, &X->data, &cf);
         if (cvxm_isepi(Y) && cvxm_isepi(X)) {
             Y-> t += X->t * alpha;
+        }
+    }
+    return err;
+}
+
+// \brief axpy; y = y + alpha*x
+__CVXC_INLINE
+int cvxm_epi_axpy(cvxc_epigraph_t *y, cvxc_float_t alpha, const cvxc_epigraph_t *x)
+{
+    int err = 0;
+    if (x && y) {
+        armas_conf_t cf = *armas_conf_default();
+        err = armas_axpy(&y->m->data, alpha, &x->m->data, &cf);
+        if (cvxm_is_epigraph(y) && cvxm_is_epigraph(x)) {
+            y->t += x->t * alpha;
         }
     }
     return err;
@@ -359,6 +445,22 @@ int cvxm_axpby(cvxc_float_t beta, cvxc_matrix_t *Y, cvxc_float_t alpha, const cv
     return err;
 }
 
+__CVXC_INLINE
+int cvxm_epi_axpby(cvxc_float_t beta, cvxc_epigraph_t *y, cvxc_float_t alpha, const cvxc_epigraph_t *x)
+{
+    int err = 0;
+    if (x && y) {
+        armas_conf_t cf = *armas_conf_default();
+        err = armas_axpby(beta, &y->m->data, alpha, &x->m->data, &cf);
+        if (cvxm_is_epigraph(x) && cvxm_is_epigraph(y)) {
+            y->t = beta*y->t + alpha*x->t;
+        }
+    }
+    return err;
+}
+
+extern int cvxm_epi_mvmult(cvxc_float_t beta, cvxc_epigraph_t *Y, cvxc_float_t alpha,
+                       const cvxc_matrix_t *A, const cvxc_epigraph_t *X, int flags);
 extern int cvxm_mvmult(cvxc_float_t beta, cvxc_matrix_t *Y, cvxc_float_t alpha,
                        const cvxc_matrix_t *A, const cvxc_matrix_t *X, int flags);
 extern int cvxm_mvmult_sym(cvxc_float_t beta, cvxc_matrix_t *Y, cvxc_float_t alpha,
