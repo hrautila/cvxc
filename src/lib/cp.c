@@ -53,7 +53,7 @@ int cvxc_cp_isok(
 }
 
 static
-int cp_factor(cvxc_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *x, cvxc_matrix_t *z)
+int cp_factor(cvxc_cp_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_matrix_t *Df)
 {
     cvxc_matrix_t Dfc;
     cvxc_problem_t *cp = (cvxc_problem_t *)S->private;
@@ -62,13 +62,13 @@ int cp_factor(cvxc_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *x, cvxc_mat
 
     cvxm_size(&nr, &nc, &cpi->Df);
     cvxm_view_map(&Dfc, &cpi->Df, 1, 0, nr-1, nc);
-    F2(cp->F, &cpi->f, &cpi->Df, &cpi->H, x, z);
+    // F2(cp->F, &cpi->f, &cpi->Df, &cpi->H, x, z);
 
     return cvxc_kktfactor(S->next, W, &cpi->H, &Dfc);
 }
 
 static
-int cp_solve(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g)
+int cp_solve(cvxc_cp_kktsolver_t *S, cvxc_epigraph_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g)
 {
     cvxc_problem_t *cp = (cvxc_problem_t *)S->private;
     cvxc_cpl_internal_t *cpi = cp->u.cpl;
@@ -88,20 +88,20 @@ int cp_solve(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgr
     cvxc_mgrp_init(&z_cpl_g, &z_cpl, &cpi->index_cpt);
 
     dnlt0 = cvxm_get(&dnlt, 0, 0);
-    epi_x = cvxm_get_epi(x);
+    epi_x = cvxm_get_epival(x);
     znlt  = cvxm_get(&z_nlt, 0, 0);
-    cvxm_axpy(x, epi_x, &gradf);
+    cvxm_axpy(x->m, epi_x, &gradf);
 
-    int err = cvxc_kktsolve(S->next, x, y, &z_cpl_g);
+    int err = cvxc_kktsolve(S->next, x->m, y, &z_cpl_g);
 
     cvxm_set(&z_nlt, 0, 0, -epi_x*dnlt0);
-    epi_x = cvxm_dot(&gradf, x) + dnlt0*dnlt0*epi_x - znlt;
-    cvxm_set_epi(x, epi_x);
+    epi_x = cvxm_dot(&gradf, x->m) + dnlt0*dnlt0*epi_x - znlt;
+    cvxm_set_epival(x, epi_x);
     return err;
 }
 
 static
-void cp_release(cvxc_kktsolver_t *kkt)
+void cp_release(cvxc_cp_kktsolver_t *kkt)
 {
     if (!kkt)
         return;
@@ -111,14 +111,14 @@ void cp_release(cvxc_kktsolver_t *kkt)
     kkt->private = 0;
 }
 
-static cvxc_kktfuncs_t cp_kktfunctions = {
+static cvxc_cp_kktfuncs_t cp_kktfunctions = {
     .factor = cp_factor,
     .solve  = cp_solve,
     .release= cp_release
 };
 
 static
-void cvxc_cp_solver_init(cvxc_kktsolver_t *cs, cvxc_problem_t *cp, cvxc_kktsolver_t *next)
+void cvxc_cp_solver_init(cvxc_cp_kktsolver_t *cs, cvxc_problem_t *cp, cvxc_kktsolver_t *next)
 {
     cs->vtable = &cp_kktfunctions;
     cs->next = next;
@@ -285,20 +285,20 @@ void cvxc_cp_release(cvxc_problem_t *cp)
 int cvxc_cp_compute_start(cvxc_problem_t *cp)
 {
     cvxc_cpl_internal_t *cpi = cp->u.cpl;
-    F0(cp->F, &cpi->x0);
+    F0(cp->F, &cpi->x0_e);
     cvxc_mgrp_initial_value(&cpi->z_g, 0);
     cvxc_mgrp_initial_value(&cpi->s_g, 0);
     cvxc_scaling_initial_value(&cpi->W);
     cvxm_set_all(&cpi->c0, 0.0);
-    cpi->c0.t = 1.0;
+    cvxm_set_epival(&cpi->c_e, 1.0);
 
-    cvxm_copy(&cpi->x,    &cpi->x0, 0);
-    cvxm_copy(&cpi->rx,   &cpi->x0, 0);
-    cvxm_copy(&cpi->dx,   &cpi->x0, 0);
-    cvxm_copy(&cpi->rx0,  &cpi->x0, 0);
-    cvxm_copy(&cpi->dx0,  &cpi->x0, 0);
-    cvxm_copy(&cpi->newx, &cpi->x0, 0);
-    cvxm_copy(&cpi->newrx,&cpi->x0, 0);
+    cvxm_epi_copy(&cpi->x_e,    &cpi->x0_e, 0);
+    cvxm_epi_copy(&cpi->rx_e,   &cpi->x0_e, 0);
+    cvxm_epi_copy(&cpi->dx_e,   &cpi->x0_e, 0);
+    cvxm_epi_copy(&cpi->rx0_e,  &cpi->x0_e, 0);
+    // cvxm_epi_copy(&cpi->dx0_e,  &cpi->x0_e, 0);
+    cvxm_epi_copy(&cpi->newx_e, &cpi->x0_e, 0);
+    cvxm_epi_copy(&cpi->newrx_e,&cpi->x0_e, 0);
     cvxm_copy(&cpi->ry,    cp->b,   0);
     return 0;
 }
