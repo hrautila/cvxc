@@ -59,7 +59,6 @@ int main(int argc, char **argv)
     cvxc_dimset_alloc(&dims, 2, (cvxc_size_t[]){4, 4, 0}, (cvxc_size_t[]){3, 0});
 
     cvxc_size_t nbytes = cvxc_conelp_setup(&cp, &c, &G, &h, &A, &b, &dims, (cvxc_kktsolver_t *)0);
-    printf("conelp setup: %ld bytes\n", nbytes);
     if (nbytes == 0)
         exit(1);
 

@@ -12,21 +12,6 @@
 //#define EFRM "%9.2e"
 #define STEP 0.99
 
-#if 0
-static
-void print_r_rti(cvxc_scaling_t *W, int k, const char *s)
-{
-    cvxc_matrix_t r, rti;
-    cvxc_scaling_elem(&r, W, CVXWS_R, k);
-    cvxc_scaling_elem(&rti, W, CVXWS_RTI, k);
-    printf("%s r\n", s);
-    cvxm_printf(stdout, "%13.6e", &r);
-    printf("%s rti\n", s);
-    cvxm_printf(stdout, "%13.6e", &rti);
-}
-#endif
-
-
 static inline
 cvxc_size_t __WORKBYTES(cvxc_size_t n)
 {
