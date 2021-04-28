@@ -57,7 +57,11 @@ int ldl2_factor(cvxc_kktsolver_t *kkt, cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc
     ldl->W = W;
     // Make a mapping of Df to protect against situation where Df itself is mapping.
     // (see function cp_factor in cp.c)
-    cvxm_view_map(&ldl->Df, Df, 0, 0, ldl->mnl, ldl->n);
+    if (Df) {
+        cvxm_view_map(&ldl->Df, Df, 0, 0, ldl->mnl, ldl->n);
+    } else {
+        cvxm_make(&ldl->Df, 0, 0, (cvxc_float_t *)0, 0);
+    }
 
     cvxm_mkconst(&ldl->K, 0.0);
     if (H) {
@@ -65,7 +69,7 @@ int ldl2_factor(cvxc_kktsolver_t *kkt, cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc
         cvxm_view_map(&Kt, &ldl->K, 0, 0, ldl->n, ldl->n);
         cvxm_copy(&Kt, H, CVXC_LOWER);
     }
-    // copy A to K
+
     if (ldl->p > 0) {
         cvxm_view_map(&Kt, &ldl->K, ldl->n, 0, ldl->p, ldl->n);
         cvxm_copy(&Kt, cp->A, 0);
@@ -207,7 +211,6 @@ int ldl2_init(cvxc_kktsolver_t *kkt, cvxc_problem_t *cp, int n, int m, const cvx
     cvxc_size_t offset = sizeof(cvxc_ldlsolver_t);
     unsigned char *buf = (unsigned char *)kkt->private;
 
-    // space for H and A (H can be zeroes)
     ldl->ldK = n + m;
     ldl->cp = cp;
     ldl->n = n;
