@@ -35,7 +35,7 @@ int log_accumulate(cvxc_float_t e, void *p)
 static int cvxm_logsum(cvxc_float_t *result, const cvxc_matrix_t *x)
 {
     cvxc_float_t sum = 0.0;
-    if (armas_iterate(&x->data, log_accumulate, &sum, 0) < 0)
+    if (armas_iterate(x, log_accumulate, &sum, 0) < 0)
         return -1;
     *result = sum;
     return 0;
