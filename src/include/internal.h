@@ -102,6 +102,12 @@ void cvxc_ldlsolver_init(cvxc_kktsolver_t *kkt,
     cvxc_kktinit(kkt, cp, n, m, dims);
 }
 
+/*
+ * Internal KKT solver initializers.
+ */
+extern void cvxc_kktldl2_load(cvxc_kktsolver_t *kkt);
+extern void cvxc_kktldl_load(cvxc_kktsolver_t *kkt);
+
 
 /*
  * @brief ConeLP solver internal variables.
@@ -366,13 +372,13 @@ int __isnull(const void *ptr) {
 static inline
 cvxc_size_t __aligned128(cvxc_size_t n)
 {
-    return (n & 0xF) != 0 ? 16 - (n & 0xF) : 0;
+    return n + ((n & 0xF) != 0 ? 16 - (n & 0xF) : 0);
 }
 
 static inline
 cvxc_size_t __aligned64(cvxc_size_t n)
 {
-    return (n & 0x7) != 0 ? 8 - (n & 0x7) : 0;
+    return n + ((n & 0x7) != 0 ? 8 - (n & 0x7) : 0);
 }
 
 static inline
