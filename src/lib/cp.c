@@ -62,7 +62,6 @@ int cp_factor(cvxc_cp_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_
 
     cvxm_size(&nr, &nc, &cpi->Df);
     cvxm_view_map(&Dfc, &cpi->Df, 1, 0, nr-1, nc);
-    // F2(cp->F, &cpi->f, &cpi->Df, &cpi->H, x, z);
 
     return cvxc_kktfactor(S->next, W, &cpi->H, &Dfc);
 }
@@ -145,11 +144,13 @@ int cvxc_cp_finalize_setup(
     if (kktsolver) {
         cp->solver = kktsolver;
     } else {
-        cvxc_ldlsolver_init(&cp->__S, cp, n, m, dims);
+        cvxc_kktldl2_load(&cp->__S);
         cp->solver = &cp->__S;
     }
+    if (cvxc_kktinit(cp->solver, cp, n, m, dims) < 0)
+        return 0;
+
     cvxc_cp_solver_init(&cpi->cp_solver, cp, cp->solver);
-    cp->solver = (cvxc_kktsolver_t *)&cpi->cp_solver;
 
     return 0;
 }
@@ -179,7 +180,6 @@ cvxc_size_t cvxc_cp_create(
     if ((used = cvxc_cpl_allocate(cp, 1, nvars, mb, 0, dims)) == 0) {
         return 0;
     }
-    // cvxc_cp_setvars(cp, F, nG, mb, G, h, A, b, dims, kktsolver);
     cp->F = F;
     cp->Gf = Gf;
     cp->h = h;
@@ -187,22 +187,6 @@ cvxc_size_t cvxc_cp_create(
     cp->b = b;
 
     cvxc_cp_finalize_setup(cp, nvars, mb, dims, kktsolver);
-    /* // fix index set G/h matrices */
-    /* cvxc_cpl_internal_t *cpi = cp->u.cpl; */
-    /* cp->index_g = &cpi->index_cpt; */
-    /* cp->c = &cpi->c0; */
-    /* cvxc_mgrp_init(&cpi->h_g, cp->h, &cpi->index_cpt); */
-
-    /* // init KKT solver */
-    /* if (kktsolver) { */
-    /*     cp->solver = kktsolver; */
-    /* } else { */
-    /*     cvxc_ldlsolver_init(&cp->__S, cp, nvars, mb, dims); */
-    /*     cp->solver = &cp->__S; */
-    /* } */
-    /* cvxc_cp_solver_init(&cpi->cp_solver, cp, cp->solver); */
-    /* cp->solver = (cvxc_kktsolver_t *)&cpi->cp_solver; */
-
     return used;
 }
 

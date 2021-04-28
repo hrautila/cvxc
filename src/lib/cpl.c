@@ -696,11 +696,13 @@ cvxc_size_t cvxc_cpl_create(
     if (kktsolver) {
         cp->solver = kktsolver;
     } else {
-        cvxc_ldlsolver_init(&cp->__S, cp, mc, mb, dims);
+        cvxc_kktldl2_load(&cp->__S);
         cp->solver = &cp->__S;
     }
+    if (cvxc_kktinit(cp->solver, cp, mc, mb, dims) < 0)
+        return 0;
+
     cvxc_cpl_solver_init(&cpi->cp_solver, cp, cp->solver);
-    // cp->solver = (cvxc_kktsolver_t *)&cpi->cp_solver;
 
     return used;
 }
