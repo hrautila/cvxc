@@ -573,6 +573,7 @@ extern int cvxm_norm(cvxc_float_t *nrm, const cvxc_matrix_t *A, int norm);
 extern void cvxm_zero(cvxc_matrix_t *A, int flags);
 
 extern cvxc_size_t cvxm_ldlwork(const cvxc_matrix_t *A);
+extern cvxc_size_t cvxm_ldl_worksize(int N);
 // \brief LDL factorization
 extern int cvxm_ldlfactor(cvxc_matrix_t *A, int *ipiv, int flags, cvxc_memblk_t *work);
 // \brief Solve equations using computed LDL factorization
