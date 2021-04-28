@@ -422,7 +422,7 @@ typedef struct cvxc_convex_program {
 
 typedef int (*cvxc_cp_initfunc)(cvxc_convex_program_t *, void *);
 
-static inline
+__CVXC_INLINE
 void cvxc_convex_program_init(cvxc_convex_program_t *cp, cvxc_convex_func F, void *user)
 {
     cp->F = F;
@@ -434,21 +434,32 @@ void cvxc_convex_program_init(cvxc_convex_program_t *cp, cvxc_convex_func F, voi
 typedef struct cvxc_problem cvxc_problem_t;
 typedef struct cvxc_kktsolver cvxc_kktsolver_t;
 
+/**
+ * @brief KKT solver function table.
+ */
 typedef struct cvxc_kktfuncs {
-    int (*init)(cvxc_kktsolver_t *S, cvxc_problem_t *cp, int n, int m, const cvxc_dimset_t *dims);
-    int (*factor)(cvxc_kktsolver_t *S, cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_matrix_t *Df);
-    int (*solve)(cvxc_kktsolver_t *S, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g);
-    cvxc_size_t (*bytes)(int n, int m, const cvxc_dimset_t *dims);
-    cvxc_size_t (*make)(cvxc_kktsolver_t *S, cvxc_problem_t *cp, int n, int m, const cvxc_dimset_t *dims, void *ptr, cvxc_size_t nbytes);
-    void (*release)(cvxc_kktsolver_t *S);
+    int (*init)(cvxc_kktsolver_t *kkt, cvxc_problem_t *cp, int n, int m, const cvxc_dimset_t *dims);
+    int (*factor)(cvxc_kktsolver_t *kkt, cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc_matrix_t *Df);
+    int (*solve)(cvxc_kktsolver_t *kkt, cvxc_matrix_t *x, cvxc_matrix_t *y, cvxc_matgrp_t *z_g);
+    void (*release)(cvxc_kktsolver_t *kkt);
 } cvxc_kktfuncs_t;
 
+/**
+ * @brief KKT solver
+ */
 typedef struct cvxc_kktsolver {
     cvxc_kktfuncs_t *vtable;
     void *private;
-    cvxc_kktsolver_t *next;
 } cvxc_kktsolver_t;
 
+__CVXC_INLINE
+void cvxc_kktsolver_init(cvxc_kktsolver_t *kkt, cvxc_kktfuncs_t *vtable, void *private)
+{
+    if (kkt) {
+        kkt->vtable = vtable;
+        kkt->private = private;
+    }
+}
 
 
 /**
@@ -493,6 +504,9 @@ extern cvxc_size_t cvxc_gpi_length(const cvxc_gpindex_t *gpi, cvxc_size_t n);
 struct cvxc_conelp_internal;
 struct cvxc_cpl_internal;
 
+/**
+ * @brief Convex problem
+ */
 typedef struct cvxc_problem {
     cvxc_matrix_t *c;                    ///< Cost function coefficients
     cvxc_matrix_t *G;                    ///< Inequality constraint coefficients
