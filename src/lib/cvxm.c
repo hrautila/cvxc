@@ -88,9 +88,9 @@ int cvxm_mplus(cvxc_float_t alpha, cvxc_matrix_t *A, cvxc_float_t beta, const cv
 
 cvxc_float_t cvxm_min(const cvxc_matrix_t *x)
 {
-    const cvxc_float_t *vec =  x->data.elems;
-    int n = x->data.rows * x->data.cols;
-    int inc = x->data.rows == 1 ? x->data.step : 1;
+    const cvxc_float_t *vec =  x->elems;
+    int n = x->rows * x->cols;
+    int inc = x->rows == 1 ? x->step : 1;
     cvxc_float_t min = FLOAT_BIG;
 
     for (int i = 0; i < n; i++) {
@@ -101,9 +101,9 @@ cvxc_float_t cvxm_min(const cvxc_matrix_t *x)
 
 cvxc_float_t cvxm_max(const cvxc_matrix_t *x)
 {
-    const cvxc_float_t *vec =  x->data.elems;
-    int n = x->data.rows * x->data.cols;
-    int inc = x->data.rows == 1 ? x->data.step : 1;
+    const cvxc_float_t *vec =  x->elems;
+    int n = x->rows * x->cols;
+    int inc = x->rows == 1 ? x->step : 1;
     cvxc_float_t max = -FLOAT_BIG;
 
     for (int i = 0; i < n; i++) {
@@ -118,7 +118,7 @@ int cvxm_epi_mvmult(
     const cvxc_epigraph_t *x, int flags)
 {
     armas_conf_t cf = *armas_conf_default();
-    int err = armas_mvmult(beta, &y->m->data, alpha, &A->data, &x->m->data, flags, &cf);
+    int err = armas_mvmult(beta, y->m, alpha, A, x->m, flags, &cf);
     if (cvxm_is_epigraph(y) && cvxm_is_epigraph(x)) {
         if ((flags & CVXC_TRANS) != 0) {
             y->t *= beta;
@@ -144,10 +144,10 @@ int cvxm_mvmult_sym(cvxc_float_t beta, cvxc_matrix_t *Y, cvxc_float_t alpha, con
                     const cvxc_matrix_t *X, int flags)
 {
     armas_conf_t cf = *armas_conf_default();
-    int err = armas_mvmult_sym(beta, &Y->data, alpha, &A->data, &X->data, flags, &cf);
-    if (cvxm_isepi(Y) && cvxm_isepi(X)) {
-        Y->t +=  beta * Y->t;
-    }
+    int err = armas_mvmult_sym(beta, Y, alpha, A, X, flags, &cf);
+    /* if (cvxm_isepi(Y) && cvxm_isepi(X)) { */
+    /*     Y->t +=  beta * Y->t; */
+    /* } */
     return err;
 }
 
@@ -160,7 +160,7 @@ cvxc_size_t cvxm_ldlwork(const cvxc_matrix_t *A)
         .offset = 0,
         .bytes = 0
     };
-    armas_bkfactor_w((armas_dense_t *)&A->data, (armas_pivot_t *)0, ARMAS_LOWER, &wb, &cf);
+    armas_bkfactor_w((armas_dense_t *)A, (armas_pivot_t *)0, ARMAS_LOWER, &wb, &cf);
     return wb.bytes;
 }
 
@@ -187,7 +187,7 @@ int cvxm_ldlfactor(cvxc_matrix_t *A, int *ipiv, int flags, cvxc_memblk_t *wrk)
     cvxm_size(&rows, &cols, A);
     armas_pivot_make(&pv, rows, ipiv);
     // min workspace is 2*N
-    if (armas_bkfactor_w(&A->data, &pv, flags, &wb, &cf) < 0) {
+    if (armas_bkfactor_w(A, &pv, flags, &wb, &cf) < 0) {
         printf("bkfactor error: %d\n", cf.error);
         return -1;
     }
@@ -207,7 +207,7 @@ int cvxm_ldlsolve(cvxc_matrix_t *B, const cvxc_matrix_t *A, const int *ipiv, int
     cvxm_size(&rows, &cols, A);
     armas_pivot_make(&pv, rows, (int *)ipiv);
     // min workspace is 2*N
-    if (armas_bksolve_w(&B->data, &A->data, &pv, flags, &wb, &cf) < 0) {
+    if (armas_bksolve_w(B, A, &pv, flags, &wb, &cf) < 0) {
         printf("bksolve error: %d\n", cf.error);
     }
     return 0;
@@ -217,13 +217,13 @@ int cvxm_ldlsolve(cvxc_matrix_t *B, const cvxc_matrix_t *A, const int *ipiv, int
 int cvxm_cholfactor(cvxc_matrix_t *A, int flags)
 {
     armas_conf_t cf = *armas_conf_default();
-    return armas_cholfactor(&A->data, ARMAS_NOPIVOT, flags, &cf);
+    return armas_cholfactor(A, ARMAS_NOPIVOT, flags, &cf);
 }
 
 int cvxm_cholsolve(cvxc_matrix_t *x, cvxc_matrix_t *A, int flags)
 {
     armas_conf_t cf = *armas_conf_default();
-    return armas_cholsolve(&x->data, &A->data, ARMAS_NOPIVOT, flags, &cf);
+    return armas_cholsolve(x, A, ARMAS_NOPIVOT, flags, &cf);
 }
 
 // \brief SVD factorization
@@ -235,7 +235,7 @@ int cvxm_svd(cvxc_matrix_t *D, cvxc_matrix_t *U, cvxc_matrix_t *V, cvxc_matrix_t
         .offset = 0,
         .bytes = wrk->mlen*sizeof(cvxc_float_t)
     };
-    return armas_svd_w(&D->data, &U->data, &V->data, &A->data, flags, &wb, &cf);
+    return armas_svd_w(D, U, V, A, flags, &wb, &cf);
 }
 
 // \brief Compute eigenvalues of symmetric matrix.
@@ -247,7 +247,7 @@ int cvxm_evd_sym(cvxc_matrix_t *D, cvxc_matrix_t *S, int flags, cvxc_memblk_t *w
         .offset = 0,
         .bytes = work->mlen*sizeof(cvxc_float_t)
     };
-    if (armas_eigen_sym_w(&D->data, &S->data, flags, &wb, &cf) < 0) {
+    if (armas_eigen_sym_w(D, S, flags, &wb, &cf) < 0) {
         printf("evd_sym error: %d\n", cf.error);
         return -1;
     }
@@ -264,7 +264,7 @@ int cvxm_evd_sym_selected(cvxc_matrix_t *D, cvxc_matrix_t *S, int *index, int fl
         .offset = 0,
         .bytes = wrk->mlen*sizeof(cvxc_float_t)
     };
-    return armas_eigen_sym_selected_w(&D->data, &S->data, ARMAS_EIGEN_INT(index[0], index[1]), flags, &wb, &cf);
+    return armas_eigen_sym_selected_w(D, S, ARMAS_EIGEN_INT(index[0], index[1]), flags, &wb, &cf);
 }
 
 int cvxm_lqfactor(cvxc_matrix_t *A, cvxc_matrix_t *tau, cvxc_memblk_t *wrk)
@@ -275,7 +275,7 @@ int cvxm_lqfactor(cvxc_matrix_t *A, cvxc_matrix_t *tau, cvxc_memblk_t *wrk)
         .offset = 0,
         .bytes = wrk->mlen*sizeof(cvxc_float_t)
     };
-    return armas_lqfactor_w(&A->data, &tau->data, &wb, &cf);
+    return armas_lqfactor_w(A, tau, &wb, &cf);
 }
 
 int cvxm_lqmult(cvxc_matrix_t *C,
@@ -290,14 +290,14 @@ int cvxm_lqmult(cvxc_matrix_t *C,
         .offset = 0,
         .bytes = wrk->mlen*sizeof(cvxc_float_t)
     };
-    return armas_lqmult_w(&C->data, &A->data, &tau->data, flags, &wb, &cf);
+    return armas_lqmult_w(C, A, tau, flags, &wb, &cf);
 }
 
 cvxc_matrix_t *cvxm_mkconst(cvxc_matrix_t *x, cvxc_float_t val)
 {
-    for (int j = 0; j < x->data.cols; j++) {
-        for (int k = 0; k < x->data.rows; k++) {
-            x->data.elems[k + j*x->data.step] = val;
+    for (int j = 0; j < x->cols; j++) {
+        for (int k = 0; k < x->rows; k++) {
+            x->elems[k + j*x->step] = val;
         }
     }
     return x;
@@ -307,8 +307,8 @@ cvxc_matrix_t *cvxm_mkconst(cvxc_matrix_t *x, cvxc_float_t val)
 cvxc_matrix_t *cvxm_mkident(cvxc_matrix_t *x)
 {
     cvxm_mkconst(x, 0.0);
-    for (int k = 0; k < x->data.cols; k++) {
-        x->data.elems[k + k*x->data.step] = 1.0;
+    for (int k = 0; k < x->cols; k++) {
+        x->elems[k + k*x->step] = 1.0;
     }
     return x;
 }
@@ -338,7 +338,7 @@ void cvxm_set_from(cvxc_matrix_t *A, cvxm_generator_t gen)
 
 int cvxm_apply2(cvxc_matrix_t *A, cvxm_operator2_t func, void *arg)
 {
-    return armas_apply2(&A->data, func, arg, 0);
+    return armas_apply2(A, func, arg, 0);
 }
 
 void cvxm_unit_vector(cvxc_matrix_t *A)
@@ -366,12 +366,7 @@ cvxc_matrix_t *cvxm_identity(cvxc_size_t n)
 // \brief print matrix to file stream
 void cvxm_printf(FILE *fp, const char *fmt, const cvxc_matrix_t *x)
 {
-    armas_printf(fp, fmt, &x->data);
-    if (cvxm_isepi(x)) {
-        fprintf(fp, "/");
-        fprintf(fp, fmt, x->t);
-        fprintf(fp, "/\n");
-    }
+    armas_printf(fp, fmt, x);
 }
 
 // \brief Matrix or vector norm
@@ -400,7 +395,7 @@ int cvxm_norm(cvxc_float_t *nrm, const cvxc_matrix_t *A, int norm)
         norm = ARMAS_NORM_INF;
         break;
     }
-    *nrm = armas_mnorm(&A->data, norm, NULLCONF);
+    *nrm = armas_mnorm(A, norm, NULLCONF);
     return 0;
 }
 

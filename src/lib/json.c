@@ -75,13 +75,9 @@ int cvxc_json_matrix_read(cvxc_matrix_t **A, cvxc_stream_t *ios)
         m = malloc(sizeof(cvxc_matrix_t));
         if (!m)
             return -1;
-        m->t = 0.0;
-        m->bits = 0;
-        amat = &m->data;
+        amat = m;
     } else {
-        (*A)->t = 0.0;
-        (*A)->bits = 0;
-        amat = &(*A)->data;
+        amat = *A;
     }
     if (armas_json_read(&amat, ios) < 0) {
         if (!*A)
@@ -102,7 +98,7 @@ int cvxc_json_matrix_read(cvxc_matrix_t **A, cvxc_stream_t *ios)
 
 int cvxc_json_matrix_write(cvxc_stream_t *ios, const cvxc_matrix_t *A)
 {
-    return armas_json_write(ios, &A->data, 0);
+    return armas_json_write(ios, A, 0);
 }
 
 enum cvxc_json_states {

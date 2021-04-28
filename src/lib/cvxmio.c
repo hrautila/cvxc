@@ -224,7 +224,7 @@ int cvxm_read_file(cvxc_matrix_t *m, FILE *fp)
         if (tok != T_FLOAT && tok != T_INT)
             goto release;
         val = strtod(buf, &endp);
-        m->data.elems[i] = val;
+        m->elems[i] = val;
     }
     tok = get_tok(buf, sizeof(buf), fp);
     if (tok != ']')
@@ -243,9 +243,9 @@ int cvxm_read_file(cvxc_matrix_t *m, FILE *fp)
 int cvxm_write_file(FILE *fp, const cvxc_matrix_t *m)
 {
     int n = 0;
-    n += fprintf(fp, "{%d, %d, [", m->data.rows, m->data.cols);
-    for (int j = 0; j < m->data.cols; j++) {
-        for (int i = 0; i < m->data.rows; i++) {
+    n += fprintf(fp, "{%d, %d, [", m->rows, m->cols);
+    for (int j = 0; j < m->cols; j++) {
+        for (int i = 0; i < m->rows; i++) {
             if ((j == 0 && i > 0) || j > 0) {
                 fputc(',', fp);
                 n++;
@@ -259,18 +259,18 @@ int cvxm_write_file(FILE *fp, const cvxc_matrix_t *m)
 
 int cvxm_json_write_file(FILE *fp, const cvxc_matrix_t *m)
 {
-    return armas_json_dump(fp, &m->data, 0);
+    return armas_json_dump(fp, m, 0);
 }
 
 int cvxm_json_read_file(cvxc_matrix_t *m, FILE *fp)
 {
-    armas_dense_t *mptr = &m->data;
+    armas_dense_t *mptr = m;
     return armas_json_load(&mptr, fp);
 }
 
 int cvxm_mm_read_file(cvxc_matrix_t *m, FILE *fp)
 {
     int flags = 0;
-    armas_dense_t *mptr = &m->data;
+    armas_dense_t *mptr = m;
     return armas_mmload(mptr, &flags, fp);
 }

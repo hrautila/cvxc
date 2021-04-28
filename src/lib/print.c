@@ -61,11 +61,11 @@ void cvxc_mat_printf(FILE *f, const char *format, cvxc_matrix_t *g, const char *
         }
         fprintf(f, "]\n");
     }
-    if (cvxm_isepi(g)) {
-        fprintf(f, "/");
-        fprintf(f, format, g->t);
-        fprintf(f, "/\n");
-    }
+    /* if (cvxm_isepi(g)) { */
+    /*     fprintf(f, "/"); */
+    /*     fprintf(f, format, g->t); */
+    /*     fprintf(f, "/\n"); */
+    /* } */
     //cvxm_printf(f, frm, g);
 }
 
