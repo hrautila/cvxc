@@ -305,14 +305,6 @@ do {                                                                    \
 } while (0)
 
 static inline
-int cvxm_xvector(int nl, cvxc_matrix_t *x, cvxc_size_t m, cvxc_size_t n, void *data, cvxc_size_t ndata)
-{
-    if (nl)
-        return cvxm_make_epi(x, m, n, data, ndata);
-    return cvxm_make(x, m, n, data, ndata);
-}
-
-static inline
 int cvxm_epi_vector(int nl, cvxc_epigraph_t *x_e, cvxc_matrix_t *x,
                     cvxc_size_t m, cvxc_size_t n, void *data, cvxc_size_t ndata)
 {
@@ -380,24 +372,20 @@ cvxc_size_t cvxc_cpl_make(cvxc_problem_t *cp,
     //fprintf(stderr, "cpl make: indexes %ld\n", offset);
 
     // map result matrix;
-    __INIT(used, cvxm_xvector(nl, &cpi->x, n, 1, &bytes[offset], nbytes));
-    cvxm_epi_make(&cpi->x_e, &cpi->x, nl);
+    __INIT(used, cvxm_epi_vector(nl, &cpi->x_e, &cpi->x, n, 1, &bytes[offset], nbytes));
 
     __INITC(used, m, &cpi->y, cvxm_make(&cpi->y, m, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->s, cdim_mnl, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->z, cdim_mnl, 1, &bytes[offset], nbytes));
 
     if (nl)  {
-        __INIT(used, cvxm_make_epi(&cpi->c0, n, 1, &bytes[offset], nbytes));
-        cvxm_epi_make(&cpi->c_e, &cpi->c0, 1);
+        __INIT(used, cvxm_epi_vector(nl, &cpi->c_e, &cpi->c0, n, 1, &bytes[offset], nbytes));
     } else {
         cvxm_epi_make(&cpi->c_e, cp->c, 0);
     }
 
     // dx, dy, ds, dz
-    __INIT(used, cvxm_xvector(nl, &cpi->dx, n, 1, &bytes[offset], nbytes));
-    cvxm_epi_make(&cpi->dx_e, &cpi->dx, nl);
-
+    __INIT(used, cvxm_epi_vector(nl, &cpi->dx_e, &cpi->dx, n, 1, &bytes[offset], nbytes));
     __INITC(used, m, &cpi->dy, cvxm_make(&cpi->dy, m, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->ds, cdim_mnl, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->dz, cdim_mnl, 1, &bytes[offset], nbytes));
@@ -409,51 +397,38 @@ cvxc_size_t cvxc_cpl_make(cvxc_problem_t *cp,
     __INIT(used, cvxm_make(&cpi->dz20, cdim_mnl, 1, &bytes[offset], nbytes));
 
     // rx, ry, rz
-    __INIT(used, cvxm_xvector(nl, &cpi->rx, n, 1, &bytes[offset], nbytes));
-    cvxm_epi_make(&cpi->rx_e, &cpi->rx, nl);
-
+    __INIT(used, cvxm_epi_vector(nl, &cpi->rx_e, &cpi->rx, n, 1, &bytes[offset], nbytes));
     __INITC(used, m, &cpi->ry, cvxm_make(&cpi->ry, m, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->rz, cdim_mnl, 1, &bytes[offset], nbytes));
 
     // x0, y0, z0, s0
-    __INIT(used, cvxm_xvector(nl, &cpi->x0, n, 1, &bytes[offset], nbytes));
-    cvxm_epi_make(&cpi->x0_e, &cpi->x0, nl);
-
+    __INIT(used, cvxm_epi_vector(nl, &cpi->x0_e, &cpi->x0, n, 1, &bytes[offset], nbytes));
     __INITC(used, m, &cpi->y0, cvxm_make(&cpi->y0, m, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->s0, cdim_mnl, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->z0, cdim_mnl, 1, &bytes[offset], nbytes));
 
     // newx, newy, newz, news, newrx
-    __INIT(used, cvxm_xvector(nl, &cpi->newx, n, 1, &bytes[offset], nbytes));
-    cvxm_epi_make(&cpi->newx_e, &cpi->newx, nl);
-
+    __INIT(used, cvxm_epi_vector(nl, &cpi->newx_e, &cpi->newx, n, 1, &bytes[offset], nbytes));
     __INITC(used, m, &cpi->newy, cvxm_make(&cpi->newy, m, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->news, cdim_mnl, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->newz, cdim_mnl, 1, &bytes[offset], nbytes));
 
-    __INIT(used, cvxm_xvector(nl, &cpi->newrx, n, 1, &bytes[offset], nbytes));
-    cvxm_epi_make(&cpi->newrx_e, &cpi->newrx, nl);
+    __INIT(used, cvxm_epi_vector(nl, &cpi->newrx_e, &cpi->newrx, n, 1, &bytes[offset], nbytes));
 
     // rx0, ry0, rz0, newrz0
-    __INIT(used, cvxm_xvector(nl, &cpi->rx0, n, 1, &bytes[offset], nbytes));
-    cvxm_epi_make(&cpi->rx0_e, &cpi->rx0, nl);
-
+    __INIT(used, cvxm_epi_vector(nl, &cpi->rx0_e, &cpi->rx0, n, 1, &bytes[offset], nbytes));
     __INITC(used, m, &cpi->ry0, cvxm_make(&cpi->ry0, m, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->rz0, cdim_mnl, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->newrz0, cdim_mnl, 1, &bytes[offset], nbytes));
 
     // wx, wy, ws, wz
-    __INIT(used, cvxm_xvector(nl, &cpi->wx, n, 1, &bytes[offset], nbytes));
-    cvxm_epi_make(&cpi->wx_e, &cpi->wx, nl);
-
+    __INIT(used, cvxm_epi_vector(nl, &cpi->wx_e, &cpi->wx, n, 1, &bytes[offset], nbytes));
     __INITC(used, m, &cpi->wy2, cvxm_make(&cpi->wy, m, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->ws, cdim_mnl, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->wz, cdim_mnl, 1, &bytes[offset], nbytes));
 
     // wx2, wy2, ws2, wz2
-    __INIT(used, cvxm_xvector(nl, &cpi->wx2, n, 1, &bytes[offset], nbytes));
-    cvxm_epi_make(&cpi->wx2_e, &cpi->wx2, nl);
-
+    __INIT(used, cvxm_epi_vector(nl, &cpi->wx2_e, &cpi->wx2, n, 1, &bytes[offset], nbytes));
     __INITC(used, m, &cpi->wy2, cvxm_make(&cpi->wy2, m, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->ws2, cdim_mnl, 1, &bytes[offset], nbytes));
     __INIT(used, cvxm_make(&cpi->wz2, cdim_mnl, 1, &bytes[offset], nbytes));
