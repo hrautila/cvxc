@@ -47,12 +47,12 @@ typedef struct cvxc_ldlsolver {
 //
 
 static
-int ldl_factor(cvxc_kktsolver_t *S,
+int ldl_factor(cvxc_kktsolver_t *kkt,
                cvxc_scaling_t *W,
                cvxc_matrix_t *H,
                cvxc_matrix_t *Df)
 {
-    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)S->private;
+    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)kkt->private;
     cvxc_problem_t *cp = ldl->cp;
     cvxc_size_t rG, cG;
     cvxc_matrix_t Kt, colvec, g0;
@@ -61,12 +61,12 @@ int ldl_factor(cvxc_kktsolver_t *S,
     cvxm_size(&rG, &cG, cp->G);
 
     ldl->W = W;
-    // TODO: only the LOWER triangular part?
+
     cvxm_mkconst(&ldl->K, 0.0);
     if (H) {
         // H is symmetric matrix; copy only the lower triangular part
         cvxm_view_map(&Kt, &ldl->K, 0, 0, ldl->n, ldl->n);
-        cvxm_copy(&Kt, H, 0);
+        cvxm_copy(&Kt, H, CVXC_LOWER);
     }
     // copy A to K
     cvxm_view_map(&Kt, &ldl->K, ldl->n, 0, ldl->p, ldl->n);
@@ -80,7 +80,6 @@ int ldl_factor(cvxc_kktsolver_t *S,
             cvxm_view_map(&colvec, Df, 0, k, ldl->mnl, 1);
             cvxm_view_map(&g0, &ldl->g, 0, 0, ldl->mnl, 1);
             cvxm_copy(&g0, &colvec, 0);
-            // unmap view? no write-back
         }
         cvxm_view_map(&colvec, ldl->G, 0, k, rG, 1);
         cvxm_view_map(&g0, &ldl->g, ldl->mnl, 0, rG, 1);
@@ -114,12 +113,12 @@ int ldl_factor(cvxc_kktsolver_t *S,
 // the solution ux, uy, W*uz.
 
 static
-int ldl_solve(cvxc_kktsolver_t *S,
+int ldl_solve(cvxc_kktsolver_t *kkt,
               cvxc_matrix_t *x,
               cvxc_matrix_t *y,
               cvxc_matgrp_t *z_g)
 {
-    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)S->private;
+    cvxc_ldlsolver_t *ldl = (cvxc_ldlsolver_t *)kkt->private;
     cvxc_problem_t *cp = ldl->cp;
     cvxc_matrix_t u0;
     int err = 0;
@@ -142,9 +141,11 @@ int ldl_solve(cvxc_kktsolver_t *S,
 
     cvxm_view_map(&u0, &ldl->u, ldl->n, 0, ldl->p, 1);
     cvxm_copy(y, &u0,CVXC_ALL);
+
     // unpack z part to result vector
     cvxm_view_map(&u0, &ldl->u, ldl->n+ldl->p, 0, ldl->ldK-ldl->p-ldl->n, 1);
     cvxc_unpack(z_g->mat, &u0, z_g->index);
+
     return err;
 }
 
@@ -163,10 +164,8 @@ cvxc_size_t ldl_bytes(int n, int m, const cvxc_dimset_t *dims)
     cvxc_size_t ipvlen = sz;
     cvxc_size_t nwork = 2 * cvxm_ldl_worksize(sz);
 
-    ipvlen *= sizeof(int);
-    ipvlen += __aligned128(ipvlen);
-    need   *= sizeof(cvxc_float_t);
-    need   += __aligned128(need);
+    ipvlen = __aligned128(ipvlen * sizeof(int));
+    need   = __aligned128(need * sizeof(cvxc_float_t));
     return need + ipvlen + nwork;
 }
 
@@ -240,21 +239,12 @@ static cvxc_kktfuncs_t ldlfunctions = {
     .factor = ldl_factor,
     .solve  = ldl_solve,
     .init   = ldl_init,
-    .bytes  = ldl_bytes,
-    .make   = ldl_make,
     .release= ldl_release
 };
 
 
 void cvxc_kktldl_load(cvxc_kktsolver_t *kkt)
 {
-    kkt->vtable = &ldlfunctions;
-    kkt->private = 0;
-    kkt->next = 0;
+    cvxc_kktsolver_init(kkt, &ldlfunctions, 0);
 }
 
-
-cvxc_kktfuncs_t *cvxc_ldlload(void *ptr)
-{
-    return &ldlfunctions;
-}

@@ -19,5 +19,7 @@
 
 #if __STDC_VERSION__
 // inline function reference
+void cvxc_kktsolver_init(cvxc_kktsolver_t *kkt, cvxc_kktfuncs_t *vtable, void *private);
+void cvxc_convex_program_init(cvxc_convex_program_t *cp, cvxc_convex_func F, void *user);
 
 #endif
