@@ -47,7 +47,6 @@ int cvxc_res(cvxc_problem_t *cp,
     int err = 0;
 
     // vx = vx - A^T*uy - G^T*W^-1*uz - c*utau/dg
-    // cvxm_mvmult(1.0, vx, -1.0, cp->A, uy, CVXC_TRANSA);
     cvxc_umat_mvmult(1.0, vx, -1.0, cp->Af, uy, CVXC_TRANSA);
     cvxm_copy(&cpi->wz3, uz, CVXC_ALL);
     cvxc_scale(&cpi->wz3_g, &cpi->W, CVXC_INV, &cpi->work);
@@ -55,7 +54,6 @@ int cvxc_res(cvxc_problem_t *cp,
     cvxm_axpy(vx, -utau/dg, cp->c);
 
     // vy = vy + A*ux - b*utau/dg
-    // cvxm_mvmult(1.0, vy, 1.0, cp->A, ux, 0);
     cvxc_umat_mvmult(1.0, vy, 1.0, cp->Af, ux, 0);
     cvxm_axpy(vy, -utau/dg, cp->b);
 
@@ -755,21 +753,17 @@ int cvxc_conelp_ready(cvxc_solution_t *sol, cvxc_problem_t *cp, int iter, int st
 
         // rx = A'*y + G'z + c
         cvxm_copy(&cpi->rx, cp->c, CVXC_ALL);
-        //cvxm_mvmult(1.0, &cpi->rx, 1.0, cp->A, &cpi->y, CVXC_TRANS);
         cvxc_umat_mvmult(1.0, &cpi->rx, 1.0, cp->Af, &cpi->y, CVXC_TRANS);
-        //cvxm_mvmult(1.0, &cpi->rx, 1.0, cp->G, &cpi->z, CVXC_TRANS);
         cvxc_umat_mvmult(1.0, &cpi->rx, 1.0, cp->Gf,&cpi->z, CVXC_TRANS);
         cpi->resx = cvxm_nrm2(&cpi->rx);
 
         // ry = b - A*x  ; TODO - computes -b - A*x ;; check
         cvxm_copy(&cpi->ry, cp->b, CVXC_ALL);
-        //cvxm_mvmult(-1.0, &cpi->ry, -1.0, cp->A, &cpi->x, CVXC_TRANS);
         cvxc_umat_mvmult(-1.0, &cpi->ry, -1.0, cp->Af, &cpi->x, CVXC_TRANS);
         cpi->resy = cvxm_nrm2(&cpi->ry);
 
         // rz = s + G*x - h
         cvxm_copy(&cpi->rz, &cpi->s, CVXC_ALL);
-        //cvxm_mvmult(1.0, &cpi->rz, 1.0, cp->G, &cpi->x, 0);
         cvxc_umat_mvmult(1.0, &cpi->rz, 1.0, cp->Gf, &cpi->x, 0);
         cvxm_axpy(&cpi->rz, 1.0, cp->h);
         cpi->resz = cvxc_snrm2(&cpi->rz_g);
@@ -972,7 +966,6 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
 
         // hrx = -A'*y - G'*z
         cvxm_scale(&cpi->hrx, 0.0, CVXC_ALL);
-        // cvxm_mvmult(0.0, &cpi->hrx, -1.0, cp->A, &cpi->y, CVXC_TRANS);
         cvxc_umat_mvmult(0.0, &cpi->hrx, -1.0, cp->Af, &cpi->y, CVXC_TRANS);
         cvxc_umat_sgemv(1.0, &cpi->hrx, -1.0, cp->Gf, &cpi->z_g, CVXC_TRANS);
         cpi->hresx = SQRT(cvxm_dot(&cpi->hrx, &cpi->hrx));
@@ -985,7 +978,6 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
 
         // hry = A*x
         cvxm_scale(&cpi->hry, 0.0, CVXC_ALL);
-        // cvxm_mvmult(0.0, &cpi->hry, 1.0, cp->A, &cpi->x, 0);
         cvxc_umat_mvmult(0.0, &cpi->hry, 1.0, cp->Af, &cpi->x, 0);
         cpi->hresy = cvxm_nrm2(&cpi->hry);
 
@@ -997,7 +989,6 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
 
         // hrz = s + G*x
         cvxm_scale(&cpi->hrz, 0.0, CVXC_ALL);
-        // cvxm_mvmult(0.0, &cpi->hrz, 1.0, cp->G, &cpi->x, 0);
         cvxc_umat_mvmult(0.0, &cpi->hrz, 1.0, cp->Gf, &cpi->x, 0);
         cvxm_axpy(&cpi->hrz, 1.0, &cpi->s);
         cpi->hresz = cvxc_snrm2(&cpi->hrz_g);
