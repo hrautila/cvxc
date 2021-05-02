@@ -1031,7 +1031,7 @@ int cvxc_conelp_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *
             cpi->dinfres = MAXF((cpi->hresy/cpi->resy0),  (cpi->hresz/cpi->resz0)) / (-cpi->cx);
         }
 
-        if (opts && opts->show_progress > 0) {
+        if (opts && (opts->bits & CVXC_OPROGRESS) != 0) {
             if (iter == 0) {
                 fprintf(stderr, "%10s %12s %9s %8s %7s %5s\n",
                     "pcost", "dcost", "gap", "pres", "dres", "k/t");

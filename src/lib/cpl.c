@@ -1165,7 +1165,7 @@ int cvxc_cpl_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *opt
         cpi->pres = cpi->pres / cpi->pres0;
         cpi->dres = cpi->dres / cpi->dres0;
 
-        if (opts->show_progress > 0) {
+        if (opts && (opts->bits & CVXC_OPROGRESS) != 0) {
             if (iter == 0) {
                 fprintf(stderr, "%10s %11s %9s %8s %7s\n",
                     "pcost", "dcost", "gap", "pres", "dres");
@@ -1236,7 +1236,7 @@ int cvxc_cpl_solve(cvxc_solution_t *sol, cvxc_problem_t *cp, cvxc_solopts_t *opt
         }
 
         if (iter == 0) {
-            if (refinement > 0 || opts->debug) {
+            if (refinement > 0 || (opts->bits & CVXC_ODEBUG) != 0) {
                 cvxm_epi_copy(&cpi->wx_e, &cpi->c_e, 0);
                 cvxm_copy(&cpi->wy, cp->b, 0);
                 cvxm_copy(&cpi->wz, &cpi->z, 0);
