@@ -33,10 +33,8 @@ int main(int argc, char **argv)
         .reltol = 0.0,
         .feastol = 0.0,
         .max_iter = 30,
-        .debug = 0,
         .refinement = 0,
-        .kkt_solver_name = 0,
-        .show_progress = 1
+        .bits = CVXC_OPROGRESS
     };
 
     while ((opt = getopt(argc, argv, "N:")) != -1) {

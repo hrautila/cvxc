@@ -85,11 +85,9 @@ int main(int argc, char **argv)
         .reltol = 0.0,
         .feastol = 0.0,
         .max_iter = 30,
-        .debug = 0,
         .refinement = 0,
-        .kkt_solver_name = 0,
-        .show_progress = 1
-    };
+        .bits = CVXC_OPROGRESS
+   };
     cvxc_convex_program_t F;
     acenter_t Acenter = (acenter_t){ .rows = 3, .cols = 1};
 
