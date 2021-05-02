@@ -642,10 +642,10 @@ int cvxc_json_write_options(cvxc_stream_t *ios, const cvxc_solopts_t *opts, cons
     ONERR(cvxc_json_write_simple_token(ios, ','));
 
     // "kkt": INT
-    ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "kkt", 3));
-    ONERR(cvxc_json_write_simple_token(ios, ':'));
-    int kktnum = cvxc_solver_number(kkt);
-    ONERR(cvxc_json_write_token(ios, CVXC_JSON_INT, &kktnum, sizeof(kktnum)));
+    /* ONERR(cvxc_json_write_token(ios, CVXC_JSON_STRING, "kkt", 3)); */
+    /* ONERR(cvxc_json_write_simple_token(ios, ':')); */
+    /* int kktnum = cvxc_solver_number(kkt); */
+    /* ONERR(cvxc_json_write_token(ios, CVXC_JSON_INT, &kktnum, sizeof(kktnum))); */
 
     ONERR(cvxc_json_write_simple_token(ios, '}'));
     return 0;
@@ -739,9 +739,9 @@ int cvxc_json_read_options(cvxc_solopts_t **opts, cvxc_stream_t *ios)
             case 3:
                 lopts->max_iter = strtol(iob, (char **)0, 0);
                 break;
-            case 4:
-                lopts->kkt_solver_name = cvxc_solver_number(iob);
-                break;
+            /* case 4: */
+            /*     lopts->kkt_solver_name = cvxc_solver_number(iob); */
+            /*     break; */
             }
             state = JSON_STATE_KEY;
             break;
