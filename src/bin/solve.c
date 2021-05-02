@@ -69,7 +69,7 @@ int solve_cpl(cvxc_params_t *params, cvxc_solopts_t *opts, struct solver_args *a
 
     if (params->opts)
         opts = params->opts;
-    opts->show_progress = args->verbose;
+    opts->bits = args->verbose ? CVXC_OPROGRESS : 0;
     opts->max_iter = args->maxiter;
 
     cvxc_cpl_solve(&solution, &cpl, opts);

@@ -132,7 +132,7 @@ int solver_read_args(struct solver_args *args, cvxc_params_t **params, cvxc_solo
     cvxc_params_t *pars;
 
     opts->refinement = args->refinement;
-    opts->show_progress = args->verbose;
+    opts->bits = args->verbose ? CVXC_OPROGRESS : 0;
     opts->max_iter = args->maxiter;
 
     if (!solver_have_file_args(args) || args->name_prob) {
