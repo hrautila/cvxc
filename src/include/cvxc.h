@@ -138,6 +138,11 @@ typedef enum  {
     CVXC_INDEX_SIGS = 3
 } cvxc_index_type;
 
+typedef enum {
+    CVXC_OPROGRESS = 0x1,
+    CVXC_ODEBUG = 0x2
+} cvxc_options_enum;
+
 // -------------------------------------------------------------------------------------
 
 // very simple
@@ -149,6 +154,9 @@ typedef struct cvxc_memblk {
 
 //----------------------------------------------------------------------------------------
 
+/**
+ * @brief Inequality constraints dimensions.
+ */
 typedef struct cvxc_dimset {
     cvxc_size_t *qdims;         ///< Second Order Cone constraint dimensions
     cvxc_size_t *sdims;         ///< SDP constraint dimensions
@@ -170,6 +178,9 @@ extern cvxc_size_t cvxc_dimset_sum(const cvxc_dimset_t *dims, cvxc_dim_enum name
 extern cvxc_size_t cvxc_dimset_sum_squared(const cvxc_dimset_t *dims, cvxc_dim_enum name);
 extern cvxc_size_t cvxc_dimset_sum_packed(const cvxc_dimset_t *dims, cvxc_dim_enum name);
 
+/**
+ * @brief Indexing to inequality constraints.
+ */
 typedef struct cvxc_index {
     cvxc_size_t *index;          ///< Index data
     cvxc_size_t *indq;           ///< SOCP vector
@@ -195,6 +206,9 @@ extern cvxc_size_t cvxc_index_length(const cvxc_index_t *ind, cvxc_dim_enum name
 extern void cvxc_index_create(cvxc_matrix_t *x, cvxc_index_t *index, const cvxc_dimset_t *dims, cvxc_index_type kind);
 extern void cvxc_subindex(cvxc_index_t *ind, const cvxc_index_t *src, int parts);
 
+/**
+ * @brief Scaling matrix.
+ */
 typedef struct cvxc_scaling {
     cvxc_float_t *data;          // Scaling matrix data space, one big block
     cvxc_size_t *indexes;        // Data space for V, R, RTI sizes and offsets
@@ -231,8 +245,8 @@ extern void cvxc_scaling_elem_printf(FILE *f, const char *format,
 extern int cvxc_scaling_copy(cvxc_scaling_t *W, const cvxc_scaling_t *Ws);
 
 
-/*
- * Matrix group stored in a continuous memory matrix.
+/**
+ * @brief Ineuqality constraint matrix group stored in a continuous memory matrix.
  */
 typedef struct cvxc_matgrp {
     cvxc_matrix_t *mat;
@@ -359,10 +373,8 @@ typedef struct cvxc_solopts {
     cvxc_float_t reltol;         ///< Relative tolerance
     cvxc_float_t feastol;        ///< Feasibility tolerance
     int max_iter;               ///< Maximum iterations
-    int debug;                  ///< Debug
     int refinement;             ///< Refinement count
-    int show_progress;          ///< Show progress of the iteration
-    int kkt_solver_name;        ///< KKT solver function
+    int bits;                   ///< Solver option flags
 } cvxc_solopts_t;
 
 typedef struct cvxc_params
