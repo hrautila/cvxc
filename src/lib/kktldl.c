@@ -8,7 +8,6 @@
 #include "internal.h"
 
 typedef struct cvxc_ldlsolver {
-    cvxc_kktfuncs_t *fnc;
     cvxc_problem_t *cp;
     cvxc_matrix_t K;
     cvxc_matrix_t u;
@@ -30,13 +29,13 @@ typedef struct cvxc_ldlsolver {
 // Solution of KKT equations by a dense LDL factorization of the 
 // 3 x 3 system.
 //
-// Returns a solver that (1) can computes the LDL factorization of
+// Initialize solver to compute the LDL factorization of
 //
 // [ H           A'   GG'*W^{-1} ]
 // [ A           0    0          ],
 // [ W^{-T}*GG   0   -I          ]
 //
-// given H, Df, W, where GG' = [Df; G], and (2) compute solution for
+// given H, Df, W, where GG' = [Df; G], and compute solution for
 //
 //  [ H     A'   GG'   ]   [ ux ]   [ bx ]
 //  [ A     0    0     ] * [ uy ] = [ by ].
