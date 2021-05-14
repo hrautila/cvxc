@@ -29,14 +29,13 @@ typedef struct cvxc_ldlsolver {
     Solution of KKT equations by a dense LDL factorization of the 2 x 2
     system.
 
-    Returns a function that (1) computes the LDL factorization of
+    Initialize solver to compute the LDL factorization of
 
         [ H + GG' * W^{-1} * W^{-T} * GG   A' ]
         [                                     ]
         [ A                                0  ]
 
-    given H, Df, W, where GG = [Df; G], and (2) returns a function for
-    solving
+    given H, Df, W, where GG = [Df; G], and compute solution for
 
         [ H    A'   GG'   ]   [ ux ]   [ bx ]
         [ A    0    0     ] * [ uy ] = [ by ].
@@ -59,8 +58,6 @@ int ldl2_factor(cvxc_kktsolver_t *kkt, cvxc_scaling_t *W, cvxc_matrix_t *H, cvxc
     // (see function cp_factor in cp.c)
     if (Df) {
         cvxm_view_map(&ldl->Df, Df, 0, 0, ldl->mnl, ldl->n);
-    } else {
-        cvxm_make(&ldl->Df, 0, 0, (cvxc_float_t *)0, 0);
     }
 
     cvxm_mkconst(&ldl->K, 0.0);
@@ -217,6 +214,7 @@ int ldl2_init(cvxc_kktsolver_t *kkt, cvxc_problem_t *cp, int n, int m, const cvx
     ldl->p = m;
     ldl->neqn = neqn;
     ldl->mnl = cvxc_dimset_sum(dims, CVXDIM_NONLINEAR);
+    cvxm_make(&ldl->Df, 0, 0, (cvxc_float_t *)0, 0);
 
     offset += cvxm_make(&ldl->K, ldl->ldK, ldl->ldK, &buf[offset], nbytes - offset);
     offset += cvxm_make(&ldl->u, ldl->ldK, 1, &buf[offset], nbytes - offset);
