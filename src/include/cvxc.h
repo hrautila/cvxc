@@ -32,7 +32,7 @@
 /**
  * LibTool version numbering.
  */
-#define CVXC_ABI_CURRENT  1
+#define CVXC_ABI_CURRENT  2
 #define CVXC_ABI_REVISION  0
 #define CVXC_ABI_AGE  0
 
